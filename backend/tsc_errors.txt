@@ -1,0 +1,105 @@
+﻿src/controllers/adminController.ts(19,49): error TS2352: Conversion of type 'ParsedQs' to type '{ page: number; limit: number; role?: string | undefined; isActive?: boolean | undefined; search?: string | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'ParsedQs' is missing the following properties from type '{ page: number; limit: number; role?: string | undefined; isActive?: boolean | undefined; search?: string | undefined; }': page, limit
+src/controllers/adminController.ts(24,104): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/adminController.ts(29,109): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/adminController.ts(63,52): error TS2352: Conversion of type 'ParsedQs' to type '{ page: number; limit: number; action?: string | undefined; user?: string | undefined; from?: string | undefined; to?: string | undefined; }' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'ParsedQs' is missing the following properties from type '{ page: number; limit: number; action?: string | undefined; user?: string | undefined; from?: string | undefined; to?: string | undefined; }': page, limit
+src/controllers/authController.ts(39,40): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/authController.ts(82,57): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/authController.ts(87,43): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/authController.ts(92,43): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/authController.ts(103,11): error TS6133: 'UserRole' is declared but its value is never read.
+src/controllers/authController.ts(106,107): error TS2749: 'UserRole' refers to a value, but is being used as a type here. Did you mean 'typeof UserRole'?
+src/controllers/detectionController.ts(19,72): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/detectionController.ts(25,87): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/detectionController.ts(32,64): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/detectionController.ts(37,83): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/gardenController.ts(7,60): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/gardenController.ts(12,59): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/gardenController.ts(17,62): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/gardenController.ts(22,62): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/notificationController.ts(10,77): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/notificationController.ts(15,53): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/plantController.ts(10,44): error TS2352: Conversion of type 'Record<string, unknown>' to type 'PlantFilters' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'Record<string, unknown>' is missing the following properties from type 'PlantFilters': page, limit
+src/controllers/plantController.ts(26,75): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/plantController.ts(36,65): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/plantController.ts(41,80): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/plantController.ts(41,95): error TS2339: Property 'role' does not exist on type 'User'.
+src/controllers/plantController.ts(85,77): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/remedyController.ts(17,67): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/remedyController.ts(22,82): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/remedyController.ts(22,97): error TS2339: Property 'role' does not exist on type 'User'.
+src/controllers/tourController.ts(19,63): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/userController.ts(10,57): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/userController.ts(15,60): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/userController.ts(21,78): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/userController.ts(22,59): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/userController.ts(28,64): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/userController.ts(33,65): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/userController.ts(38,48): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/userController.ts(46,77): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/userController.ts(51,53): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/userController.ts(58,60): error TS2339: Property 'sub' does not exist on type 'User'.
+src/controllers/userController.ts(63,47): error TS2339: Property 'sub' does not exist on type 'User'.
+src/middleware/rateLimiter.ts(52,36): error TS2339: Property 'sub' does not exist on type 'User'.
+src/middleware/rbac.ts(16,23): error TS7053: Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Record<UserRole, number>'.
+src/middleware/rbac.ts(16,47): error TS2339: Property 'role' does not exist on type 'User'.
+src/models/SystemConfig.ts(3,18): error TS2430: Interface 'ISystemConfig' incorrectly extends interface 'Document<ObjectId, any, any, Record<string, any>, {}>'.
+  Types of property '_id' are incompatible.
+    Type 'string' is not assignable to type 'ObjectId'.
+src/models/User.ts(104,12): error TS2790: The operand of a 'delete' operator must be optional.
+src/models/User.ts(105,12): error TS2790: The operand of a 'delete' operator must be optional.
+src/models/User.ts(106,12): error TS2790: The operand of a 'delete' operator must be optional.
+src/services/authService.ts(144,16): error TS6133: 'userId' is declared but its value is never read.
+src/services/detectionService.ts(62,19): error TS2352: Conversion of type '(FlattenMaps<IDetection> & Required<{ _id: ObjectId; }> & { __v: number; })[]' to type 'IDetection[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FlattenMaps<IDetection> & Required<{ _id: ObjectId; }> & { __v: number; }' is not comparable to type 'IDetection'.
+    The types of 'collection.db.client' are incompatible between these types.
+      Type 'FlattenMaps<MongoClient>' is missing the following properties from type 'MongoClient': driverInfoList, _close
+src/services/gardenService.ts(55,24): error TS2345: Argument of type '{ plant: mongoose.Types.ObjectId; position: { x: number; y: number; z: number; }; rotation: { x: number; y: number; z: number; }; scale: number; growthStage: GrowthStage; plantedAt: Date; notes: string | null; }' is not assignable to parameter of type 'IGardenPlant'.
+  Types of property 'notes' are incompatible.
+    Type 'string | null' is not assignable to type 'string | undefined'.
+      Type 'null' is not assignable to type 'string | undefined'.
+src/services/plantService.ts(62,15): error TS2352: Conversion of type '(FlattenMaps<IPlant> & Required<{ _id: ObjectId; }> & { __v: number; })[]' to type 'IPlant[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FlattenMaps<IPlant> & Required<{ _id: ObjectId; }> & { __v: number; }' is not comparable to type 'IPlant'.
+    Types of property 'attributes' are incompatible.
+      Type 'Record<string, unknown>' is missing the following properties from type 'Map<string, unknown>': clear, delete, forEach, get, and 8 more.
+src/services/plantService.ts(81,12): error TS2352: Conversion of type '(FlattenMaps<IPlant> & Required<{ _id: ObjectId; }> & { __v: number; })[]' to type 'IPlant[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FlattenMaps<IPlant> & Required<{ _id: ObjectId; }> & { __v: number; }' is not comparable to type 'IPlant'.
+    Types of property 'attributes' are incompatible.
+      Type 'Record<string, unknown>' is missing the following properties from type 'Map<string, unknown>': clear, delete, forEach, get, and 8 more.
+src/services/plantService.ts(98,5): error TS2322: Type '(FlattenMaps<IPlant> & Required<{ _id: ObjectId; }> & { __v: number; })[]' is not assignable to type 'Partial<IPlant>[]'.
+  Type 'FlattenMaps<IPlant> & Required<{ _id: ObjectId; }> & { __v: number; }' is not assignable to type 'Partial<IPlant>'.
+    Types of property 'attributes' are incompatible.
+      Type 'Record<string, unknown>' is missing the following properties from type 'Map<string, unknown>': clear, delete, forEach, get, and 8 more.
+src/services/plantService.ts(144,12): error TS2352: Conversion of type '(FlattenMaps<IPlant> & Required<{ _id: ObjectId; }> & { __v: number; })[]' to type 'IPlant[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FlattenMaps<IPlant> & Required<{ _id: ObjectId; }> & { __v: number; }' is not comparable to type 'IPlant'.
+    Types of property 'attributes' are incompatible.
+      Type 'Record<string, unknown>' is missing the following properties from type 'Map<string, unknown>': clear, delete, forEach, get, and 8 more.
+src/services/plantService.ts(227,16): error TS2352: Conversion of type '(FlattenMaps<IReview> & Required<{ _id: ObjectId; }> & { __v: number; })[]' to type 'IReview[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FlattenMaps<IReview> & Required<{ _id: ObjectId; }> & { __v: number; }' is not comparable to type 'IReview'.
+    The types of 'collection.db.client' are incompatible between these types.
+      Type 'FlattenMaps<MongoClient>' is missing the following properties from type 'MongoClient': driverInfoList, _close
+src/services/remedyService.ts(46,17): error TS2352: Conversion of type '(FlattenMaps<IRemedy> & Required<{ _id: ObjectId; }> & { __v: number; })[]' to type 'IRemedy[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FlattenMaps<IRemedy> & Required<{ _id: ObjectId; }> & { __v: number; }' is not comparable to type 'IRemedy'.
+    The types of 'collection.db.client' are incompatible between these types.
+      Type 'FlattenMaps<MongoClient>' is missing the following properties from type 'MongoClient': driverInfoList, _close
+src/services/tourService.ts(15,21): error TS2352: Conversion of type '(FlattenMaps<ITour> & Required<{ _id: ObjectId; }> & { __v: number; })[]' to type 'ITour[]' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Type 'FlattenMaps<ITour> & Required<{ _id: ObjectId; }> & { __v: number; }' is not comparable to type 'ITour'.
+    The types of 'collection.db.client' are incompatible between these types.
+      Type 'FlattenMaps<MongoClient>' is missing the following properties from type 'MongoClient': driverInfoList, _close
+src/socket/changeStreams.ts(55,16): error TS2339: Property 'fullDocument' does not exist on type 'ChangeStreamDocument<AnyObject>'.
+  Property 'fullDocument' does not exist on type 'ChangeStreamDropDocument'.
+src/socket/changeStreams.ts(58,26): error TS2339: Property 'fullDocument' does not exist on type 'ChangeStreamDocument<AnyObject>'.
+  Property 'fullDocument' does not exist on type 'ChangeStreamDropDocument'.
+src/socket/changeStreams.ts(59,25): error TS2339: Property 'fullDocument' does not exist on type 'ChangeStreamDocument<AnyObject>'.
+  Property 'fullDocument' does not exist on type 'ChangeStreamDropDocument'.
+src/utils/auditLogger.ts(16,28): error TS2339: Property 'sub' does not exist on type 'User'.
+src/utils/encryption.ts(6,7): error TS6133: 'AUTH_TAG_LENGTH' is declared but its value is never read.
+src/utils/jwt.ts(10,14): error TS2769: No overload matches this call.
+  Overload 1 of 5, '(payload: string | object | Buffer<ArrayBufferLike>, secretOrPrivateKey: null, options?: (SignOptions & { algorithm: "none"; }) | undefined): string', gave the following error.
+    Argument of type 'string' is not assignable to parameter of type 'null'.
+  Overload 2 of 5, '(payload: string | object | Buffer<ArrayBufferLike>, secretOrPrivateKey: Buffer<ArrayBufferLike> | Secret | PrivateKeyInput | JsonWebKeyInput, options?: SignOptions | undefined): string', gave the following error.
+    Type 'string' is not assignable to type 'number | StringValue | undefined'.
+  Overload 3 of 5, '(payload: string | object | Buffer<ArrayBufferLike>, secretOrPrivateKey: Buffer<ArrayBufferLike> | Secret | PrivateKeyInput | JsonWebKeyInput, callback: SignCallback): void', gave the following error.
+    Object literal may only specify known properties, and 'algorithm' does not exist in type 'SignCallback'.
