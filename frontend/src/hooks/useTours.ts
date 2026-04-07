@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { api, ApiError } from '../lib/api';
 import type { Tour } from '../lib/types';
 
-export function useTours() {
+export function useTours(params?: { page?: number; limit?: number }) {
   const [tours, setTours] = useState<Tour[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -12,7 +12,8 @@ export function useTours() {
     (async () => {
       setIsLoading(true);
       try {
-        const res = await api.get<{ tours: Tour[] }>('/tours');
+        const queryParams = params ? `?${new URLSearchParams(Object.entries(params).map(([k, v]) => [k, v!.toString()]))}` : '';
+        const res = await api.get<{ tours: Tour[] }>(`/tours${queryParams}`);
         if (!cancelled) setTours(res.data.tours || (Array.isArray(res.data) ? res.data as unknown as Tour[] : []));
       } catch (err) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : 'Failed to load tours');
@@ -21,7 +22,7 @@ export function useTours() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [params?.page, params?.limit]);
 
   return { tours, isLoading, error };
 }
