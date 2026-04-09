@@ -44,7 +44,63 @@ export function usePlants(options: UsePlantsOptions = {}): UsePlantsReturn {
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Failed to load plants';
       setError(msg);
-      setPlants([]);
+      // Fallback mock data for 3D garden UI testing since backend DB is down
+      setPlants([
+        {
+          _id: "mock1",
+          commonName: "Tulsi (Mock)",
+          scientificName: "Ocimum sanctum",
+          slug: "tulsi-mock",
+          placement3d: { position: { x: 0, y: 0, z: 5 }, scale: 1.0 },
+          medicinalUses: ["Immunity", "Stress Relief"],
+          family: "Lamiaceae",
+          description: "Mock description",
+          shortDescription: "A sacred mock plant for testing",
+          toxicityLevel: "NONE",
+          ayurvedicNames: ["Mock Tulasi"],
+          regionNative: ["India"],
+          partsUsed: [],
+          growingConditions: {},
+          images: [],
+          categories: [],
+          tags: [],
+          isPublished: true,
+          isFeatured: true,
+          avgRating: 5,
+          reviewCount: 1,
+          viewCount: 100,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          model3dUrl: null
+        } as Plant,
+        {
+          _id: "mock2",
+          commonName: "Ashwagandha (Mock)",
+          scientificName: "Withania somnifera",
+          slug: "ashwagandha-mock",
+          placement3d: { position: { x: 8, y: 0, z: -3 }, scale: 1.2 },
+          medicinalUses: ["Vitality", "Stress Relief"],
+          family: "Solanaceae",
+          description: "Mock description",
+          shortDescription: "A powerful adaptogen mock plant",
+          toxicityLevel: "LOW",
+          ayurvedicNames: ["Mock Ashwagandha"],
+          regionNative: ["India", "North Africa"],
+          partsUsed: [],
+          growingConditions: {},
+          images: [],
+          categories: [],
+          tags: [],
+          isPublished: true,
+          isFeatured: true,
+          avgRating: 4.8,
+          reviewCount: 2,
+          viewCount: 50,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          model3dUrl: null
+        } as Plant
+      ]);
     } finally {
       setIsLoading(false);
     }

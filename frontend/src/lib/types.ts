@@ -39,6 +39,10 @@ export interface Plant {
   growingConditions: GrowingConditions;
   images: PlantImage[];
   model3dUrl: string | null;
+  placement3d?: {
+    position: { x: number; y: number; z: number };
+    scale: number;
+  } | null;
   categories: string[];
   tags: string[];
   isPublished: boolean;

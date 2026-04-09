@@ -235,9 +235,28 @@ async function seed() {
     },
   ];
 
+  // 3D garden placement coordinates for each plant
+  const placements3d = [
+    { position: { x: 0, y: 0, z: 5 }, scale: 1.0 },     // Tulsi — centre-front
+    { position: { x: 8, y: 0, z: -3 }, scale: 1.2 },     // Ashwagandha
+    { position: { x: -7, y: 0, z: 2 }, scale: 0.9 },     // Aloe Vera
+    { position: { x: 5, y: 0, z: -10 }, scale: 1.1 },    // Turmeric
+    { position: { x: -10, y: 0, z: -6 }, scale: 1.3 },   // Neem
+    { position: { x: 3, y: 0, z: 12 }, scale: 0.8 },     // Brahmi
+    { position: { x: -4, y: 0, z: -14 }, scale: 1.0 },   // Amla
+    { position: { x: 12, y: 0, z: 6 }, scale: 1.1 },     // Giloy
+    { position: { x: -12, y: 0, z: 10 }, scale: 0.9 },   // Shatavari
+    { position: { x: 0, y: 0, z: -8 }, scale: 1.0 },     // Mulethi
+  ];
+
   const plants = [];
-  for (const p of plantsData) {
-    plants.push(await Plant.create({ ...p, createdBy: adminUser._id }));
+  for (let i = 0; i < plantsData.length; i++) {
+    const p = plantsData[i];
+    plants.push(await Plant.create({
+      ...p,
+      createdBy: adminUser._id,
+      placement3d: placements3d[i] || { position: { x: i * 3, y: 0, z: 0 }, scale: 1 },
+    }));
   }
   console.log(`🌿 Created ${plants.length} plants with real botanical data`);
 

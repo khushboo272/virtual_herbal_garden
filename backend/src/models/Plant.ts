@@ -16,6 +16,10 @@ export interface IPlant extends Document {
   growingConditions: IGrowingConditions;
   images: IPlantImage[];
   model3dUrl: string | null;
+  placement3d: {
+    position: { x: number; y: number; z: number };
+    scale: number;
+  } | null;
   categories: Types.ObjectId[];
   tags: string[];
   attributes: Map<string, unknown>;
@@ -78,6 +82,17 @@ const PlantSchema = new Schema<IPlant>(
     growingConditions: { type: GrowingConditionsSchema, default: {} },
     images: [PlantImageSchema],
     model3dUrl: { type: String, default: null },
+    placement3d: {
+      type: {
+        position: {
+          x: { type: Number, required: true },
+          y: { type: Number, required: true },
+          z: { type: Number, required: true },
+        },
+        scale: { type: Number, required: true },
+      },
+      default: null,
+    },
     categories: [{ type: Schema.Types.ObjectId, ref: 'Category' }],
     tags: [{ type: String, lowercase: true }],
     attributes: { type: Map, of: Schema.Types.Mixed },

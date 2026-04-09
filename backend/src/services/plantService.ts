@@ -101,8 +101,11 @@ export class PlantService {
   }
 
   async getBySlug(slug: string, userId?: string): Promise<IPlant> {
+    const isId = mongoose.Types.ObjectId.isValid(slug);
+    const query = isId ? { _id: slug, isDeleted: false } : { slug, isDeleted: false };
+
     const plant = await Plant.findOneAndUpdate(
-      { slug, isDeleted: false },
+      query,
       { $inc: { viewCount: 1 } },
       { new: true },
     )
