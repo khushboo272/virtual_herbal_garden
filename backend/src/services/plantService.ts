@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import Plant, { IPlant } from '../models/Plant';
 import Review, { IReview } from '../models/Review';
 import ActivityLog from '../models/ActivityLog';
+import '../models/Category';
+import '../models/User';
 import { ActivityType, PaginationMeta } from '../types';
 import { generateSlug } from '../utils/slug';
 import { AppError } from '../utils/apiResponse';
