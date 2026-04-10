@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────
-// HUD.tsx — Heads-up-display overlays (crosshair, controls hint)
+// HUD.tsx — Heads-up-display overlays (crosshair, controls, audio)
 // ─────────────────────────────────────────────────────
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -7,9 +7,7 @@ import {
   Volume2,
   VolumeOff,
   Map,
-  ArrowLeft,
   MousePointerClick,
-  Info,
   Home,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -19,9 +17,18 @@ interface HUDProps {
   showMinimap: boolean;
   onToggleMinimap: () => void;
   plantCount: number;
+  audioEnabled: boolean;
+  onToggleAudio: () => void;
 }
 
-export function HUD({ isLocked, showMinimap, onToggleMinimap, plantCount }: HUDProps) {
+export function HUD({
+  isLocked,
+  showMinimap,
+  onToggleMinimap,
+  plantCount,
+  audioEnabled,
+  onToggleAudio,
+}: HUDProps) {
   return (
     <>
       {/* Crosshair — visible only when pointer-locked */}
@@ -145,6 +152,29 @@ export function HUD({ isLocked, showMinimap, onToggleMinimap, plantCount }: HUDP
           gap: 8,
         }}
       >
+        {/* Audio toggle */}
+        <button
+          onClick={onToggleAudio}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            background: audioEnabled ? "rgba(76,175,80,0.4)" : "rgba(255,255,255,0.12)",
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            color: "white",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "background 0.2s",
+          }}
+          title={audioEnabled ? "Mute Ambient Sounds" : "Enable Ambient Sounds"}
+        >
+          {audioEnabled ? <Volume2 size={18} /> : <VolumeOff size={18} />}
+        </button>
+
+        {/* Minimap toggle */}
         <button
           onClick={onToggleMinimap}
           style={{
@@ -159,6 +189,7 @@ export function HUD({ isLocked, showMinimap, onToggleMinimap, plantCount }: HUDP
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            transition: "background 0.2s",
           }}
           title="Toggle Minimap"
         >
