@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import { authService } from '../services/authService';
 import { sendSuccess, sendCreated, sendError } from '../utils/apiResponse';
 import { env } from '../config/env';
+import { signAccessToken, generateRefreshToken, hashRefreshToken } from '../utils/jwt';
+import { UserRole } from '../types';
+import RefreshToken from '../models/RefreshToken';
 
 export class AuthController {
   async register(req: Request, res: Response) {
@@ -95,27 +98,30 @@ export class AuthController {
   }
 
   async googleCallback(req: Request, res: Response) {
-    const user = req.user as unknown as { _id: string; email: string; role: string };
-    if (!user) {
-      return res.redirect(`${env.CLIENT_URL}/login?error=oauth_failed`);
+    try {
+      // Passport Google strategy returns a JwtPayload: { sub, email, role }
+      const user = req.user as unknown as { sub: string; email: string; role: string };
+      if (!user) {
+        return res.redirect(`${env.CLIENT_URL}/?error=oauth_failed`);
+      }
+
+      const accessToken = signAccessToken({ sub: user.sub, email: user.email, role: user.role as UserRole });
+      const refreshTokenValue = generateRefreshToken();
+      await RefreshToken.create({
+        user: user.sub, tokenHash: hashRefreshToken(refreshTokenValue),
+        deviceInfo: { ua: req.headers['user-agent'] || '', ip: req.ip || '' },
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      });
+
+      res.cookie('refreshToken', refreshTokenValue, {
+        httpOnly: true, secure: env.NODE_ENV === 'production',
+        sameSite: 'strict', maxAge: 30 * 24 * 60 * 60 * 1000, path: '/api/v1/auth',
+      });
+      res.redirect(`${env.CLIENT_URL}/oauth/callback?token=${accessToken}`);
+    } catch (err) {
+      console.error('Google callback error:', err);
+      res.redirect(`${env.CLIENT_URL}/?error=oauth_failed`);
     }
-    const { signAccessToken, generateRefreshToken, hashRefreshToken } = await import('../utils/jwt');
-    type UserRole = import('../types').UserRole;
-    const RefreshToken = (await import('../models/RefreshToken')).default;
-
-    const accessToken = signAccessToken({ sub: user._id.toString(), email: user.email, role: user.role as UserRole });
-    const refreshTokenValue = generateRefreshToken();
-    await RefreshToken.create({
-      user: user._id, tokenHash: hashRefreshToken(refreshTokenValue),
-      deviceInfo: { ua: req.headers['user-agent'] || '', ip: req.ip || '' },
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    });
-
-    res.cookie('refreshToken', refreshTokenValue, {
-      httpOnly: true, secure: env.NODE_ENV === 'production',
-      sameSite: 'strict', maxAge: 30 * 24 * 60 * 60 * 1000, path: '/api/v1/auth',
-    });
-    res.redirect(`${env.CLIENT_URL}/oauth/callback?token=${accessToken}`);
   }
 }
 

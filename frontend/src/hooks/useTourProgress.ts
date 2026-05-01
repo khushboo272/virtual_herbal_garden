@@ -1,14 +1,5 @@
 // ──────────────────────────────────────────────────────────
-// VirtualTourPage — Wraps VirtualTour in TourProgressProvider
+// useTourProgress — Convenience hook for tour progress
 // ──────────────────────────────────────────────────────────
 
-import { TourProgressProvider } from '../../contexts/TourProgressContext';
-import { VirtualTour } from '../components/slides/VirtualTour';
-
-export function VirtualTourPage() {
-  return (
-    <TourProgressProvider>
-      <VirtualTour />
-    </TourProgressProvider>
-  );
-}
+export { useTourProgressContext as useTourProgress } from '../contexts/TourProgressContext';

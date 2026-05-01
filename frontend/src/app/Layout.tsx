@@ -1,4 +1,4 @@
-import { Outlet, Link, useLocation } from "react-router-dom";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { Leaf, BookOpen, Sparkles, Map, Pill, Award, LayoutDashboard, Shield, Palette, LogIn, LogOut, User } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
@@ -22,11 +22,14 @@ const authNavLinks = [
 
 export function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, isAuthenticated, login, register, logout } = useAuth();
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
 
   const handleAuthSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -44,11 +47,45 @@ export function Layout() {
         await register(name, email, password);
       }
       setShowAuthDialog(false);
+      navigate("/");  // ✅ Redirect to home after success
     } catch (err: any) {
       setAuthError(err?.message || "Authentication failed");
     } finally {
       setAuthLoading(false);
     }
+  };
+
+  // ── Google Sign-In Handler ──
+  const handleGoogleSignIn = () => {
+    setGoogleLoading(true);
+    setGoogleError(null);
+
+    // Open the backend Google OAuth endpoint in a popup
+    const width = 500;
+    const height = 600;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+    const popup = window.open(
+      "/api/v1/auth/google",
+      "google-oauth",
+      `width=${width},height=${height},left=${left},top=${top},popup=yes`
+    );
+
+    if (!popup) {
+      setGoogleError("Popup blocked. Please allow popups for this site.");
+      setGoogleLoading(false);
+      return;
+    }
+
+    // Poll the popup to detect when it closes (OAuth complete or cancelled)
+    const pollTimer = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(pollTimer);
+        setGoogleLoading(false);
+        setShowAuthDialog(false);
+        // The OAuthCallbackPage will handle token storage and redirect
+      }
+    }, 500);
   };
 
   return (
@@ -230,6 +267,36 @@ export function Layout() {
               {authLoading ? "Please wait..." : authMode === "login" ? "Sign In" : "Create Account"}
             </Button>
 
+            {/* ── Divider ── */}
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
+
+            {/* ── Google Sign-In Button ── */}
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={googleLoading}
+              className="btn-google"
+              aria-label="Continue with Google"
+            >
+              {googleLoading ? (
+                <span className="spinner-sm" />
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                  <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+                  <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2.04a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
+                  <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/>
+                  <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.31z"/>
+                </svg>
+              )}
+              <span>{googleLoading ? "Signing in..." : "Continue with Google"}</span>
+            </button>
+
+            {googleError && (
+              <p className="auth-error" role="alert">{googleError}</p>
+            )}
+
             <p className="text-center text-sm text-green-600">
               {authMode === "login" ? (
                 <>
@@ -237,7 +304,7 @@ export function Layout() {
                   <button
                     type="button"
                     className="text-green-800 font-semibold hover:underline"
-                    onClick={() => { setAuthMode("register"); setAuthError(null); }}
+                    onClick={() => { setAuthMode("register"); setAuthError(null); setGoogleError(null); }}
                   >
                     Sign up
                   </button>
@@ -248,7 +315,7 @@ export function Layout() {
                   <button
                     type="button"
                     className="text-green-800 font-semibold hover:underline"
-                    onClick={() => { setAuthMode("login"); setAuthError(null); }}
+                    onClick={() => { setAuthMode("login"); setAuthError(null); setGoogleError(null); }}
                   >
                     Sign in
                   </button>

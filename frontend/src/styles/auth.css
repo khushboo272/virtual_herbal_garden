@@ -1,0 +1,74 @@
+/* ──────────────────────────────────────────────────────────
+   Auth Modal — Google OAuth + Divider Styles
+   ────────────────────────────────────────────────────────── */
+
+/* ── Divider ("or" separator) ── */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #E5E7EB;
+}
+.auth-divider span {
+  font-size: 13px;
+  color: #9CA3AF;
+  font-weight: 500;
+}
+
+/* ── Google Sign-In Button ── */
+.btn-google {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 8px;
+  background: #FFFFFF;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+}
+.btn-google:hover:not(:disabled) {
+  background: #F9FAFB;
+  border-color: #D1D5DB;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+.btn-google:active {
+  background: #F3F4F6;
+}
+.btn-google:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Loading Spinner (small) ── */
+.spinner-sm {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #D1D5DB;
+  border-top-color: #1A7A3C;
+  border-radius: 50%;
+  animation: auth-spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes auth-spin { to { transform: rotate(360deg); } }
+
+/* ── Auth Error Text ── */
+.auth-error {
+  font-size: 13px;
+  color: #DC2626;
+  margin-top: 6px;
+  text-align: center;
+}

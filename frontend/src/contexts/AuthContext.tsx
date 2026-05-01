@@ -28,8 +28,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Check auth state on mount
+  // Check auth state on mount — also captures ?token= from OAuth redirects
   useEffect(() => {
+    // Check if a token was passed via URL query param (OAuth callback fallback)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    if (urlToken) {
+      setAccessToken(urlToken);
+      // Clean the URL to remove the token
+      window.history.replaceState({}, '', window.location.pathname);
+      refreshUser().finally(() => setIsLoading(false));
+      return;
+    }
+
     const token = localStorage.getItem('access_token');
     if (token) {
       refreshUser().finally(() => setIsLoading(false));
