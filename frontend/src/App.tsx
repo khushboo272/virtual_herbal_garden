@@ -13,6 +13,7 @@ import { UserDashboardPage } from "./app/pages/UserDashboardPage";
 import { AdminPanelPage } from "./app/pages/AdminPanelPage";
 import { MobileViewPage } from "./app/pages/MobileViewPage";
 import { StyleGuidePage } from "./app/pages/StyleGuidePage";
+import { OAuthCallbackPage } from "./app/pages/OAuthCallbackPage";
 
 export default function App() {
   return (
@@ -34,6 +35,9 @@ export default function App() {
 
         {/* Full-screen page without navbar (immersive experience) */}
         <Route path="/garden-3d" element={<VirtualGarden3DPage />} />
+
+        {/* OAuth callback — captures token from Google redirect */}
+        <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
       </Routes>
     </BrowserRouter>
   );
