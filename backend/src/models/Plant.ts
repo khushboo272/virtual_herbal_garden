@@ -20,6 +20,7 @@ export interface IPlant extends Document {
     position: { x: number; y: number; z: number };
     scale: number;
   } | null;
+  color: string;
   categories: Types.ObjectId[];
   tags: string[];
   attributes: Map<string, unknown>;
@@ -93,6 +94,7 @@ const PlantSchema = new Schema<IPlant>(
       },
       default: null,
     },
+    color: { type: String, default: '#2d7a3a' },
     categories: [{ type: Schema.Types.ObjectId, ref: 'Category' }],
     tags: [{ type: String, lowercase: true }],
     attributes: { type: Map, of: Schema.Types.Mixed },

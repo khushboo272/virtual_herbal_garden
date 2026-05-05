@@ -43,6 +43,7 @@ export interface Plant {
     position: { x: number; y: number; z: number };
     scale: number;
   } | null;
+  color?: string;
   categories: string[];
   tags: string[];
   isPublished: boolean;

@@ -1,40 +1,22 @@
 // ─────────────────────────────────────────────────────
 // VirtualGarden3DPage.tsx — Full immersive 3D garden
-// Combines Canvas, Scene, Controls, Plants, Overlays
-// Enhanced with Suspense, audio state, AAA rendering
+// Now uses Garden3DScene (AAA-quality Canvas wrapper)
+// Keeps all existing UI: HUD, Minimap, PlantInfoPanel
 // ─────────────────────────────────────────────────────
-import { useState, Suspense } from "react";
-import { Canvas } from "@react-three/fiber";
-import * as THREE from "three";
+import { useState, useCallback } from 'react';
 
-// 3D components
-import { Scene } from "../components/3d/Scene";
-import { Controls } from "../components/3d/Controls";
-import { River } from "../components/3d/River";
-import { Birds } from "../components/3d/Bird";
-import { Plant3D } from "../components/3d/Plant3D";
-import { GrassTufts, BackgroundTrees, Flowers, GardenPath, Stones, Mushrooms } from "../components/3d/Decorations";
-import { MinimapPlayerTracker, MinimapOverlay } from "../components/3d/Minimap";
-import { AmbientAudio } from "../components/3d/AmbientAudio";
+// AAA 3D Scene
+import Garden3DScene from '../../components/Garden3DScene';
+import type { ScenePlant } from '../../components/Garden3DScene';
 
-// UI overlays
-import { HUD } from "../components/3d/HUD";
-import { PlantInfoPanel } from "../components/3d/PlantInfoPanel";
+// UI overlays (kept intact)
+import { HUD } from '../components/3d/HUD';
+import { MinimapOverlay } from '../components/3d/Minimap';
+import { PlantInfoPanel } from '../components/3d/PlantInfoPanel';
 
 // Hooks
-import { usePlants } from "../../hooks/usePlants";
-import type { Plant } from "../../lib/types";
-
-/* ── Loading fallback inside Canvas ───────────────── */
-
-function SceneLoader() {
-  return (
-    <mesh>
-      <sphereGeometry args={[0.3, 16, 16]} />
-      <meshBasicMaterial color="#81c784" wireframe />
-    </mesh>
-  );
-}
+import { usePlants } from '../../hooks/usePlants';
+import type { Plant } from '../../lib/types';
 
 export function VirtualGarden3DPage() {
   const { plants } = usePlants({ limit: 50 });
@@ -43,70 +25,42 @@ export function VirtualGarden3DPage() {
   const [selectedPlant, setSelectedPlant] = useState<Plant | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(false);
 
-  const handlePlantClick = (plant: Plant) => {
-    setSelectedPlant(plant);
-    document.exitPointerLock?.();
-  };
+  // Map backend plant data to the shape expected by Garden3DScene
+  const mappedPlants: ScenePlant[] = plants.map((p) => ({
+    id: p._id,
+    name: p.commonName,
+    position: p.placement3d
+      ? [p.placement3d.position.x, p.placement3d.position.y, p.placement3d.position.z] as [number, number, number]
+      : [(Math.random() - 0.5) * 20, 0, (Math.random() - 0.5) * 20] as [number, number, number],
+    modelUrl: p.model3dUrl ?? null,
+    scale: p.placement3d?.scale ?? 1,
+    color: p.color ?? '#2d7a3a',
+  }));
+
+  // Handle plant selection from 3D scene — find original plant data
+  const handlePlantSelect = useCallback((scenePlant: ScenePlant) => {
+    const fullPlant = plants.find((p) => p._id === scenePlant.id);
+    if (fullPlant) {
+      setSelectedPlant(fullPlant);
+      document.exitPointerLock?.();
+    }
+  }, [plants]);
 
   return (
-    <div style={{ width: "100vw", height: "100vh", position: "relative", background: "#1a1a2e" }}>
-      {/* WebGL Canvas — AAA rendering config */}
-      <Canvas
-        shadows
-        camera={{ fov: 65, near: 0.1, far: 200, position: [0, 2, 20] }}
-        style={{ position: "absolute", inset: 0 }}
-        dpr={[1, 1.5]}
-        gl={{
-          antialias: true,
-          toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 0.75,
-          outputColorSpace: THREE.SRGBColorSpace,
-        }}
-        onCreated={({ gl }) => {
-          gl.setClearColor(new THREE.Color("#b0c8d8"), 1);
-          gl.shadowMap.enabled = true;
-          gl.shadowMap.type = THREE.PCFSoftShadowMap;
-        }}
-      >
-        <Suspense fallback={<SceneLoader />}>
-          {/* Scene — lighting, sky, ground */}
-          <Scene />
-          <River />
-          <Birds />
+    <div style={{ width: '100vw', height: '100vh', position: 'relative', background: '#1a1a2e' }}>
+      {/* AAA 3D Garden Scene */}
+      <div style={{ position: 'absolute', inset: 0 }}>
+        <Garden3DScene
+          plants={mappedPlants}
+          onPlantSelect={handlePlantSelect}
+          audioEnabled={audioEnabled}
+          isLocked={!!selectedPlant}
+          onLock={() => setIsLocked(true)}
+          onUnlock={() => setIsLocked(false)}
+        />
+      </div>
 
-          {/* Decorations */}
-          <GrassTufts />
-          <BackgroundTrees />
-          <Flowers />
-          <GardenPath />
-          <Stones />
-          <Mushrooms />
-
-          {/* Plants from API */}
-          {plants.map((plant) => (
-            <Plant3D
-              key={plant._id}
-              plant={plant}
-              onClick={handlePlantClick}
-            />
-          ))}
-
-          {/* Audio system */}
-          <AmbientAudio enabled={audioEnabled} />
-
-          {/* Controls */}
-          <Controls
-            enabled={!selectedPlant}
-            onLock={() => setIsLocked(true)}
-            onUnlock={() => setIsLocked(false)}
-          />
-
-          {/* Minimap player tracker (inside canvas) */}
-          <MinimapPlayerTracker />
-        </Suspense>
-      </Canvas>
-
-      {/* HUD overlays */}
+      {/* HUD overlays — unchanged */}
       <HUD
         isLocked={isLocked}
         showMinimap={showMinimap}
@@ -116,10 +70,10 @@ export function VirtualGarden3DPage() {
         onToggleAudio={() => setAudioEnabled(!audioEnabled)}
       />
 
-      {/* Minimap */}
+      {/* Minimap — unchanged */}
       <MinimapOverlay plants={plants} visible={showMinimap && !selectedPlant} />
 
-      {/* Plant info side panel */}
+      {/* Plant info side panel — unchanged */}
       <PlantInfoPanel
         plant={selectedPlant}
         onClose={() => setSelectedPlant(null)}
