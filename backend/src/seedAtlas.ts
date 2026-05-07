@@ -3,16 +3,16 @@ dotenv.config();
 
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import User from './models/User';
-import Category from './models/Category';
-import Plant from './models/Plant';
-import Tour from './models/Tour';
-import Remedy from './models/Remedy';
-import Review from './models/Review';
-import Bookmark from './models/Bookmark';
-import Garden from './models/Garden';
-import Notification from './models/Notification';
-import SystemConfig from './models/SystemConfig';
+import User from './modules/users/User.model';
+import Category from './modules/plants/Category.model';
+import Plant from './modules/plants/Plant.model';
+import Tour from './modules/tours/Tour.model';
+import Remedy from './modules/remedies/Remedy.model';
+import Review from './modules/plants/Review.model';
+import Bookmark from './modules/users/Bookmark.model';
+import Garden from './modules/garden/Garden.model';
+import Notification from './modules/notifications/Notification.model';
+import SystemConfig from './modules/admin/SystemConfig.model';
 import { UserRole, ToxicityLevel, PlantPart, DifficultyLevel, GrowthStage, BookmarkEntityType, NotificationType, ImageType } from './types';
 
 const MONGODB_URI = process.env.MONGODB_URI!;

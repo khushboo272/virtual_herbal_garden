@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
-import Plant from './models/Plant';
-import Tour from './models/Tour';
-import Remedy from './models/Remedy';
-import SystemConfig from './models/SystemConfig';
+import Plant from './modules/plants/Plant.model';
+import Tour from './modules/tours/Tour.model';
+import Remedy from './modules/remedies/Remedy.model';
+import SystemConfig from './modules/admin/SystemConfig.model';
 import { DifficultyLevel } from './types';
 
 export async function seedDatabase() {

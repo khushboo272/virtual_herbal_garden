@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import authRoutes from './auth';
-import plantRoutes from './plants';
-import remedyRoutes from './remedies';
-import gardenRoutes from './garden';
-import aiRoutes from './ai';
-import userRoutes from './users';
-import adminRoutes from './admin';
-import tourRoutes from './tours';
+import authRoutes from '../modules/auth/auth.routes';
+import plantRoutes from '../modules/plants/plant.routes';
+import remedyRoutes from '../modules/remedies/remedy.routes';
+import gardenRoutes from '../modules/garden/garden.routes';
+import aiRoutes from '../modules/ai-detection/detection.routes';
+import userRoutes from '../modules/users/user.routes';
+import adminRoutes from '../modules/admin/admin.routes';
+import tourRoutes from '../modules/tours/tour.routes';
 
 const router = Router();
 

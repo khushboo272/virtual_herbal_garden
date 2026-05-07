@@ -5,13 +5,13 @@ import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
-import passport from './config/passport';
-import { env } from './config/env';
-import { sanitizeInput } from './middleware/sanitize';
-import { globalLimiter } from './middleware/rateLimiter';
-import { errorHandler } from './middleware/errorHandler';
+import passport from './modules/auth/passport.strategy';
+import { env } from './core/config/env';
+import { sanitizeInput } from './core/middleware/sanitize';
+import { globalLimiter } from './core/middleware/rateLimiter';
+import { errorHandler } from './core/middleware/errorHandler';
 import routes from './routes';
-import { logger } from './utils/logger';
+import { logger } from './core/utils/logger';
 
 const app = express();
 
