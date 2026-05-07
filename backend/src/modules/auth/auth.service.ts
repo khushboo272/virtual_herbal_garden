@@ -247,6 +247,11 @@ export class AuthService {
 
     return { accessToken, refreshToken: refreshTokenValue };
   }
+
+  /** Public wrapper for generateTokenPair — used by controller for register/OAuth flows */
+  async generateTokenPairForOAuth(user: IUser, req: Request): Promise<TokenPair> {
+    return this.generateTokenPair(user, req);
+  }
 }
 
 export const authService = new AuthService();

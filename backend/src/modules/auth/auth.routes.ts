@@ -19,7 +19,7 @@ router.post('/verify-email', validate(verifyEmailSchema), authController.verifyE
 router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), authController.forgotPassword);
 router.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword);
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'], session: false }));
-router.get('/google/callback', passport.authenticate('google', { session: false, failureRedirect: '/login' }), authController.googleCallback);
+router.get('/google/callback', passport.authenticate('google', { session: false, failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:5173'}/?error=oauth_failed` }), authController.googleCallback);
 router.post('/2fa/setup', authenticate(), authController.setup2fa);
 router.post('/2fa/verify', authenticate(), validate(verify2faSchema), authController.verify2fa);
 router.post('/logout-all', authenticate(), authController.logoutAll);

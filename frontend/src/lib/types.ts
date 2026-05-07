@@ -151,14 +151,16 @@ export interface Review {
 
 export interface User {
   _id: string;
-  name: string;
+  displayName: string;
   email: string;
   role: 'GUEST' | 'USER' | 'BOTANIST' | 'ADMIN' | 'SUPER_ADMIN';
-  avatar?: string;
-  bio?: string;
+  avatarUrl?: string | null;
+  bio?: string | null;
   isEmailVerified: boolean;
-  twoFactorEnabled: boolean;
+  is2faEnabled: boolean;
+  isActive: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface AuthTokens {

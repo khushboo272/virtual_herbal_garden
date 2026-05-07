@@ -31,6 +31,7 @@ function getAccessToken(): string | null {
 }
 
 export function setAccessToken(token: string): void {
+  console.debug('[Auth] setAccessToken called, token length:', token?.length);
   localStorage.setItem('access_token', token);
 }
 
@@ -48,13 +49,12 @@ function getRefreshToken(): string | null {
 }
 
 async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
   try {
+    // The refresh token is stored as an httpOnly cookie — it's sent
+    // automatically via credentials: 'include'. No need for localStorage.
     const res = await fetch(`${API_BASE}/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
       credentials: 'include',
     });
     if (!res.ok) {
@@ -65,7 +65,6 @@ async function refreshAccessToken(): Promise<string | null> {
     const newToken = data.data?.accessToken;
     if (newToken) {
       setAccessToken(newToken);
-      if (data.data?.refreshToken) setRefreshToken(data.data.refreshToken);
       return newToken;
     }
     return null;

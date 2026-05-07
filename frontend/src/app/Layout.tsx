@@ -23,7 +23,7 @@ const authNavLinks = [
 export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAuthenticated, login, register, logout } = useAuth();
+  const { user, isAuthenticated, login, register, logout, refreshUser } = useAuth();
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authError, setAuthError] = useState<string | null>(null);
@@ -60,6 +60,12 @@ export function Layout() {
     setGoogleLoading(true);
     setGoogleError(null);
 
+    // Clear any stale OAuth signal from a previous attempt
+    localStorage.removeItem('oauth_result');
+
+    // Snapshot whether a token existed BEFORE the popup opens
+    const hadTokenBefore = !!localStorage.getItem('access_token');
+
     // Open the backend Google OAuth endpoint in a popup
     const width = 500;
     const height = 600;
@@ -77,15 +83,100 @@ export function Layout() {
       return;
     }
 
-    // Poll the popup to detect when it closes (OAuth complete or cancelled)
-    const pollTimer = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(pollTimer);
-        setGoogleLoading(false);
-        setShowAuthDialog(false);
-        // The OAuthCallbackPage will handle token storage and redirect
+    let handled = false;
+
+    const handleOAuthSuccess = () => {
+      if (handled) return; // Prevent duplicate calls
+      handled = true;
+      clearInterval(pollTimer);
+      window.removeEventListener('message', handleMessage);
+      // Token is already stored in localStorage by the popup's OAuthCallbackPage
+      refreshUser()
+        .then(() => {
+          setGoogleLoading(false);
+          setShowAuthDialog(false);
+        })
+        .catch(() => {
+          setGoogleLoading(false);
+          setGoogleError('Sign-in succeeded but failed to load profile. Please refresh.');
+        });
+    };
+
+    const handleOAuthError = (errorMsg: string) => {
+      if (handled) return;
+      handled = true;
+      clearInterval(pollTimer);
+      window.removeEventListener('message', handleMessage);
+      setGoogleLoading(false);
+      setGoogleError(errorMsg || 'Google authentication failed.');
+    };
+
+    // CHANNEL 1: postMessage (works when window.opener survives the redirect)
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'OAUTH_SUCCESS') {
+        handleOAuthSuccess();
+      } else if (event.data?.type === 'OAUTH_ERROR') {
+        handleOAuthError(event.data.error);
       }
-    }, 500);
+    };
+    window.addEventListener('message', handleMessage);
+
+    // CHANNEL 2: Poll for popup close, then check localStorage for results.
+    // This is the primary reliable fallback when window.opener is lost
+    // (cross-origin Google redirect nulls it). The popup writes both
+    // the access_token and an 'oauth_result' signal to localStorage
+    // before calling window.close(). After the popup closes, we read
+    // these values directly — no need for storage events.
+    const pollTimer = setInterval(() => {
+      // Check if popup is closed (try-catch because cross-origin access can throw)
+      let isClosed = false;
+      try {
+        isClosed = popup.closed;
+      } catch {
+        isClosed = true; // If we can't access it, assume closed
+      }
+
+      if (!isClosed) return;
+
+      // Popup is closed — stop polling immediately to prevent duplicate handling
+      clearInterval(pollTimer);
+      window.removeEventListener('message', handleMessage);
+
+      if (handled) return; // Already handled via postMessage
+
+      // Wait a brief moment for any pending localStorage writes to flush
+      setTimeout(() => {
+        // Check the explicit signal from OAuthCallbackPage
+        const oauthResult = localStorage.getItem('oauth_result');
+        if (oauthResult) {
+          localStorage.removeItem('oauth_result');
+          try {
+            const parsed = JSON.parse(oauthResult);
+            if (parsed.type === 'success') {
+              handleOAuthSuccess();
+            } else {
+              handleOAuthError(parsed.error || 'Google authentication failed.');
+            }
+          } catch {
+            handleOAuthError('Unexpected error during Google sign-in.');
+          }
+          return;
+        }
+
+        // Fallback: check if a NEW access_token appeared in localStorage
+        // (the popup stores it via setAccessToken before closing)
+        const hasTokenNow = !!localStorage.getItem('access_token');
+        if (!hadTokenBefore && hasTokenNow) {
+          handleOAuthSuccess();
+          return;
+        }
+
+        // No signal found — user likely closed the popup manually without completing
+        setGoogleLoading(false);
+        // Don't show error — user may want to retry
+      }, 500);
+    }, 400);
   };
 
   return (
@@ -152,7 +243,7 @@ export function Layout() {
                 {isAuthenticated ? (
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-green-700 hidden md:inline">
-                      {user?.name?.split(" ")[0]}
+                      {user?.displayName?.split(" ")[0]}
                     </span>
                     <Button
                       variant="ghost"

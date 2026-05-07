@@ -10,10 +10,10 @@ import { LoadingState } from "../../../components/DataStates";
 interface UserDashboardProps {
   user: {
     _id: string;
-    name: string;
+    displayName: string;
     email: string;
     role: string;
-    avatar?: string;
+    avatarUrl?: string | null;
   };
 }
 
@@ -21,7 +21,7 @@ export function UserDashboard({ user }: UserDashboardProps) {
   const { bookmarks, isLoading: bookmarksLoading } = useBookmarks();
   const { stats, isLoading: statsLoading } = useUserProfile();
 
-  const initials = user.name
+  const initials = (user.displayName || 'U')
     .split(" ")
     .map((n) => n[0])
     .join("")
@@ -62,7 +62,7 @@ export function UserDashboard({ user }: UserDashboardProps) {
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h1 className="text-3xl text-green-900 mb-1">Welcome back, {user.name.split(" ")[0]}!</h1>
+                <h1 className="text-3xl text-green-900 mb-1">Welcome back, {(user.displayName || 'User').split(" ")[0]}!</h1>
                 <p className="text-green-600">Continue your herbal learning journey</p>
               </div>
             </div>
