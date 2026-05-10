@@ -15,6 +15,9 @@ import { logger } from './core/utils/logger';
 
 const app = express();
 
+// Trust the first proxy (e.g., Cloudflare Tunnel) to fix express-rate-limit issues
+app.set('trust proxy', 1);
+
 // Security headers
 app.use(helmet({
   contentSecurityPolicy: {

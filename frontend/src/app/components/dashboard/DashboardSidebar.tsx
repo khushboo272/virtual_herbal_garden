@@ -27,20 +27,10 @@ export function DashboardSidebar({ role, collapsed, onToggleCollapse, badgeCount
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-40 h-screen bg-white border-r border-green-200/60 transition-all duration-300 flex flex-col',
+        'sticky top-[64px] z-40 h-[calc(100vh-64px)] bg-white border-r border-green-200/60 transition-all duration-300 flex flex-col shrink-0',
         collapsed ? 'w-[68px]' : 'w-[240px]',
       )}
     >
-      {/* Logo */}
-      <div className="flex items-center gap-2 px-4 py-4 border-b border-green-200/60">
-        <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center flex-shrink-0">
-          <Leaf className="w-4 h-4 text-white" />
-        </div>
-        {!collapsed && (
-          <span className="text-sm font-semibold text-green-800 truncate">Virtual Herbal Garden</span>
-        )}
-      </div>
-
       {/* Navigation Sections */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
         {sections.map((section, sIdx) => (

@@ -11,6 +11,8 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0',
+    allowedHosts: true,
     port: 5173,
     proxy: {
       '/api': {
@@ -24,5 +26,10 @@ export default defineConfig({
         ws: true,
       },
     },
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./vitest.setup.ts'],
+    globals: true,
   },
 })

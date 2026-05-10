@@ -6,18 +6,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./components/ui/dialog";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
-
-const navLinks = [
-  { to: "/library", label: "Library", icon: BookOpen },
-  { to: "/ai-detect", label: "AI Scanner", icon: Sparkles },
-  { to: "/garden-3d", label: "3D Garden", icon: Map },
-  { to: "/remedies", label: "Remedies", icon: Pill },
-  { to: "/virtual-tour", label: "Virtual Tour", icon: Award },
-];
-
-const authNavLinks = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["USER", "BOTANIST", "ADMIN", "SUPER_ADMIN"] },
-];
+import { Navbar } from "../components/navbar/Navbar";
 
 export function Layout() {
   const location = useLocation();
@@ -181,99 +170,18 @@ export function Layout() {
   return (
     <div className="min-h-screen">
       {/* Shared Navigation */}
-      <nav className="bg-white/80 backdrop-blur-md border-b border-green-200/50 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-3">
-          <div className="flex items-center justify-between">
-            {/* Logo */}
-            <Link to="/" className="flex items-center gap-2 no-underline">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
-                <Leaf className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-xl text-green-800 font-semibold">Virtual Herbal Garden</h1>
-            </Link>
-
-            {/* Nav Links */}
-            <div className="flex items-center gap-1">
-              {navLinks.map((link) => {
-                const isActive = location.pathname === link.to;
-                return (
-                  <Link key={link.to} to={link.to}>
-                    <Button
-                      variant={isActive ? "default" : "ghost"}
-                      size="sm"
-                      className={
-                        isActive
-                          ? "bg-green-600 hover:bg-green-700 text-white"
-                          : "text-green-700 hover:bg-green-50"
-                      }
-                    >
-                      <link.icon className="w-4 h-4 mr-1.5" />
-                      {link.label}
-                    </Button>
-                  </Link>
-                );
-              })}
-
-              {/* Auth-gated links */}
-              {isAuthenticated && authNavLinks
-                .filter((link) => !link.roles || link.roles.includes(user?.role || ""))
-                .map((link) => {
-                  const isActive = location.pathname === link.to;
-                  return (
-                    <Link key={link.to} to={link.to}>
-                      <Button
-                        variant={isActive ? "default" : "ghost"}
-                        size="sm"
-                        className={
-                          isActive
-                            ? "bg-green-600 hover:bg-green-700 text-white"
-                            : "text-green-700 hover:bg-green-50"
-                        }
-                      >
-                        <link.icon className="w-4 h-4 mr-1.5" />
-                        {link.label}
-                      </Button>
-                    </Link>
-                  );
-                })}
-
-              {/* Auth Button */}
-              <div className="ml-2 border-l border-green-200 pl-2">
-                {isAuthenticated ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-green-700 hidden md:inline">
-                      {user?.displayName?.split(" ")[0]}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => logout()}
-                      className="text-green-700 hover:bg-green-50"
-                    >
-                      <LogOut className="w-4 h-4 mr-1.5" />
-                      Logout
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setAuthMode("login");
-                      setShowAuthDialog(true);
-                      setAuthError(null);
-                    }}
-                    className="text-green-700 hover:bg-green-50"
-                  >
-                    <LogIn className="w-4 h-4 mr-1.5" />
-                    Login
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navbar 
+        onLoginClick={() => {
+          setAuthMode("login");
+          setShowAuthDialog(true);
+          setAuthError(null);
+        }}
+        onRegisterClick={() => {
+          setAuthMode("register");
+          setShowAuthDialog(true);
+          setAuthError(null);
+        }}
+      />
 
       {/* Page Content */}
       <Outlet />
