@@ -14,10 +14,11 @@ const router = Router();
 
 router.use(authenticate(), requireRole(UserRole.ADMIN));
 
+router.get('/dashboard-summary', adminController.getDashboardSummary);
 router.get('/stats/overview', adminController.getOverviewStats);
 router.get('/stats/analytics', adminController.getAnalytics);
 router.get('/users', validate(adminUserQuerySchema, 'query'), adminController.listUsers);
-router.patch('/users/:id/role', validate(updateUserRoleSchema), adminController.updateUserRole);
+router.patch('/users/:id/role', requireRole(UserRole.SUPER_ADMIN), validate(updateUserRoleSchema), adminController.updateUserRole);
 router.patch('/users/:id/ban', validate(banUserSchema), adminController.banUser);
 router.get('/plants/drafts', adminController.getDraftPlants);
 router.post('/plants/:id/approve', adminController.approvePlant);
@@ -27,6 +28,7 @@ router.delete('/reviews/:id', adminController.deleteReview);
 router.get('/audit-logs', validate(auditLogQuerySchema, 'query'), adminController.getAuditLogs);
 router.post('/notifications/broadcast', validate(broadcastNotificationSchema), adminController.broadcastNotification);
 router.get('/system/health', adminController.getSystemHealth);
+router.get('/system/config/public', adminController.getPublicConfig);
 router.patch('/system/config', requireRole(UserRole.SUPER_ADMIN), validate(updateSystemConfigSchema), adminController.updateSystemConfig);
 
 export default router;

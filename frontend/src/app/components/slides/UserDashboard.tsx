@@ -1,11 +1,39 @@
-import { BookmarkIcon, Clock, TrendingUp, Award, Leaf, Heart, FileText, BarChart3 } from "lucide-react";
+// ──────────────────────────────────────────────────────────
+// USER Dashboard — PRD §4.2.2
+// ──────────────────────────────────────────────────────────
+
+import { useNavigate } from 'react-router-dom';
+import { BookmarkIcon, Leaf, Sparkles, Flame, Clock, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { Progress } from "../ui/progress";
-import { Avatar, AvatarFallback } from "../ui/avatar";
-import { useBookmarks, useUserProfile } from "../../../hooks/useUser";
-import { LoadingState } from "../../../components/DataStates";
+import { StatCard } from "../dashboard/StatCard";
+import { SkeletonDashboard } from "../dashboard/SkeletonCard";
+import { DashboardEmptyState } from "../dashboard/DashboardEmptyState";
+import { useUserDashboard } from "../../../hooks/useDashboard";
+
+// ── Curated botanical quotes (PRD §4.2.2 Section 1) ──────
+const QUOTES = [
+  "The earth laughs in flowers. — Ralph Waldo Emerson",
+  "In every walk with nature, one receives far more than one seeks. — John Muir",
+  "Study nature, love nature, stay close to nature. It will never fail you. — Frank Lloyd Wright",
+  "Nature does not hurry, yet everything is accomplished. — Lao Tzu",
+  "The garden suggests there might be a place where we can meet nature halfway. — Michael Pollan",
+  "To plant a garden is to believe in tomorrow. — Audrey Hepburn",
+  "The best time to plant a tree was 20 years ago. The second best time is now. — Chinese Proverb",
+];
+
+function getTimeOfDayGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function getDailyQuote(): string {
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  return QUOTES[dayOfYear % QUOTES.length];
+}
 
 interface UserDashboardProps {
   user: {
@@ -18,248 +46,206 @@ interface UserDashboardProps {
 }
 
 export function UserDashboard({ user }: UserDashboardProps) {
-  const { bookmarks, isLoading: bookmarksLoading } = useBookmarks();
-  const { stats, isLoading: statsLoading } = useUserProfile();
+  const navigate = useNavigate();
+  const { data, isLoading } = useUserDashboard();
+  const firstName = (user.displayName || 'User').split(" ")[0];
 
-  const initials = (user.displayName || 'U')
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  if (isLoading) return <SkeletonDashboard />;
 
-  const dashStats = [
-    { label: "Plants Explored", value: String(stats?.plantsExplored ?? 0), icon: Leaf, color: "bg-green-100 text-green-700" },
-    { label: "Tours Completed", value: String(stats?.toursCompleted ?? 0), icon: Award, color: "bg-emerald-100 text-emerald-700" },
-    { label: "Learning Hours", value: String(stats?.learningHours ?? 0), icon: Clock, color: "bg-teal-100 text-teal-700" },
-    { label: "Detections", value: String(stats?.detections ?? 0), icon: TrendingUp, color: "bg-lime-100 text-lime-700" },
-  ];
-
-  const achievements = [
-    { title: "First Steps", description: "Completed your first tour", earned: (stats?.toursCompleted ?? 0) >= 1 },
-    { title: "Plant Explorer", description: "Viewed 25+ plants", earned: (stats?.plantsExplored ?? 0) >= 25 },
-    { title: "Knowledge Seeker", description: "Spent 10+ hours learning", earned: (stats?.learningHours ?? 0) >= 10 },
-    { title: "Master Herbalist", description: "Complete all tours", earned: false },
-  ];
-
-  const learningProgress = [
-    { category: "Immunity Plants", progress: Math.min(100, (stats?.plantsExplored ?? 0) * 5), plants: Math.floor((stats?.plantsExplored ?? 0) * 0.36) },
-    { category: "Digestive Herbs", progress: Math.min(100, (stats?.plantsExplored ?? 0) * 3), plants: Math.floor((stats?.plantsExplored ?? 0) * 0.25) },
-    { category: "Skin Care", progress: Math.min(100, (stats?.plantsExplored ?? 0) * 2), plants: Math.floor((stats?.plantsExplored ?? 0) * 0.19) },
-    { category: "Respiratory", progress: Math.min(100, (stats?.plantsExplored ?? 0) * 1.5), plants: Math.floor((stats?.plantsExplored ?? 0) * 0.13) },
-  ];
+  const stats = data?.stats ?? { bookmarks: 0, gardenPlants: 0, aiScans: 0, streak: 0 };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50/50 via-emerald-50/30 to-teal-50/30">
-      <div className="max-w-7xl mx-auto px-6 py-12">
-        {/* Header */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Avatar className="w-16 h-16 border-4 border-white shadow-lg">
-                <AvatarFallback className="bg-gradient-to-br from-green-500 to-emerald-600 text-white text-xl">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+    <div className="space-y-8">
+      {/* Section 1 — Welcome Header (PRD §4.2.2 Section 1) */}
+      <div>
+        <h1 className="text-2xl font-bold text-green-900 mb-1">
+          {getTimeOfDayGreeting()}, {firstName} 🌿
+        </h1>
+        <p className="text-green-600 text-sm italic">"{getDailyQuote()}"</p>
+      </div>
+
+      {/* Section 2 — Stat Cards Row (PRD §4.2.2 Section 2) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="My Bookmarks"
+          value={stats.bookmarks}
+          icon={BookmarkIcon}
+          color="bg-amber-100 text-amber-700"
+          delta={stats.bookmarks > 0 ? `${stats.bookmarks} total` : undefined}
+          onClick={() => navigate('/dashboard/bookmarks')}
+        />
+        <StatCard
+          label="Garden Plants"
+          value={stats.gardenPlants}
+          icon={Leaf}
+          color="bg-green-100 text-green-700"
+          onClick={() => navigate('/dashboard/garden')}
+        />
+        <StatCard
+          label="AI Scans"
+          value={stats.aiScans}
+          icon={Sparkles}
+          color="bg-purple-100 text-purple-700"
+          onClick={() => navigate('/dashboard/scanner')}
+        />
+        <StatCard
+          label="Streak"
+          value={stats.streak}
+          icon={Flame}
+          color="bg-orange-100 text-orange-700"
+        />
+      </div>
+
+      {/* Section 3 — Two-column layout (PRD §4.2.2 Section 3) */}
+      <div className="grid lg:grid-cols-5 gap-6">
+        {/* Left column (60%) — My Garden Preview */}
+        <Card className="lg:col-span-3 border-2 border-green-200/60 bg-white">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-900">
+              <Leaf className="w-5 h-5 text-green-600" />
+              My Garden Preview
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats.gardenPlants > 0 ? (
               <div>
-                <h1 className="text-3xl text-green-900 mb-1">Welcome back, {(user.displayName || 'User').split(" ")[0]}!</h1>
-                <p className="text-green-600">Continue your herbal learning journey</p>
+                <div className="rounded-xl bg-gradient-to-br from-green-100 to-emerald-50 h-40 flex items-center justify-center mb-4">
+                  <div className="text-center">
+                    <Leaf className="w-12 h-12 text-green-400 mx-auto mb-2" />
+                    <p className="text-green-700 font-medium">{stats.gardenPlants} plants growing</p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <Button className="bg-green-600 hover:bg-green-700 flex-1" onClick={() => navigate('/dashboard/garden')}>
+                    Open Full Garden
+                  </Button>
+                  <Button variant="outline" className="border-green-300 text-green-700 flex-1" onClick={() => navigate('/library')}>
+                    Add a Plant
+                  </Button>
+                </div>
               </div>
-            </div>
-            <Button className="bg-green-600 hover:bg-green-700">
-              <FileText className="w-4 h-4 mr-2" />
-              My Notes
+            ) : (
+              <DashboardEmptyState
+                icon={Leaf}
+                title="Your garden is empty"
+                description="Start building your virtual herbal garden by adding your first plant."
+                actionLabel="Plant your first herb →"
+                onAction={() => navigate('/library')}
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Right column (40%) — Recent Activity Feed */}
+        <Card className="lg:col-span-2 border-2 border-green-200/60 bg-white">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-900">
+              <Clock className="w-5 h-5 text-green-600" />
+              Recent Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data?.recentActivity && data.recentActivity.length > 0 ? (
+              <div className="space-y-3">
+                {data.recentActivity.slice(0, 8).map((activity) => (
+                  <div key={activity._id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <ActivityIcon type={activity.activityType} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700 truncate">{formatActivityLabel(activity.activityType)}</p>
+                      <p className="text-xs text-gray-400">{formatRelativeTime(activity.createdAt)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <DashboardEmptyState
+                icon={Clock}
+                title="No activity yet"
+                description="Your recent actions will appear here as you explore."
+              />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Section 4 — My Bookmarks Carousel (PRD §4.2.2 Section 4) */}
+      <Card className="border-2 border-green-200/60 bg-white">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-green-900">
+              <BookmarkIcon className="w-5 h-5 text-green-600" />
+              My Bookmarks
+              <Badge className="bg-green-100 text-green-700 border-green-300 ml-2">{stats.bookmarks}</Badge>
+            </CardTitle>
+            <Button variant="ghost" size="sm" className="text-green-600" onClick={() => navigate('/dashboard/bookmarks')}>
+              View All <ArrowRight className="w-3 h-3 ml-1" />
             </Button>
           </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          {dashStats.map((stat) => (
-            <Card key={stat.label} className="border-2 border-green-200 bg-white hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-3">
-                  <div className={`w-12 h-12 rounded-xl ${stat.color} flex items-center justify-center`}>
-                    <stat.icon className="w-6 h-6" />
+        </CardHeader>
+        <CardContent>
+          {data?.recentBookmarks && data.recentBookmarks.length > 0 ? (
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              {data.recentBookmarks.slice(0, 10).map((bk: any) => (
+                <div key={bk._id} className="flex-shrink-0 w-36 border-2 border-green-100 rounded-xl p-3 hover:border-green-300 hover:shadow-md transition-all cursor-pointer">
+                  <div className="w-full h-20 rounded-lg bg-green-50 mb-2 flex items-center justify-center overflow-hidden">
+                    {bk.entityId?.images?.[0]?.url ? (
+                      <img src={bk.entityId.images[0].url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <Leaf className="w-6 h-6 text-green-300" />
+                    )}
                   </div>
+                  <p className="text-xs font-medium text-gray-800 truncate">{bk.entityId?.commonName || 'Plant'}</p>
                 </div>
-                <div className="text-3xl text-green-900 mb-1">{stat.value}</div>
-                <p className="text-sm text-green-600">{stat.label}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Left Column - Main Content */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Bookmarked Plants */}
-            <Card className="border-2 border-green-200 bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-green-900">
-                  <BookmarkIcon className="w-5 h-5 text-green-600" />
-                  Bookmarked Plants
-                  <Badge className="ml-auto bg-green-100 text-green-700 border-green-300">
-                    {bookmarks.length}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {bookmarks.slice(0, 4).map((bk) => (
-                    <Card 
-                      key={bk._id}
-                      className="border-2 border-green-100 hover:border-green-300 hover:shadow-md transition-all cursor-pointer group"
-                    >
-                      <CardContent className="p-0">
-                        <div className="flex items-center gap-3 p-4">
-                          <img 
-                            src={bk.plant?.images?.[0]?.url || ''} 
-                            alt={bk.plant?.commonName || 'Plant'}
-                            className="w-16 h-16 object-cover rounded-lg border-2 border-green-200 group-hover:scale-110 transition-transform"
-                          />
-                          <div className="flex-1">
-                            <h4 className="text-sm text-green-900 mb-1">{bk.plant?.commonName || 'Unknown plant'}</h4>
-                            <p className="text-xs text-green-600">Saved {new Date(bk.createdAt).toLocaleDateString()}</p>
-                          </div>
-                          <Heart className="w-5 h-5 text-green-600 fill-green-600" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-                <Button 
-                  variant="outline" 
-                  className="w-full mt-4 border-green-300 text-green-700 hover:bg-green-50"
-                >
-                  View All Bookmarks
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Learning Progress */}
-            <Card className="border-2 border-green-200 bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-green-900">
-                  <BarChart3 className="w-5 h-5 text-green-600" />
-                  Learning Progress by Category
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {learningProgress.map((category) => (
-                  <div key={category.category}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <h4 className="text-sm text-green-900">{category.category}</h4>
-                        <p className="text-xs text-green-600">{category.plants} plants explored</p>
-                      </div>
-                      <span className="text-sm text-green-700">{category.progress}%</span>
-                    </div>
-                    <Progress value={category.progress} className="h-2 bg-green-100" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Recently Viewed */}
-            <Card className="border-2 border-green-200 bg-white">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-green-900">
-                  <Clock className="w-5 h-5 text-green-600" />
-                  Recently Viewed
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {bookmarks.slice(0, 3).map((bk) => (
-                    <div 
-                      key={bk._id}
-                      className="flex items-center gap-4 p-3 rounded-lg border-2 border-green-100 hover:border-green-300 hover:bg-green-50/50 cursor-pointer transition-all"
-                    >
-                      <img 
-                        src={bk.plant?.images?.[0]?.url || ''} 
-                        alt={bk.plant?.commonName || 'Plant'}
-                        className="w-14 h-14 object-cover rounded-lg"
-                      />
-                      <div className="flex-1">
-                        <h4 className="text-sm text-green-900">{bk.plant?.commonName || 'Unknown'}</h4>
-                        <p className="text-xs text-green-600">Viewed recently</p>
-                      </div>
-                      <Button size="sm" variant="ghost" className="text-green-700">
-                        View
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Column - Sidebar */}
-          <div className="space-y-6">
-            {/* Achievements */}
-            <Card className="border-2 border-green-200 bg-gradient-to-br from-green-50 to-emerald-50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-green-900">
-                  <Award className="w-5 h-5 text-green-600" />
-                  Achievements
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {achievements.map((achievement, idx) => (
-                  <div 
-                    key={idx}
-                    className={`p-4 rounded-lg border-2 ${
-                      achievement.earned 
-                        ? 'bg-white border-green-300' 
-                        : 'bg-gray-50 border-gray-200 opacity-60'
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        achievement.earned 
-                          ? 'bg-green-100' 
-                          : 'bg-gray-200'
-                      }`}>
-                        <Award className={`w-5 h-5 ${
-                          achievement.earned 
-                            ? 'text-green-600' 
-                            : 'text-gray-400'
-                        }`} />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-sm text-green-900 mb-1">{achievement.title}</h4>
-                        <p className="text-xs text-green-600">{achievement.description}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card className="border-2 border-green-200 bg-white">
-              <CardHeader>
-                <CardTitle className="text-green-900">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button className="w-full bg-green-600 hover:bg-green-700 justify-start">
-                  <Leaf className="w-4 h-4 mr-2" />
-                  Explore New Plants
-                </Button>
-                <Button variant="outline" className="w-full border-green-300 text-green-700 hover:bg-green-50 justify-start">
-                  <Award className="w-4 h-4 mr-2" />
-                  Continue Tour
-                </Button>
-                <Button variant="outline" className="w-full border-green-300 text-green-700 hover:bg-green-50 justify-start">
-                  <FileText className="w-4 h-4 mr-2" />
-                  Review Notes
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
+              ))}
+            </div>
+          ) : (
+            <DashboardEmptyState
+              icon={BookmarkIcon}
+              title="No bookmarks yet"
+              description="Save plants you love for easy access later."
+              actionLabel="Explore Plants →"
+              onAction={() => navigate('/library')}
+            />
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
+}
+
+// ── Helpers ──────────────────────────────────────────────
+
+function ActivityIcon({ type }: { type: string }) {
+  switch (type) {
+    case 'BOOKMARK': return <BookmarkIcon className="w-4 h-4 text-amber-600" />;
+    case 'DETECTION': return <Sparkles className="w-4 h-4 text-purple-600" />;
+    case 'VIEW_PLANT': return <Leaf className="w-4 h-4 text-green-600" />;
+    case 'GARDEN_UPDATE': return <Leaf className="w-4 h-4 text-emerald-600" />;
+    default: return <Clock className="w-4 h-4 text-gray-400" />;
+  }
+}
+
+function formatActivityLabel(type: string): string {
+  switch (type) {
+    case 'BOOKMARK': return 'Bookmarked a plant';
+    case 'DETECTION': return 'Used AI Scanner';
+    case 'VIEW_PLANT': return 'Viewed a plant';
+    case 'GARDEN_UPDATE': return 'Updated garden';
+    case 'REVIEW': return 'Left a review';
+    default: return 'Activity';
+  }
+}
+
+function formatRelativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString();
 }

@@ -52,6 +52,16 @@ export class UserController {
     sendSuccess(res, { message: 'All notifications marked as read' });
   }
 
+  async getStats(req: Request, res: Response) {
+    const stats = await userService.getStats(req.user!.sub);
+    sendSuccess(res, stats);
+  }
+
+  async getDashboardSummary(req: Request, res: Response) {
+    const summary = await userService.getDashboardSummary(req.user!.sub);
+    sendSuccess(res, summary);
+  }
+
   async getActivity(req: Request, res: Response) {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;

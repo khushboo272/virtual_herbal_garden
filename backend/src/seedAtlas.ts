@@ -13,7 +13,10 @@ import Bookmark from './modules/users/Bookmark.model';
 import Garden from './modules/garden/Garden.model';
 import Notification from './modules/notifications/Notification.model';
 import SystemConfig from './modules/admin/SystemConfig.model';
-import { UserRole, ToxicityLevel, PlantPart, DifficultyLevel, GrowthStage, BookmarkEntityType, NotificationType, ImageType } from './types';
+import AuditLog from './modules/admin/AuditLog.model';
+import ActivityLog from './modules/notifications/ActivityLog.model';
+import Detection from './modules/ai-detection/Detection.model';
+import { UserRole, ToxicityLevel, PlantPart, DifficultyLevel, GrowthStage, BookmarkEntityType, NotificationType, ImageType, AuditAction, ActivityType, DetectionStatus } from './types';
 
 const MONGODB_URI = process.env.MONGODB_URI!;
 const DB_NAME = process.env.MONGODB_DB_NAME || 'herbal_garden_dev';
@@ -24,7 +27,7 @@ async function seed() {
   console.log('✅ Connected!\n');
 
   // Clear existing data
-  const collections = ['users','categories','plants','tours','remedies','reviews','bookmarks','gardens','notifications','systemconfigs'];
+  const collections = ['users','categories','plants','tours','remedies','reviews','bookmarks','gardens','notifications','systemconfigs','auditlogs','activitylogs','detections'];
   for (const c of collections) {
     try { await mongoose.connection.db!.dropCollection(c); } catch {}
   }
@@ -34,6 +37,19 @@ async function seed() {
   // 1. USERS
   // ═══════════════════════════════════════════
   const passwordHash = await bcrypt.hash('Test@1234', 12);
+  const now = new Date();
+
+  const superAdminUser = await User.create({
+    email: 'superadmin@virtualherbal.garden',
+    passwordHash,
+    role: UserRole.SUPER_ADMIN,
+    displayName: 'System Administrator',
+    bio: 'Platform super administrator with full system access.',
+    isEmailVerified: true,
+    isActive: true,
+    lastLoginAt: now,
+    lastActiveAt: now,
+  });
 
   const adminUser = await User.create({
     email: 'admin@virtualherbal.garden',
@@ -43,6 +59,8 @@ async function seed() {
     bio: 'AYUSH-certified Ayurvedic practitioner with 15+ years of experience in herbal medicine.',
     isEmailVerified: true,
     isActive: true,
+    lastLoginAt: now,
+    lastActiveAt: now,
   });
 
   const botanistUser = await User.create({
@@ -53,6 +71,8 @@ async function seed() {
     bio: 'Ethnobotanist specializing in Western Ghats medicinal flora. PhD from IISER Pune.',
     isEmailVerified: true,
     isActive: true,
+    lastLoginAt: now,
+    lastActiveAt: now,
   });
 
   const normalUser = await User.create({
@@ -63,6 +83,8 @@ async function seed() {
     bio: 'Herbal medicine enthusiast and organic gardener.',
     isEmailVerified: true,
     isActive: true,
+    lastLoginAt: now,
+    lastActiveAt: now,
   });
 
   const guestUser = await User.create({
@@ -73,9 +95,11 @@ async function seed() {
     bio: 'Learning about traditional Indian remedies.',
     isEmailVerified: false,
     isActive: true,
+    lastLoginAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+    lastActiveAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
   });
 
-  console.log(`👤 Created ${4} users (password: Test@1234)`);
+  console.log(`👤 Created 5 users (password: Test@1234 for all)`);
 
   // ═══════════════════════════════════════════
   // 2. CATEGORIES
@@ -418,7 +442,46 @@ async function seed() {
     allowedDetectionsPerHour: 10,
     featureFlags: new Map([['3d_garden', true], ['ai_detection', true], ['guided_tours', true], ['dark_mode', true]]),
   });
-  console.log(`⚙️  Created system config\n`);
+  console.log(`⚙️  Created system config`);
+
+  // ═══════════════════════════════════════════
+  // 11. AUDIT LOGS (for admin dashboard)
+  // ═══════════════════════════════════════════
+  await AuditLog.create([
+    { user: superAdminUser._id, action: AuditAction.CREATE, entityType: 'SystemConfig', entityId: null, ipAddress: '127.0.0.1', userAgent: 'seed-script' },
+    { user: adminUser._id, action: AuditAction.CREATE, entityType: 'Plant', entityId: plants[0]._id, ipAddress: '127.0.0.1', userAgent: 'seed-script' },
+    { user: adminUser._id, action: AuditAction.UPDATE, entityType: 'Plant', entityId: plants[1]._id, oldValue: { isPublished: false }, newValue: { isPublished: true }, ipAddress: '127.0.0.1', userAgent: 'seed-script' },
+    { user: adminUser._id, action: AuditAction.ROLE_CHANGE, entityType: 'User', entityId: botanistUser._id, oldValue: { role: 'USER' }, newValue: { role: 'BOTANIST' }, ipAddress: '127.0.0.1', userAgent: 'seed-script' },
+  ]);
+  console.log(`📋 Created 4 audit logs`);
+
+  // ═══════════════════════════════════════════
+  // 12. ACTIVITY LOGS (for user dashboard feed)
+  // ═══════════════════════════════════════════
+  await ActivityLog.create([
+    { user: normalUser._id, activityType: ActivityType.VIEW_PLANT, entityId: plants[0]._id, metadata: { plantName: 'Tulsi' } },
+    { user: normalUser._id, activityType: ActivityType.BOOKMARK, entityId: plants[1]._id, metadata: { entityType: 'PLANT' } },
+    { user: normalUser._id, activityType: ActivityType.DETECTION, entityId: null, metadata: { result: 'Tulsi' } },
+    { user: normalUser._id, activityType: ActivityType.REVIEW, entityId: plants[0]._id, metadata: { rating: 5 } },
+    { user: normalUser._id, activityType: ActivityType.VIEW_PLANT, entityId: plants[3]._id, metadata: { plantName: 'Turmeric' } },
+    { user: normalUser._id, activityType: ActivityType.GARDEN_UPDATE, entityId: null, metadata: { action: 'planted Aloe Vera' } },
+    { user: guestUser._id, activityType: ActivityType.VIEW_PLANT, entityId: plants[2]._id, metadata: { plantName: 'Aloe Vera' } },
+    { user: guestUser._id, activityType: ActivityType.REVIEW, entityId: plants[3]._id, metadata: { rating: 4 } },
+  ]);
+  console.log(`📊 Created 8 activity logs`);
+
+  // ═══════════════════════════════════════════
+  // 13. AI DETECTIONS (for AI scan stats)
+  // ═══════════════════════════════════════════
+  const detExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  await Detection.create([
+    { user: normalUser._id, imageUrl: '/uploads/detect-1.jpg', status: DetectionStatus.COMPLETE, predictions: [{ plant: plants[0]._id, confidence: 0.94, rank: 1, commonName: 'Tulsi' }], topMatch: plants[0]._id, modelVersion: 'plant.id-v3', processingTimeMs: 1230, expiresAt: detExpiry },
+    { user: normalUser._id, imageUrl: '/uploads/detect-2.jpg', status: DetectionStatus.COMPLETE, predictions: [{ plant: plants[3]._id, confidence: 0.87, rank: 1, commonName: 'Turmeric' }], topMatch: plants[3]._id, modelVersion: 'plant.id-v3', processingTimeMs: 980, expiresAt: detExpiry },
+    { user: normalUser._id, imageUrl: '/uploads/detect-3.jpg', status: DetectionStatus.COMPLETE, predictions: [{ plant: plants[2]._id, confidence: 0.91, rank: 1, commonName: 'Aloe Vera' }], topMatch: plants[2]._id, modelVersion: 'plant.id-v3', processingTimeMs: 1100, expiresAt: detExpiry },
+    { user: guestUser._id, imageUrl: '/uploads/detect-4.jpg', status: DetectionStatus.COMPLETE, predictions: [{ plant: plants[4]._id, confidence: 0.78, rank: 1, commonName: 'Neem' }], topMatch: plants[4]._id, modelVersion: 'plant.id-v3', processingTimeMs: 1450, expiresAt: detExpiry },
+    { user: botanistUser._id, imageUrl: '/uploads/detect-5.jpg', status: DetectionStatus.COMPLETE, predictions: [{ plant: plants[5]._id, confidence: 0.96, rank: 1, commonName: 'Brahmi' }], topMatch: plants[5]._id, modelVersion: 'plant.id-v3', processingTimeMs: 870, expiresAt: detExpiry },
+  ]);
+  console.log(`🤖 Created 5 AI detections\n`);
 
   // ═══════════════════════════════════════════
   // SUMMARY
@@ -426,7 +489,7 @@ async function seed() {
   console.log('═══════════════════════════════════════════');
   console.log('  ✅ DATABASE SEEDED SUCCESSFULLY');
   console.log('═══════════════════════════════════════════');
-  console.log(`  👤 Users:         4  (admin / botanist / user / guest)`);
+  console.log(`  👤 Users:         5  (superadmin / admin / botanist / user / guest)`);
   console.log(`  📁 Categories:    6`);
   console.log(`  🌿 Plants:       ${plants.length}`);
   console.log(`  🗺️  Tours:         3`);
@@ -436,11 +499,16 @@ async function seed() {
   console.log(`  🏡 Gardens:       1`);
   console.log(`  🔔 Notifications: 3`);
   console.log(`  ⚙️  SystemConfig:  1`);
+  console.log(`  📋 AuditLogs:     4`);
+  console.log(`  📊 ActivityLogs:  8`);
+  console.log(`  🤖 Detections:    5`);
   console.log('');
-  console.log('  🔑 Login Credentials:');
-  console.log('     Admin:    admin@virtualherbal.garden    / Test@1234');
-  console.log('     Botanist: botanist@virtualherbal.garden / Test@1234');
-  console.log('     User:     user@virtualherbal.garden     / Test@1234');
+  console.log('  🔑 Login Credentials (password: Test@1234 for all):');
+  console.log('     SUPER_ADMIN: superadmin@virtualherbal.garden');
+  console.log('     ADMIN:       admin@virtualherbal.garden');
+  console.log('     BOTANIST:    botanist@virtualherbal.garden');
+  console.log('     USER:        user@virtualherbal.garden');
+  console.log('     USER (unverified): guest@virtualherbal.garden');
   console.log('═══════════════════════════════════════════');
 
   await mongoose.disconnect();

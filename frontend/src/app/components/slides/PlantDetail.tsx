@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { ArrowLeft, Leaf, MapPin, Calendar, AlertCircle, BookOpen, Video, Volume2, Heart, Share2, Sparkles } from "lucide-react";
+import { ArrowLeft, Leaf, MapPin, Calendar, AlertCircle, BookOpen, Video, Volume2, Heart, Share2, Sparkles, Lock } from "lucide-react";
 import { Button } from "../ui/button";
 import { Card, CardContent } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { PlantViewer3DModal } from "../PlantViewer3DModal";
 import { Link } from "react-router-dom";
+import { useAuth } from "../../../contexts/AuthContext";
 
 interface PlantDetailProps {
   plant: {
@@ -24,6 +26,7 @@ interface PlantDetailProps {
 
 export function PlantDetail({ plant }: PlantDetailProps) {
   const [show3DViewer, setShow3DViewer] = useState(false);
+  const { isAuthenticated } = useAuth();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50/50 via-emerald-50/30 to-teal-50/30">
@@ -111,12 +114,31 @@ export function PlantDetail({ plant }: PlantDetailProps) {
                   <p className="text-xl italic text-green-600">{plant.botanicalName}</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button size="icon" variant="outline" className="border-green-300 text-green-700">
-                    <Heart className="w-4 h-4" />
-                  </Button>
-                  <Button size="icon" variant="outline" className="border-green-300 text-green-700">
-                    <Share2 className="w-4 h-4" />
-                  </Button>
+                  {isAuthenticated ? (
+                    <>
+                      <Button size="icon" variant="outline" className="border-green-300 text-green-700">
+                        <Heart className="w-4 h-4" />
+                      </Button>
+                      <Button size="icon" variant="outline" className="border-green-300 text-green-700">
+                        <Share2 className="w-4 h-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button size="icon" variant="outline" disabled className="border-gray-300 text-gray-400 opacity-60">
+                              <Lock className="w-4 h-4" />
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Sign in to unlock this feature.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                 </div>
               </div>
 

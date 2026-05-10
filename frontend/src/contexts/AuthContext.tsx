@@ -2,10 +2,23 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { api, setAccessToken, clearTokens } from '../lib/api';
 import type { User } from '../lib/types';
 
+// ── Role hierarchy (must match backend ROLE_HIERARCHY) ──
+type UserRole = 'GUEST' | 'USER' | 'BOTANIST' | 'ADMIN' | 'SUPER_ADMIN';
+
+const ROLE_HIERARCHY: Record<UserRole, number> = {
+  GUEST: 0,
+  USER: 1,
+  BOTANIST: 2,
+  ADMIN: 3,
+  SUPER_ADMIN: 4,
+};
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  role: UserRole;
+  hasMinRole: (minimum: UserRole) => boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -17,6 +30,15 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const role: UserRole = (user?.role as UserRole) || 'GUEST';
+
+  const hasMinRole = useCallback(
+    (minimum: UserRole): boolean => {
+      return ROLE_HIERARCHY[role] >= ROLE_HIERARCHY[minimum];
+    },
+    [role],
+  );
 
   const refreshUser = useCallback(async () => {
     try {
@@ -92,6 +114,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isLoading,
         isAuthenticated: !!user,
+        role,
+        hasMinRole,
         login,
         register,
         logout,
@@ -110,3 +134,4 @@ export function useAuth(): AuthContextType {
   }
   return context;
 }
+

@@ -4,6 +4,11 @@ import { UserRole, NotificationType } from '../../types';
 import { sendSuccess } from '../../core/utils/apiResponse';
 
 export class AdminController {
+  async getDashboardSummary(_req: Request, res: Response) {
+    const summary = await adminService.getDashboardSummary();
+    sendSuccess(res, summary);
+  }
+
   async getOverviewStats(_req: Request, res: Response) {
     const stats = await adminService.getOverviewStats();
     sendSuccess(res, stats);
@@ -76,6 +81,11 @@ export class AdminController {
   async getSystemHealth(_req: Request, res: Response) {
     const health = await adminService.getSystemHealth();
     sendSuccess(res, health);
+  }
+
+  async getPublicConfig(_req: Request, res: Response) {
+    const config = await adminService.getPublicConfig();
+    sendSuccess(res, config);
   }
 
   async updateSystemConfig(req: Request, res: Response) {

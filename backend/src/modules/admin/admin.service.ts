@@ -3,6 +3,7 @@ import Plant from '../plants/Plant.model';
 import Remedy from '../remedies/Remedy.model';
 import Detection from '../ai-detection/Detection.model';
 import Review from '../plants/Review.model';
+import Tour from '../tours/Tour.model';
 import AuditLog from './AuditLog.model';
 import Notification from '../notifications/Notification.model';
 import SystemConfig from './SystemConfig.model';
@@ -11,6 +12,67 @@ import { AppError } from '../../core/utils/apiResponse';
 import { redis } from '../../core/config/redis';
 
 export class AdminService {
+  /**
+   * Aggregated dashboard summary per PRD §4.4.2 / §7.1
+   * Powers the 6 ADMIN stat cards + pending moderation counts.
+   */
+  async getDashboardSummary(): Promise<Record<string, unknown>> {
+    const cached = await redis.get('admin:dashboard-summary');
+    if (cached) return JSON.parse(cached);
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const [
+      totalUsers,
+      activeToday,
+      publishedPlants,
+      aiScansToday,
+      pendingPlants,
+      pendingRemedies,
+      pendingTours,
+      toursPublished,
+      // Delta metrics (7 days ago)
+      usersLastWeek,
+      plantsLastWeek,
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ lastActiveAt: { $gte: startOfToday } }),
+      Plant.countDocuments({ isPublished: true, isDeleted: false }),
+      Detection.countDocuments({ createdAt: { $gte: startOfToday } }),
+      Plant.countDocuments({ isPublished: false, isDeleted: false }),
+      Remedy.countDocuments({ isPublished: false, isDeleted: false }),
+      Tour.countDocuments({ isPublished: false, isDeleted: false }),
+      Tour.countDocuments({ isPublished: true, isDeleted: false }),
+      User.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
+      Plant.countDocuments({ isPublished: true, isDeleted: false, createdAt: { $gte: sevenDaysAgo } }),
+    ]);
+
+    const summary = {
+      stats: {
+        totalUsers,
+        activeToday,
+        publishedPlants,
+        aiScansToday,
+        pendingReview: pendingPlants + pendingRemedies + pendingTours,
+        toursPublished,
+      },
+      deltas: {
+        newUsersThisWeek: usersLastWeek,
+        newPlantsThisWeek: plantsLastWeek,
+      },
+      pendingByType: {
+        plants: pendingPlants,
+        remedies: pendingRemedies,
+        tours: pendingTours,
+      },
+    };
+
+    await redis.setex('admin:dashboard-summary', 120, JSON.stringify(summary));
+    return summary;
+  }
+
   async getOverviewStats(): Promise<Record<string, unknown>> {
     const cached = await redis.get('admin:stats:overview');
     if (cached) return JSON.parse(cached);
@@ -144,8 +206,18 @@ export class AdminService {
     adminId: string,
     req: import('express').Request,
   ): Promise<unknown> {
+    // PRD §5.5: Cannot promote to SUPER_ADMIN via API
+    if (newRole === UserRole.SUPER_ADMIN) {
+      throw new AppError('Cannot promote to Super Admin via API', 403, 'FORBIDDEN');
+    }
+
     const user = await User.findById(userId);
     if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
+
+    // PRD §5.5: Cannot demote or modify another SUPER_ADMIN
+    if (user.role === UserRole.SUPER_ADMIN) {
+      throw new AppError('Cannot modify a Super Admin account', 403, 'FORBIDDEN');
+    }
 
     const oldRole = user.role;
     user.role = newRole;
@@ -332,6 +404,37 @@ export class AdminService {
     checks.s3 = 'ok'; // Would add actual S3 check in production
 
     return checks;
+  }
+
+  /**
+   * Public config for frontend bootstrap (PRD §4.5.3).
+   * Returns only feature flags — no secrets or internal config.
+   */
+  async getPublicConfig(): Promise<Record<string, unknown>> {
+    const cached = await redis.get('system:config:public');
+    if (cached) return JSON.parse(cached);
+
+    const config = await SystemConfig.findById('global').lean();
+    const flags = config?.featureFlags
+      ? Object.fromEntries(config.featureFlags instanceof Map ? config.featureFlags : Object.entries(config.featureFlags))
+      : {
+          '3dGarden': true,
+          aiScanner: true,
+          guidedTours: true,
+          userReviews: true,
+          botanistContributions: true,
+          maintenanceMode: false,
+          certificateGeneration: true,
+          emailDigest: true,
+        };
+
+    const publicConfig = {
+      featureFlags: flags,
+      maintenanceMode: config?.maintenanceMode ?? false,
+    };
+
+    await redis.setex('system:config:public', 60, JSON.stringify(publicConfig));
+    return publicConfig;
   }
 
   async updateSystemConfig(data: Partial<{

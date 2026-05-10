@@ -51,6 +51,29 @@ export class UserService {
     if (!r) throw new AppError('Bookmark not found', 404, 'NOT_FOUND');
   }
 
+  async getStats(userId: string): Promise<{
+    plantsExplored: number;
+    toursCompleted: number;
+    learningHours: number;
+    detections: number;
+  }> {
+    const user = await User.findById(userId);
+    if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
+
+    const [plantsExplored, detections] = await Promise.all([
+      Bookmark.countDocuments({ user: userId, entityType: 'PLANT' }),
+      Detection.countDocuments({ user: userId }),
+    ]);
+
+    // toursCompleted and learningHours: no tracking model yet — return 0
+    return {
+      plantsExplored,
+      toursCompleted: 0,
+      learningHours: 0,
+      detections,
+    };
+  }
+
   async getActivity(userId: string, page: number, limit: number) {
     const skip = (page - 1) * limit;
     const [activities, total] = await Promise.all([
@@ -58,6 +81,39 @@ export class UserService {
       ActivityLog.countDocuments({ user: userId }),
     ]);
     return { activities, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } as PaginationMeta };
+  }
+
+  /**
+   * Aggregated dashboard summary per PRD §4.2.2 / §7.1
+   * Single endpoint to power all 4 USER stat cards + recent activity + bookmarks.
+   */
+  async getDashboardSummary(userId: string) {
+    const [bookmarksCount, gardenDoc, scansCount, recentActivity, recentBookmarks] =
+      await Promise.all([
+        Bookmark.countDocuments({ user: userId }),
+        Garden.findOne({ user: userId }).select('plants').lean(),
+        Detection.countDocuments({ user: userId }),
+        ActivityLog.find({ user: userId })
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .lean(),
+        Bookmark.find({ user: userId })
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .populate('entityId')
+          .lean(),
+      ]);
+
+    return {
+      stats: {
+        bookmarks: bookmarksCount,
+        gardenPlants: gardenDoc?.plants?.length ?? 0,
+        aiScans: scansCount,
+        streak: 0, // TODO: implement streak tracking in User model
+      },
+      recentActivity,
+      recentBookmarks,
+    };
   }
 
   async deleteAccount(userId: string): Promise<void> {

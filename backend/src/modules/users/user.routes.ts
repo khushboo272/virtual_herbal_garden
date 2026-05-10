@@ -20,6 +20,8 @@ router.delete('/me/bookmarks/:id', userController.deleteBookmark);
 router.get('/me/notifications', userController.getNotifications);
 router.patch('/me/notifications/read-all', userController.markAllNotificationsRead);
 router.get('/me/activity', userController.getActivity);
+router.get('/me/stats', userController.getStats);
+router.get('/me/dashboard-summary', userController.getDashboardSummary);
 router.delete('/me', userController.deleteAccount);
 
 export default router;

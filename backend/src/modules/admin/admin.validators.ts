@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const updateUserRoleSchema = z.object({
-  role: z.enum(['GUEST', 'USER', 'BOTANIST', 'ADMIN', 'SUPER_ADMIN']),
+  role: z.enum(['USER', 'BOTANIST', 'ADMIN']),
 });
 
 export const banUserSchema = z.object({

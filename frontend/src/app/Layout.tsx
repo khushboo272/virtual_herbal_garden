@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
-import { Leaf, BookOpen, Sparkles, Map, Pill, Award, LayoutDashboard, Shield, Palette, LogIn, LogOut, User } from "lucide-react";
+import { Leaf, BookOpen, Sparkles, Map, Pill, Award, LayoutDashboard, LogIn, LogOut, User, Palette } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { useState } from "react";
@@ -17,7 +17,6 @@ const navLinks = [
 
 const authNavLinks = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["USER", "BOTANIST", "ADMIN", "SUPER_ADMIN"] },
-  { to: "/admin", label: "Admin", icon: Shield, roles: ["ADMIN", "SUPER_ADMIN"] },
 ];
 
 export function Layout() {
