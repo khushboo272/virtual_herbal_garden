@@ -34,12 +34,12 @@ export function useAdminPlants() {
   const fetchPlants = useCallback(async (page = 1, limit = 20, search?: string) => {
     setIsLoading(true);
     try {
-      const res = await api.get<{ plants: Plant[]; total: number }>(
+      const res = await api.get<Plant[]>(
         '/plants',
         { page, limit, search, includeUnpublished: true },
       );
-      setPlants(res.data.plants || []);
-      setTotal(res.data.total || 0);
+      setPlants(res.data || []);
+      setTotal(res.meta?.total || 0);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to load plants');
     } finally {
@@ -70,12 +70,12 @@ export function useAdminUsers() {
   const fetchUsers = useCallback(async (page = 1, limit = 20, search?: string) => {
     setIsLoading(true);
     try {
-      const res = await api.get<{ users: User[]; total: number }>(
+      const res = await api.get<User[]>(
         '/admin/users',
         { page, limit, search },
       );
-      setUsers(res.data.users || []);
-      setTotal(res.data.total || 0);
+      setUsers(res.data || []);
+      setTotal(res.meta?.total || 0);
     } catch {
       setUsers([]);
     } finally {

@@ -9,6 +9,11 @@ export class AdminController {
     sendSuccess(res, summary);
   }
 
+  async getStats(_req: Request, res: Response) {
+    const stats = await adminService.getStats();
+    sendSuccess(res, stats);
+  }
+
   async getOverviewStats(_req: Request, res: Response) {
     const stats = await adminService.getOverviewStats();
     sendSuccess(res, stats);

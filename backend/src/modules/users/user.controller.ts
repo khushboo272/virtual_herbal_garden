@@ -52,6 +52,13 @@ export class UserController {
     sendSuccess(res, { message: 'All notifications marked as read' });
   }
 
+  async markNotificationsRead(req: Request, res: Response) {
+    const { ids } = req.body;
+    if (!ids) throw new AppError('ids field is required', 400, 'MISSING_IDS');
+    await notificationService.markRead(req.user!.sub, ids);
+    sendSuccess(res, { message: 'Notifications marked as read' });
+  }
+
   async getStats(req: Request, res: Response) {
     const stats = await userService.getStats(req.user!.sub);
     sendSuccess(res, stats);

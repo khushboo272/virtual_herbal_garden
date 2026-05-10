@@ -31,9 +31,9 @@ export function AdminPanel() {
   const { data: dashData } = useAdminDashboard();
 
   const stats = [
-    { label: "Total Users", value: dashData?.stats?.totalUsers ?? apiStats?.totalUsers ?? 0, icon: Users, color: "bg-blue-100 text-blue-700", delta: dashData?.deltas?.newUsersThisWeek ? `+${dashData.deltas.newUsersThisWeek} this week` : undefined },
+    { label: "Total Users", value: dashData?.stats?.totalUsers ?? apiStats?.totalUsers ?? 0, icon: Users, color: "bg-blue-100 text-blue-700", delta: dashData?.deltas?.newUsersThisWeek ? `+${dashData?.deltas?.newUsersThisWeek} this week` : undefined },
     { label: "Active Today", value: dashData?.stats?.activeToday ?? 0, icon: Eye, color: "bg-green-100 text-green-700" },
-    { label: "Published Plants", value: dashData?.stats?.publishedPlants ?? apiStats?.totalPlants ?? 0, icon: Leaf, color: "bg-emerald-100 text-emerald-700", delta: dashData?.deltas?.newPlantsThisWeek ? `+${dashData.deltas.newPlantsThisWeek} this week` : undefined },
+    { label: "Published Plants", value: dashData?.stats?.publishedPlants ?? apiStats?.totalPlants ?? 0, icon: Leaf, color: "bg-emerald-100 text-emerald-700", delta: dashData?.deltas?.newPlantsThisWeek ? `+${dashData?.deltas?.newPlantsThisWeek} this week` : undefined },
     { label: "AI Scans Today", value: dashData?.stats?.aiScansToday ?? apiStats?.totalDetections ?? 0, icon: TrendingUp, color: "bg-purple-100 text-purple-700" },
     { label: "Pending Review", value: dashData?.stats?.pendingReview ?? 0, icon: Clock, color: "bg-amber-100 text-amber-700" },
     { label: "Tours Published", value: dashData?.stats?.toursPublished ?? 0, icon: Map, color: "bg-teal-100 text-teal-700" },

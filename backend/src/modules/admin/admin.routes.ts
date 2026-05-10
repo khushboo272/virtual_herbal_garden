@@ -15,6 +15,7 @@ const router = Router();
 router.use(authenticate(), requireRole(UserRole.ADMIN));
 
 router.get('/dashboard-summary', adminController.getDashboardSummary);
+router.get('/stats', adminController.getStats);
 router.get('/stats/overview', adminController.getOverviewStats);
 router.get('/stats/analytics', adminController.getAnalytics);
 router.get('/users', validate(adminUserQuerySchema, 'query'), adminController.listUsers);

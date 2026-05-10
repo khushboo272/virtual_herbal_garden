@@ -205,12 +205,25 @@ export interface Bookmark {
 
 // ── Notification ─────────────────────────────────────────
 
+export enum NotificationType {
+  CONTRIBUTION_PUBLISHED = 'CONTRIBUTION_PUBLISHED',
+  CONTRIBUTION_REJECTED = 'CONTRIBUTION_REJECTED',
+  CONTRIBUTION_CHANGES_REQUESTED = 'CONTRIBUTION_CHANGES_REQUESTED',
+  NEW_SUBMISSION = 'NEW_SUBMISSION',
+  ROLE_CHANGED = 'ROLE_CHANGED',
+  ACCOUNT_SUSPENDED = 'ACCOUNT_SUSPENDED',
+  SCAN_COMPLETE = 'SCAN_COMPLETE',
+  SYSTEM_ALERT = 'SYSTEM_ALERT',
+  ADMIN = 'ADMIN',
+}
+
 export interface Notification {
   _id: string;
   user: string;
   title: string;
-  message: string;
-  type: string;
+  body: string;
+  type: NotificationType;
+  actionUrl: string | null;
   isRead: boolean;
   createdAt: string;
 }

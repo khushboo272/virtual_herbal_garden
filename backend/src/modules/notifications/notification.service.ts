@@ -1,5 +1,6 @@
 import Notification from './Notification.model';
 import { NotificationType, PaginationMeta } from '../../types';
+import { getIO } from '../../core/socket';
 
 export class NotificationService {
   async getUserNotifications(
@@ -30,6 +31,17 @@ export class NotificationService {
     );
   }
 
+  async markRead(userId: string, ids: string[] | 'all'): Promise<void> {
+    if (ids === 'all') {
+      await this.markAllRead(userId);
+    } else if (Array.isArray(ids) && ids.length > 0) {
+      await Notification.updateMany(
+        { user: userId, _id: { $in: ids } },
+        { $set: { isRead: true } },
+      );
+    }
+  }
+
   async createNotification(
     userId: string,
     type: NotificationType,
@@ -37,13 +49,20 @@ export class NotificationService {
     body: string,
     actionUrl?: string,
   ): Promise<void> {
-    await Notification.create({
+    const notification = await Notification.create({
       user: userId,
       type,
       title,
       body,
       actionUrl: actionUrl || null,
     });
+
+    try {
+      const io = getIO();
+      io.to(`user:${userId}`).emit('notification:new', notification);
+    } catch (e) {
+      // Ignore if socket is not initialized
+    }
   }
 
   async getUnreadCount(userId: string): Promise<number> {

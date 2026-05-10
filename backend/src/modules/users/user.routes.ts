@@ -19,6 +19,7 @@ router.post('/me/bookmarks', validate(createBookmarkSchema), userController.crea
 router.delete('/me/bookmarks/:id', userController.deleteBookmark);
 router.get('/me/notifications', userController.getNotifications);
 router.patch('/me/notifications/read-all', userController.markAllNotificationsRead);
+router.patch('/me/notifications/mark-read', userController.markNotificationsRead);
 router.get('/me/activity', userController.getActivity);
 router.get('/me/stats', userController.getStats);
 router.get('/me/dashboard-summary', userController.getDashboardSummary);

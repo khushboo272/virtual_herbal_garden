@@ -46,9 +46,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.get<User>('/users/me');
       console.debug('[Auth] refreshUser: got user', res.data?.email);
       setUser(res.data);
+      // Connect socket when user is loaded
+      import('../lib/socket').then(({ connectSocket }) => {
+        const token = localStorage.getItem('access_token');
+        if (token) connectSocket(token);
+      });
     } catch (err: any) {
       console.debug('[Auth] refreshUser failed:', err?.status, err?.message);
       setUser(null);
+      import('../lib/socket').then(({ disconnectSocket }) => disconnectSocket());
       // Only clear tokens on explicit 401 (token truly invalid)
       // Don't clear on network errors (503, 500, etc.) — server may be temporarily down
       if (err?.status === 401) {
@@ -89,12 +95,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await api.post<{ accessToken: string; user: User }>('/auth/login', { email, password });
     setAccessToken(res.data.accessToken);
     setUser(res.data.user);
+    import('../lib/socket').then(({ connectSocket }) => connectSocket(res.data.accessToken));
   }, []);
 
   const register = useCallback(async (displayName: string, email: string, password: string) => {
     const res = await api.post<{ accessToken: string; user: User }>('/auth/register', { displayName, email, password });
     setAccessToken(res.data.accessToken);
     setUser(res.data.user);
+    import('../lib/socket').then(({ connectSocket }) => connectSocket(res.data.accessToken));
   }, []);
 
   const logout = useCallback(async () => {
@@ -105,6 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       clearTokens();
       setUser(null);
+      import('../lib/socket').then(({ disconnectSocket }) => disconnectSocket());
     }
   }, []);
 

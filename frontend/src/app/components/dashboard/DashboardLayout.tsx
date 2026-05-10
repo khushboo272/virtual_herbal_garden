@@ -26,6 +26,7 @@ import {
   BreadcrumbSeparator,
 } from '../ui/breadcrumb';
 import { DashboardSidebar } from './DashboardSidebar';
+import { NotificationPanel } from './NotificationPanel';
 import { useAuth } from '../../../contexts/AuthContext';
 import { cn } from '../ui/utils';
 import type { UserRole } from './roleNavConfig';
@@ -120,12 +121,7 @@ export function DashboardLayout() {
               </div>
 
               {/* Notifications */}
-              <Button variant="ghost" size="icon" className="relative text-gray-500 hover:text-green-700 hover:bg-green-50">
-                <Bell className="w-5 h-5" />
-                <Badge className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] px-1 py-0 min-w-[16px] h-4">
-                  3
-                </Badge>
-              </Button>
+              <NotificationPanel />
 
               {/* Profile Dropdown */}
               <DropdownMenu>

@@ -6,12 +6,41 @@ import Review from '../plants/Review.model';
 import Tour from '../tours/Tour.model';
 import AuditLog from './AuditLog.model';
 import Notification from '../notifications/Notification.model';
+import { notificationService } from '../notifications/notification.service';
 import SystemConfig from './SystemConfig.model';
 import { UserRole, AuditAction, NotificationType, PaginationMeta } from '../../types';
 import { AppError } from '../../core/utils/apiResponse';
 import { redis } from '../../core/config/redis';
 
 export class AdminService {
+  /**
+   * General statistics for the Admin Panel
+   */
+  async getStats(): Promise<Record<string, unknown>> {
+    const [totalPlants, totalUsers, totalDetections, viewsData, recentLogs] = await Promise.all([
+      Plant.countDocuments({ isDeleted: false }),
+      User.countDocuments(),
+      Detection.countDocuments(),
+      Plant.aggregate([{ $group: { _id: null, total: { $sum: '$viewCount' } } }]),
+      AuditLog.find().sort({ createdAt: -1 }).limit(10).populate('user', 'displayName')
+    ]);
+
+    const recentActivity = recentLogs.map((log: any) => ({
+      action: log.action,
+      target: log.entityType,
+      user: log.user?.displayName || 'System',
+      timestamp: log.createdAt.toISOString()
+    }));
+
+    return {
+      totalPlants,
+      totalUsers,
+      totalViews: viewsData[0]?.total || 0,
+      totalDetections,
+      recentActivity
+    };
+  }
+
   /**
    * Aggregated dashboard summary per PRD §4.4.2 / §7.1
    * Powers the 6 ADMIN stat cards + pending moderation counts.
@@ -283,26 +312,26 @@ export class AdminService {
     const plant = await Plant.findByIdAndUpdate(plantId, { isPublished: true }, { new: true });
     if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
 
-    await Notification.create({
-      user: plant.createdBy,
-      type: NotificationType.ADMIN,
-      title: 'Plant Approved',
-      body: `Your plant "${plant.commonName}" has been approved and published.`,
-      actionUrl: `/plants/${plant.slug}`,
-    });
+    await notificationService.createNotification(
+      plant.createdBy.toString(),
+      NotificationType.ADMIN,
+      'Plant Approved',
+      `Your plant "${plant.commonName}" has been approved and published.`,
+      `/plants/${plant.slug}`,
+    );
   }
 
   async rejectPlant(plantId: string, feedback: string): Promise<void> {
     const plant = await Plant.findById(plantId);
     if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
 
-    await Notification.create({
-      user: plant.createdBy,
-      type: NotificationType.ADMIN,
-      title: 'Plant Submission Rejected',
-      body: `Your plant "${plant.commonName}" was not approved. Feedback: ${feedback}`,
-      actionUrl: `/plants/${plant.slug}`,
-    });
+    await notificationService.createNotification(
+      plant.createdBy.toString(),
+      NotificationType.ADMIN,
+      'Plant Submission Rejected',
+      `Your plant "${plant.commonName}" was not approved. Feedback: ${feedback}`,
+      `/plants/${plant.slug}`,
+    );
   }
 
   async getFlaggedReviews(page: number, limit: number) {
@@ -380,8 +409,15 @@ export class AdminService {
       actionUrl: data.actionUrl || null,
     }));
 
-    await Notification.insertMany(notifications);
-    return notifications.length;
+    const inserted = await Notification.insertMany(notifications);
+    try {
+      const { getIO } = await import('../../core/socket');
+      const io = getIO();
+      inserted.forEach(n => io.to(`user:${n.user}`).emit('notification:new', n));
+    } catch (e) {
+      // Ignore if socket not initialized
+    }
+    return inserted.length;
   }
 
   async getSystemHealth(): Promise<Record<string, unknown>> {
