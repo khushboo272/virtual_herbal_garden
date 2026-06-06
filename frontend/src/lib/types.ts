@@ -38,7 +38,11 @@ export interface Plant {
   regionNative: string[];
   growingConditions: GrowingConditions;
   images: PlantImage[];
-  model3dUrl: string | null;
+  modelUrl: string | null;
+  globalPosition3D?: { x: number; y: number; z: number } | null;
+  botanicalBed?: string | null;
+  isVisibleInGarden?: boolean;
+  uploadedBy?: string | null;
   placement3d?: {
     position: { x: number; y: number; z: number };
     scale: number;

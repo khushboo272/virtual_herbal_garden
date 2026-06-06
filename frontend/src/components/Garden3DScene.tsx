@@ -3,14 +3,15 @@
 // Photorealistic lighting, PBR terrain, HDRI environment,
 // atmospheric effects, post-processing
 // ─────────────────────────────────────────────────────
-import { Suspense, useRef, useMemo } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { Sky, Environment, Billboard, Text } from '@react-three/drei';
-import { EffectComposer, Bloom, SMAA } from '@react-three/postprocessing';
+import { Suspense, useRef, useMemo, useEffect } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Billboard, Text } from '@react-three/drei';
+import { Physics } from '@react-three/rapier';
 import * as THREE from 'three';
+import type { Plant as FullPlant } from '../lib/types';
 
-// Garden sub-components
 import { RealisticGround } from './garden/RealisticGround';
+import { PersonalizedZone } from './garden/PersonalizedZone';
 import { River } from './garden/River';
 import { GardenPath } from './garden/Path';
 import { Plant } from './garden/Plant';
@@ -22,6 +23,14 @@ import { AudioSystem } from './garden/AudioSystem';
 import { Loader } from './garden/Loader';
 import { Controls } from '../app/components/3d/Controls';
 import { MinimapPlayerTracker } from '../app/components/3d/Minimap';
+import { PostProcessingStack } from './garden/PostProcessingStack';
+import { useMediaQuery } from '../hooks/useMediaQuery';
+
+// New dynamic systems
+import { windSystem } from './garden/WindSystem';
+import { DayNightSystem } from './garden/DayNightSystem';
+import { ProceduralCloudSystem } from './garden/ProceduralCloudSystem';
+import { NightElements } from './garden/NightElements';
 
 /* ── Types ────────────────────────────────────────── */
 
@@ -37,10 +46,16 @@ export interface ScenePlant {
 interface Garden3DSceneProps {
   plants: ScenePlant[];
   onPlantSelect: (plant: ScenePlant) => void;
+  selectedPlant?: FullPlant | null;
+  cameraMode?: 'fps' | 'orbit';
+  ghostPosition?: [number, number, number] | null;
   audioEnabled?: boolean;
   isLocked?: boolean;
   onLock?: () => void;
   onUnlock?: () => void;
+  onGroundMove?: (position: [number, number, number]) => void;
+  onGroundClick?: (position: [number, number, number]) => void;
+  isFullGardenView?: boolean;
 }
 
 /* ── Scene Loader Fallback ────────────────────────── */
@@ -54,21 +69,32 @@ function SceneLoader() {
   );
 }
 
+/* ── Global Updaters ────────────────────────── */
+function GlobalUpdaters() {
+  useFrame(({ clock }) => {
+    windSystem.update(clock.getElapsedTime());
+  });
+  return null;
+}
+
 /* ── Main Garden3DScene ───────────────────────────── */
 
-export default function Garden3DScene({ plants, onPlantSelect, audioEnabled = false, isLocked = false, onLock, onUnlock }: Garden3DSceneProps) {
+export default function Garden3DScene({ plants, onPlantSelect, selectedPlant, cameraMode = 'fps', ghostPosition, audioEnabled = false, isLocked = false, onLock, onUnlock, onGroundMove, onGroundClick, isFullGardenView }: Garden3DSceneProps) {
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const qualityTier = isMobile ? 'low' : 'high';
+
   return (
     <>
       <Canvas
         shadows
-        camera={{ position: [0, 2, 12], fov: 65, near: 0.1, far: 300 }}
+        camera={{ position: [0, 2, 12], fov: 65, near: 0.1, far: 500 }}
         gl={{
           antialias: true,
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.2,
           outputColorSpace: THREE.SRGBColorSpace,
         }}
-        dpr={[1, 1.5]}
+        dpr={isMobile ? [1, 1] : [1, 1.5]}
         style={{ width: '100%', height: '100%' }}
         onCreated={({ gl }) => {
           gl.shadowMap.enabled = true;
@@ -76,68 +102,58 @@ export default function Garden3DScene({ plants, onPlantSelect, audioEnabled = fa
         }}
       >
         <Suspense fallback={<SceneLoader />}>
-          {/* ── Lighting ── */}
+          <GlobalUpdaters />
+          
+          <DayNightSystem />
+          <ProceduralCloudSystem />
+          <NightElements />
 
-          {/* Low ambient so shadows read properly */}
-          <ambientLight intensity={0.3} />
+          <Physics gravity={[0, -9.81, 0]}>
+            {/* ── Terrain ── */}
+            <RealisticGround 
+              onPointerMove={(e) => {
+                if (onGroundMove) {
+                  e.stopPropagation();
+                  onGroundMove([e.point.x, e.point.y, e.point.z]);
+                }
+              }}
+              onClick={(e) => {
+                if (onGroundClick) {
+                  e.stopPropagation();
+                  onGroundClick([e.point.x, e.point.y, e.point.z]);
+                }
+              }}
+            />
+            <PersonalizedZone />
+            <River />
+            <GardenPath />
 
-          {/* Sun — warm, directional, with high-res shadow map */}
-          <directionalLight
-            position={[50, 80, 30]}
-            intensity={2.5}
-            castShadow
-            shadow-mapSize-width={2048}
-            shadow-mapSize-height={2048}
-            shadow-camera-far={200}
-            shadow-camera-left={-60}
-            shadow-camera-right={60}
-            shadow-camera-top={60}
-            shadow-camera-bottom={-60}
-            shadow-bias={-0.0001}
-          />
+            {/* ── Plants from API ── */}
+            {plants.map((plant) => (
+              <Plant key={plant.id} plant={plant} onSelect={onPlantSelect} />
+            ))}
 
-          {/* Sky/ground hemisphere for natural color bleed */}
-          <hemisphereLight
-            args={['#87ceeb', '#2d5a1a', 0.4]}
-          />
+            {/* ── Environment details ── */}
+            <Suspense fallback={null}>
+              <Rocks />
+              <GrassField />
+              <Flowers />
+            </Suspense>
 
-          {/* ── Atmosphere ── */}
-
-          {/* Physical sun sky dome */}
-          <Sky
-            distance={450000}
-            sunPosition={[1, 0.3, 0]}
-            inclination={0.49}
-            azimuth={0.25}
-            turbidity={8}
-            rayleigh={0.5}
-          />
-
-          {/* Atmospheric perspective fog */}
-          <fog attach="fog" args={['#c8dff0', 60, 200]} />
-
-          {/* HDRI environment — falls back to preset if file not found */}
-          <Environment
-            preset="forest"
-            background={false}
-          />
-
-          {/* ── Terrain ── */}
-          <RealisticGround />
-          <River />
-          <GardenPath />
-
-          {/* ── Plants from API ── */}
-          {plants.map((plant) => (
-            <Plant key={plant.id} plant={plant} onSelect={onPlantSelect} />
-          ))}
-
-          {/* ── Environment details ── */}
-          <Suspense fallback={null}>
-            <Rocks />
-            <GrassField />
-            <Flowers />
-          </Suspense>
+            {/* ── Placement Ghost ── */}
+            {ghostPosition && (
+              <group position={ghostPosition}>
+                <mesh position={[0, 0.5, 0]}>
+                  <cylinderGeometry args={[0.2, 0.2, 1, 16]} />
+                  <meshBasicMaterial color="#ffeb3b" transparent opacity={0.6} wireframe />
+                </mesh>
+                <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+                  <ringGeometry args={[0.5, 0.8, 32]} />
+                  <meshBasicMaterial color="#ffeb3b" transparent opacity={0.8} />
+                </mesh>
+              </group>
+            )}
+          </Physics>
 
           {/* ── Birds ── */}
           <Birds />
@@ -152,20 +168,16 @@ export default function Garden3DScene({ plants, onPlantSelect, audioEnabled = fa
           {/* ── Controls & Minimap Tracker ── */}
           <Controls 
             enabled={!isLocked} 
+            selectedPlant={selectedPlant}
+            mode={cameraMode}
             onLock={onLock} 
             onUnlock={onUnlock} 
+            isFullGardenView={isFullGardenView}
           />
           <MinimapPlayerTracker />
 
           {/* ── Post-Processing ── */}
-          <EffectComposer>
-            <Bloom
-              luminanceThreshold={0.9}
-              luminanceSmoothing={0.9}
-              intensity={0.4}
-            />
-            <SMAA />
-          </EffectComposer>
+          <PostProcessingStack quality={qualityTier} />
         </Suspense>
       </Canvas>
 

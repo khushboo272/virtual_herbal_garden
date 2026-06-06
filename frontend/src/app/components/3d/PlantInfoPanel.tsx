@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────
 import { motion, AnimatePresence } from "motion/react";
 import { X, Leaf, FlaskConical, MapPin, Info, ExternalLink } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import type { Plant } from "../../../lib/types";
 
 interface PlantInfoPanelProps {
@@ -11,6 +12,8 @@ interface PlantInfoPanelProps {
 }
 
 export function PlantInfoPanel({ plant, onClose }: PlantInfoPanelProps) {
+  const [, setSearchParams] = useSearchParams();
+
   return (
     <AnimatePresence>
       {plant && (
@@ -59,6 +62,23 @@ export function PlantInfoPanel({ plant, onClose }: PlantInfoPanelProps) {
 
           {/* Scrollable content */}
           <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            {/* Quick Actions */}
+            <div className="flex gap-2 mb-2">
+              <button
+                onClick={() => {
+                  setSearchParams(prev => {
+                    prev.set('placePlantId', plant._id);
+                    return prev;
+                  });
+                  onClose();
+                }}
+                className="flex-1 py-2 bg-green-100 hover:bg-green-200 text-green-800 text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <MapPin className="w-4 h-4" />
+                Move Plant
+              </button>
+            </div>
+
             {/* Family */}
             <div className="flex items-center gap-2 text-sm text-green-700">
               <Info className="w-4 h-4" />

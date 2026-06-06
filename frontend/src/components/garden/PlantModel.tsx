@@ -1,11 +1,12 @@
 // ─────────────────────────────────────────────────────
-// PlantModel.tsx — GLTF model loader with wind animation
-// Loads actual 3D models from public/models/ directory
+// PlantModel.tsx — GLTF model loader with LOD support
+// Loads actual 3D models and handles Level of Detail
 // ─────────────────────────────────────────────────────
 import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useGLTF } from '@react-three/drei';
+import { useGLTF, Detailed } from '@react-three/drei';
 import * as THREE from 'three';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 interface PlantModelProps {
   modelUrl: string;
@@ -15,18 +16,20 @@ interface PlantModelProps {
 
 export function PlantModel({ modelUrl, position, scale = 1 }: PlantModelProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  
   const { scene } = useGLTF(modelUrl);
   const cloned = useMemo(() => scene.clone(), [scene]);
 
-  // Enable shadows on all meshes
+  // Enable shadows on all meshes (except mobile for performance)
   useMemo(() => {
     cloned.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
+        child.castShadow = !isMobile;
+        child.receiveShadow = !isMobile;
       }
     });
-  }, [cloned]);
+  }, [cloned, isMobile]);
 
   // Wind effect — subtle sway
   useFrame(({ clock }) => {
@@ -37,9 +40,19 @@ export function PlantModel({ modelUrl, position, scale = 1 }: PlantModelProps) {
     }
   });
 
+  // Low poly fallback for LOD (Level of Detail) at distance > 30 units
+  const lowPolyFallback = useMemo(() => {
+    const geo = new THREE.CylinderGeometry(0.2, 0.4, 2, 5);
+    const mat = new THREE.MeshBasicMaterial({ color: '#2d7a3a' });
+    return new THREE.Mesh(geo, mat);
+  }, []);
+
   return (
     <group ref={groupRef} position={position} scale={scale}>
-      <primitive object={cloned} />
+      <Detailed distances={[0, 40]}>
+        <primitive object={cloned} />
+        <primitive object={lowPolyFallback} position={[0, 1, 0]} />
+      </Detailed>
     </group>
   );
 }

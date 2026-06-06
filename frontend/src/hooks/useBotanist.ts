@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api, ApiError } from '../lib/api';
+import { getSocket } from '../lib/socket';
 import type { Plant, Remedy, Detection } from '../lib/types';
 
 // ── Botanist Draft Plants ────────────────────────────────
@@ -25,7 +26,19 @@ export function useBotanistDrafts() {
     }
   }, []);
 
-  useEffect(() => { fetchDrafts(); }, [fetchDrafts]);
+  useEffect(() => { 
+    fetchDrafts(); 
+    const socket = getSocket();
+    const handler = () => fetchDrafts();
+    socket.on('plant:updated', handler);
+    socket.on('plantModelUpdated', handler);
+    socket.on('plantPositionUpdated', handler);
+    return () => {
+      socket.off('plant:updated', handler);
+      socket.off('plantModelUpdated', handler);
+      socket.off('plantPositionUpdated', handler);
+    };
+  }, [fetchDrafts]);
 
   return { drafts, isLoading, error, refetch: fetchDrafts };
 }
@@ -54,9 +67,21 @@ export function useBotanistPlants() {
     }
   }, []);
 
-  useEffect(() => { fetchPlants(); }, [fetchPlants]);
+  useEffect(() => { 
+    fetchPlants(); 
+    const socket = getSocket();
+    const handler = () => fetchPlants();
+    socket.on('plant:updated', handler);
+    socket.on('plantModelUpdated', handler);
+    socket.on('plantPositionUpdated', handler);
+    return () => {
+      socket.off('plant:updated', handler);
+      socket.off('plantModelUpdated', handler);
+      socket.off('plantPositionUpdated', handler);
+    };
+  }, [fetchPlants]);
 
-  return { plants, total, isLoading, error, fetchPlants };
+  return { plants, total, isLoading, error, refetch: fetchPlants };
 }
 
 // ── Botanist Corrections (AI detection feedback) ─────────

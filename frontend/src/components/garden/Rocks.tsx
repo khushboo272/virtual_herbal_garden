@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────
 import { useMemo } from 'react';
 import * as THREE from 'three';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 function seededRandom(seed: number) {
   const x = Math.sin(seed) * 10000;
@@ -10,6 +11,8 @@ function seededRandom(seed: number) {
 }
 
 export function Rocks() {
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  
   const rocks = useMemo(() =>
     Array.from({ length: 30 }, (_, i) => ({
       pos: [
@@ -32,7 +35,7 @@ export function Rocks() {
     <group>
       {rocks.map((r, i) => (
         <group key={i} position={r.pos} rotation={[0, r.rot, 0]} scale={r.scale}>
-          <mesh castShadow receiveShadow>
+          <mesh castShadow={!isMobile} receiveShadow={!isMobile}>
             <dodecahedronGeometry args={[1, 1]} />
             <meshStandardMaterial
               color={`hsl(25, ${8 + seededRandom(i) * 8}%, ${r.colorL}%)`}

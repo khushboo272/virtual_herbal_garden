@@ -1,10 +1,11 @@
 // ─────────────────────────────────────────────────────
 // AudioSystem.tsx — Positional audio for birds and river
-// Uses PositionalAudio from drei with graceful fallback
+// Uses Howler for ambient and PositionalAudio from drei for spatial
 // ─────────────────────────────────────────────────────
 import { useRef, useEffect, useState } from 'react';
 import { useThree } from '@react-three/fiber';
 import { PositionalAudio } from '@react-three/drei';
+import { Howl } from 'howler';
 
 /* ── Safe audio wrapper — only renders if file exists ── */
 
@@ -41,16 +42,64 @@ function SafePositionalAudio({
 
 /* ── AudioSystem ──────────────────────────────────── */
 
-export function AudioSystem() {
+export function useAmbientAudio(isAudioEnabled = true, isNight = false) {
+  const birdsRef = useRef<Howl | null>(null);
+  const nightRef = useRef<Howl | null>(null);
+
+  // Initialize howls
+  useEffect(() => {
+    if (!isAudioEnabled) return;
+    try {
+      birdsRef.current = new Howl({
+        src: ['/sounds/birds.mp3'],
+        loop: true,
+        volume: isNight ? 0 : 0.5,
+        autoplay: true,
+      });
+
+      nightRef.current = new Howl({
+        src: ['/sounds/night-insects.mp3'],
+        loop: true,
+        volume: isNight ? 0.5 : 0,
+        autoplay: true,
+      });
+
+      return () => {
+        if (birdsRef.current && typeof birdsRef.current.unload === 'function') {
+          birdsRef.current.unload();
+        }
+        if (nightRef.current && typeof nightRef.current.unload === 'function') {
+          nightRef.current.unload();
+        }
+      };
+    } catch (e) {
+      console.error("USE EFFECT ERROR:", e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAudioEnabled]);
+
+  // Handle fading
+  useEffect(() => {
+    if (!isAudioEnabled) return;
+    const fadeDuration = 2000;
+    
+    if (isNight) {
+      // Fade out birds, fade in night
+      if (birdsRef.current) birdsRef.current.fade(0.5, 0, fadeDuration);
+      if (nightRef.current) nightRef.current.fade(0, 0.5, fadeDuration);
+    } else {
+      // Fade out night, fade in birds
+      if (birdsRef.current) birdsRef.current.fade(0, 0.5, fadeDuration);
+      if (nightRef.current) nightRef.current.fade(0.5, 0, fadeDuration);
+    }
+  }, [isNight, isAudioEnabled]);
+}
+
+export function AudioSystem({ isAudioEnabled = true, isNight = false }: { isAudioEnabled?: boolean, isNight?: boolean }) {
+  useAmbientAudio(isAudioEnabled, isNight);
+
   return (
     <>
-      {/* Birds ambient — positioned high above */}
-      <SafePositionalAudio
-        url="/sounds/birds.mp3"
-        distance={30}
-        position={[0, 15, 0]}
-      />
-
       {/* River — positioned at river location */}
       <SafePositionalAudio
         url="/sounds/river.mp3"

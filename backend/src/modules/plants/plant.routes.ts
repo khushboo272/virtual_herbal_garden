@@ -3,7 +3,7 @@ import { plantController } from './plant.controller';
 import { authenticate } from '../../core/middleware/auth';
 import { requireRole } from '../../core/middleware/rbac';
 import { validate } from '../../core/middleware/validate';
-import { uploadMultiple } from '../../core/middleware/upload';
+import { uploadMultiple, uploadGLB } from '../../core/middleware/upload';
 import { UserRole } from '../../types';
 import { createPlantSchema, updatePlantSchema, plantQuerySchema, plantReviewSchema } from './plant.validators';
 
@@ -13,6 +13,7 @@ const router = Router();
 router.get('/', validate(plantQuerySchema, 'query'), plantController.list);
 router.get('/featured', plantController.featured);
 router.get('/search/autocomplete', plantController.autocomplete);
+router.get('/garden', plantController.getGardenPlants);
 router.get('/:slug', authenticate(true), plantController.getBySlug);
 router.get('/:id/related', plantController.getRelated);
 router.get('/:id/reviews', plantController.getReviews);
@@ -25,5 +26,11 @@ router.post('/:id/feature', authenticate(), requireRole(UserRole.ADMIN), plantCo
 router.delete('/:id', authenticate(), requireRole(UserRole.ADMIN), plantController.delete);
 router.post('/:id/images', authenticate(), requireRole(UserRole.BOTANIST), uploadMultiple, plantController.uploadImages);
 router.post('/:id/reviews', authenticate(), requireRole(UserRole.USER), validate(plantReviewSchema), plantController.createReview);
+
+// 3D Garden / Model Upload Routes
+router.put('/:id/model', authenticate(), requireRole(UserRole.BOTANIST), uploadGLB.fields([{ name: 'model', maxCount: 1 }]), plantController.uploadModel);
+router.put('/:id/model-lod', authenticate(), requireRole(UserRole.BOTANIST), uploadGLB.fields([{ name: 'model_lod1', maxCount: 1 }, { name: 'model_lod2', maxCount: 1 }]), plantController.uploadModelLod);
+router.patch('/:id/garden-position', authenticate(), requireRole(UserRole.BOTANIST), plantController.updateGardenPosition);
+router.delete('/:id/model', authenticate(), requireRole(UserRole.BOTANIST), plantController.deleteModel);
 
 export default router;

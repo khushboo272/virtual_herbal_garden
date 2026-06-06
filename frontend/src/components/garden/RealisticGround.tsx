@@ -125,7 +125,12 @@ function generateTexture(type: 'color' | 'normal' | 'roughness', size = 1024): T
 
 /* ── RealisticGround Component ────────────────────── */
 
-export function RealisticGround() {
+interface RealisticGroundProps {
+  onPointerMove?: (e: any) => void;
+  onClick?: (e: any) => void;
+}
+
+export function RealisticGround({ onPointerMove, onClick }: RealisticGroundProps) {
   const { colorMap, normalMap, roughnessMap } = useMemo(() => ({
     colorMap: generateTexture('color'),
     normalMap: generateTexture('normal'),
@@ -133,7 +138,13 @@ export function RealisticGround() {
   }), []);
 
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+    <mesh 
+      rotation={[-Math.PI / 2, 0, 0]} 
+      position={[0, -0.01, 0]} 
+      receiveShadow
+      onPointerMove={onPointerMove}
+      onClick={onClick}
+    >
       <planeGeometry args={[200, 200, 64, 64]} />
       <meshStandardMaterial
         map={colorMap}

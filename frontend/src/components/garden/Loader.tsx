@@ -5,7 +5,7 @@
 import { useProgress } from '@react-three/drei';
 
 export function Loader() {
-  const { active, progress } = useProgress();
+  const { active, progress, loaded, total, item } = useProgress();
 
   if (!active) return null;
 
@@ -56,9 +56,14 @@ export function Loader() {
         />
       </div>
 
-      {/* Percentage */}
-      <p style={{ margin: '12px 0 0', fontSize: '14px', color: '#aaaaaa' }}>
-        {Math.round(progress)}%
+      {/* Percentage and Count */}
+      <p style={{ margin: '12px 0 4px', fontSize: '14px', color: '#aaaaaa' }}>
+        {Math.round(progress)}% ({loaded}/{total})
+      </p>
+
+      {/* Item currently loading */}
+      <p style={{ margin: '0', fontSize: '10px', color: '#666666', maxWidth: '80%', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {item || 'Initializing...'}
       </p>
 
       <style>{`

@@ -80,7 +80,7 @@ export default function App() {
         <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
 
         {/* Full-screen page without navbar (immersive experience) */}
-        <Route path="/garden-3d" element={<RequireRole minimumRole="USER"><VirtualGarden3DPage /></RequireRole>} />
+        <Route path="/garden-3d" element={<VirtualGarden3DPage />} />
 
         {/* OAuth callback — captures token from Google redirect */}
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />

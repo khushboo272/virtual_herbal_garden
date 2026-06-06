@@ -1,4 +1,5 @@
-import { FlaskConical, FileText, CheckCircle, Clock, AlertCircle, Plus, Leaf, Eye, TrendingUp } from "lucide-react";
+import { useState } from 'react';
+import { FlaskConical, FileText, CheckCircle, Clock, AlertCircle, Plus, Leaf, Eye, TrendingUp, Cuboid } from "lucide-react";
 import { StatCard } from "../dashboard/StatCard";
 import { StatusBadge, type ContentStatus } from "../dashboard/StatusBadge";
 import { DashboardEmptyState } from "../dashboard/DashboardEmptyState";
@@ -18,11 +19,25 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
 import { useBotanistDrafts, useBotanistPlants, useBotanistStats } from "../../../hooks/useBotanist";
+import { PlantUploadModal } from "../3d/PlantUploadModal";
 
 export function BotanistPanel() {
   const { stats } = useBotanistStats();
-  const { drafts } = useBotanistDrafts();
-  const { plants: allPlants } = useBotanistPlants();
+  const { drafts, refetch: refetchDrafts } = useBotanistDrafts();
+  const { plants: allPlants, refetch: refetchPlants } = useBotanistPlants();
+
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [selectedPlant, setSelectedPlant] = useState<any>(null);
+
+  const openUploadModal = (plant: any) => {
+    setSelectedPlant(plant);
+    setUploadModalOpen(true);
+  };
+
+  const handleUploadSuccess = () => {
+    refetchDrafts();
+    refetchPlants();
+  };
 
   const summaryStats = [
     {
@@ -164,10 +179,16 @@ export function BotanistPanel() {
                               {new Date(plant.createdAt).toLocaleDateString()}
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button size="sm" variant="ghost" className="text-purple-600 hover:text-purple-700">
-                                <Eye className="w-4 h-4 mr-1" />
-                                View
-                              </Button>
+                              <div className="flex justify-end gap-2">
+                                <Button size="sm" variant="outline" className="text-purple-600 border-purple-200 hover:bg-purple-50" onClick={() => openUploadModal(plant)}>
+                                  <Cuboid className="w-4 h-4 mr-1" />
+                                  3D Model
+                                </Button>
+                                <Button size="sm" variant="ghost" className="text-purple-600 hover:text-purple-700">
+                                  <Eye className="w-4 h-4 mr-1" />
+                                  View
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -214,10 +235,15 @@ export function BotanistPanel() {
                             <p className="text-sm text-gray-500 italic mb-2">{plant.scientificName}</p>
                             <div className="flex items-center justify-between">
                               <Badge className="bg-green-100 text-green-700 border-green-300">Published</Badge>
-                              <span className="text-xs text-gray-500 flex items-center gap-1">
-                                <Eye className="w-3 h-3" />
-                                {plant.viewCount?.toLocaleString() ?? 0}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <Button size="icon" variant="ghost" className="h-6 w-6 text-purple-600 hover:bg-purple-100 rounded" onClick={(e) => { e.stopPropagation(); openUploadModal(plant); }}>
+                                  <Cuboid className="w-4 h-4" />
+                                </Button>
+                                <span className="text-xs text-gray-500 flex items-center gap-1">
+                                  <Eye className="w-3 h-3" />
+                                  {plant.viewCount?.toLocaleString() ?? 0}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </CardContent>
@@ -338,6 +364,13 @@ export function BotanistPanel() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <PlantUploadModal 
+        isOpen={uploadModalOpen} 
+        onClose={() => setUploadModalOpen(false)} 
+        plant={selectedPlant}
+        onSuccess={handleUploadSuccess}
+      />
     </div>
   );
 }

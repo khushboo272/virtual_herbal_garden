@@ -167,40 +167,46 @@ export function Layout() {
     }, 400);
   };
 
+  const isGardenRoute = location.pathname === '/garden' || location.pathname.startsWith('/garden/');
+
   return (
     <div className="min-h-screen">
       {/* Shared Navigation */}
-      <Navbar 
-        onLoginClick={() => {
-          setAuthMode("login");
-          setShowAuthDialog(true);
-          setAuthError(null);
-        }}
-        onRegisterClick={() => {
-          setAuthMode("register");
-          setShowAuthDialog(true);
-          setAuthError(null);
-        }}
-      />
+      {!isGardenRoute && (
+        <Navbar 
+          onLoginClick={() => {
+            setAuthMode("login");
+            setShowAuthDialog(true);
+            setAuthError(null);
+          }}
+          onRegisterClick={() => {
+            setAuthMode("register");
+            setShowAuthDialog(true);
+            setAuthError(null);
+          }}
+        />
+      )}
 
       {/* Page Content */}
       <Outlet />
 
       {/* Footer */}
-      <footer className="bg-white/80 backdrop-blur-md border-t border-green-200/50 mt-auto">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="flex items-center justify-between text-sm text-green-600">
-            <p>© 2026 Virtual Herbal Garden. All rights reserved.</p>
-            <div className="flex items-center gap-4">
-              <Link to="/style-guide" className="hover:text-green-800 flex items-center gap-1">
-                <Palette className="w-3 h-3" />
-                Style Guide
-              </Link>
-              <Link to="/mobile" className="hover:text-green-800">Mobile View</Link>
+      {!isGardenRoute && (
+        <footer className="bg-white/80 backdrop-blur-md border-t border-green-200/50 mt-auto">
+          <div className="max-w-7xl mx-auto px-6 py-6">
+            <div className="flex items-center justify-between text-sm text-green-600">
+              <p>© 2026 Virtual Herbal Garden. All rights reserved.</p>
+              <div className="flex items-center gap-4">
+                <Link to="/style-guide" className="hover:text-green-800 flex items-center gap-1">
+                  <Palette className="w-3 h-3" />
+                  Style Guide
+                </Link>
+                <Link to="/mobile" className="hover:text-green-800">Mobile View</Link>
+              </div>
             </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* Auth Dialog */}
       <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>

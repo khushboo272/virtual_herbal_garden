@@ -9,8 +9,13 @@ import {
   Map,
   MousePointerClick,
   Home,
+  Maximize,
+  Minimize,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from 'react';
+import { useMediaQuery } from '../../../hooks/useMediaQuery';
+import { MobileJoystick } from './MobileJoystick';
 
 interface HUDProps {
   isLocked: boolean;
@@ -19,6 +24,9 @@ interface HUDProps {
   plantCount: number;
   audioEnabled: boolean;
   onToggleAudio: () => void;
+  cameraMode: 'fps' | 'orbit';
+  onToggleCameraMode: () => void;
+  onViewFullGarden?: () => void;
 }
 
 export function HUD({
@@ -28,7 +36,48 @@ export function HUD({
   plantCount,
   audioEnabled,
   onToggleAudio,
+  cameraMode,
+  onToggleCameraMode,
+  onViewFullGarden,
 }: HUDProps) {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 768px)');
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    const docEl = document.documentElement as any;
+    const doc = document as any;
+
+    if (!doc.fullscreenElement && !doc.webkitFullscreenElement && !doc.mozFullScreenElement && !doc.msFullscreenElement) {
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch((err: Error) => console.error(err));
+      } else if (docEl.webkitRequestFullscreen) {
+        docEl.webkitRequestFullscreen();
+      } else if (docEl.mozRequestFullScreen) {
+        docEl.mozRequestFullScreen();
+      } else if (docEl.msRequestFullscreen) {
+        docEl.msRequestFullscreen();
+      }
+    } else {
+      if (doc.exitFullscreen) {
+        doc.exitFullscreen();
+      } else if (doc.webkitExitFullscreen) {
+        doc.webkitExitFullscreen();
+      } else if (doc.mozCancelFullScreen) {
+        doc.mozCancelFullScreen();
+      } else if (doc.msExitFullscreen) {
+        doc.msExitFullscreen();
+      }
+    }
+  };
+
   return (
     <>
       {/* Crosshair — visible only when pointer-locked */}
@@ -152,6 +201,29 @@ export function HUD({
           gap: 8,
         }}
       >
+        {/* Time Indicator */}
+        <div
+          data-testid="time-indicator"
+          style={{
+            height: 40,
+            padding: '0 16px',
+            borderRadius: 12,
+            background: "rgba(255,255,255,0.12)",
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            color: "white",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: "monospace",
+            fontWeight: "bold",
+            fontSize: 14,
+            boxShadow: "0 4px 10px rgba(0,0,0,0.2)"
+          }}
+        >
+          <GameClock />
+        </div>
+
         {/* Audio toggle */}
         <button
           onClick={onToggleAudio}
@@ -194,6 +266,62 @@ export function HUD({
           title="Toggle Minimap"
         >
           <Map size={18} />
+        </button>
+
+        {/* Fullscreen toggle */}
+        <button
+          data-testid="fullscreen-toggle"
+          onClick={toggleFullscreen}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            background: isFullscreen ? "rgba(76,175,80,0.4)" : "rgba(255,255,255,0.12)",
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            color: "white",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "background 0.2s",
+          }}
+          title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+        >
+          {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+        </button>
+
+        {/* Camera mode toggle */}
+        <button
+          onClick={onViewFullGarden}
+          className="flex flex-col items-center justify-center p-3 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md transition-colors"
+          title="View Full Garden"
+        >
+          <Map className="w-5 h-5 mb-1 text-green-400" />
+          <span className="text-[10px] font-bold tracking-wider">MAP</span>
+        </button>
+
+        <button
+          onClick={onToggleCameraMode}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            background: cameraMode === 'orbit' ? "rgba(76,175,80,0.4)" : "rgba(255,255,255,0.12)",
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            color: "white",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "background 0.2s",
+          }}
+          title={cameraMode === 'orbit' ? "Switch to FPS Mode" : "Switch to Orbit Mode"}
+        >
+          <span style={{ fontWeight: 'bold', fontSize: 12 }}>
+            {cameraMode === 'orbit' ? 'ORB' : 'FPS'}
+          </span>
         </button>
       </motion.div>
 
@@ -250,7 +378,7 @@ export function HUD({
       </AnimatePresence>
 
       {/* Bottom controls hint when locked */}
-      {isLocked && (
+      {isLocked && !isMobile && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -278,6 +406,9 @@ export function HUD({
           Click plants to inspect
         </motion.div>
       )}
+
+      {/* Mobile Joystick */}
+      {isMobile && <MobileJoystick />}
     </>
   );
 }
@@ -292,3 +423,40 @@ const kbdStyle: React.CSSProperties = {
   fontFamily: "monospace",
   color: "rgba(255,255,255,0.8)",
 };
+
+// Internal component for the clock to avoid re-rendering the whole HUD
+
+function GameClock() {
+  const [timeStr, setTimeStr] = useState("12:00 PM");
+
+  useEffect(() => {
+    const startTime = performance.now();
+    let frameId: number;
+
+    const tick = () => {
+      const elapsedSec = (performance.now() - startTime) / 1000;
+      // 120 seconds cycle. 0 = noon (12:00)
+      const cycle = (elapsedSec % 120) / 120;
+      // 0 -> 12:00 PM
+      // 0.25 -> 6:00 PM
+      // 0.5 -> 12:00 AM
+      // 0.75 -> 6:00 AM
+      let hoursFloat = (cycle * 24 + 12) % 24;
+      
+      const h = Math.floor(hoursFloat);
+      const m = Math.floor((hoursFloat - h) * 60);
+      
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const displayH = h % 12 === 0 ? 12 : h % 12;
+      const displayM = m.toString().padStart(2, '0');
+      
+      setTimeStr(`${displayH}:${displayM} ${ampm}`);
+      frameId = requestAnimationFrame(tick);
+    };
+    
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+
+  return <span>{timeStr}</span>;
+}

@@ -1,0 +1,75 @@
+import { useRef, useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+
+export function NightElements() {
+  const firefliesRef = useRef<THREE.InstancedMesh>(null);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  
+  // Fireflies count
+  const count = 200;
+  
+  const particles = useMemo(() => {
+    const temp = [];
+    for (let i = 0; i < count; i++) {
+      const t = Math.random() * 100;
+      const factor = 20 + Math.random() * 100;
+      const speed = 0.01 + Math.random() / 200;
+      const xFactor = -50 + Math.random() * 100;
+      const yFactor = -50 + Math.random() * 100;
+      const zFactor = -50 + Math.random() * 100;
+      temp.push({ t, factor, speed, xFactor, yFactor, zFactor, mx: 0, my: 0 });
+    }
+    return temp;
+  }, [count]);
+
+  useFrame(({ clock }) => {
+    // Determine if it's night based on our 120s cycle
+    // 0 = noon, 0.5 = midnight (60s)
+    const cycle = (clock.getElapsedTime() % 120) / 120;
+    const timeOfDay = cycle * Math.PI * 2;
+    const isNight = Math.cos(timeOfDay) < 0;
+    
+    // Fade in/out fireflies based on time
+    const nightFactor = Math.max(0, -Math.cos(timeOfDay)); 
+    
+    if (firefliesRef.current) {
+      const material = firefliesRef.current.material as THREE.MeshBasicMaterial;
+      material.opacity = nightFactor;
+      material.transparent = true;
+      
+      if (nightFactor > 0) {
+        particles.forEach((particle, i) => {
+          let { t, factor, speed, xFactor, yFactor, zFactor } = particle;
+          t = particle.t += speed / 2;
+          const a = Math.cos(t) + Math.sin(t * 1) / 10;
+          const b = Math.sin(t) + Math.cos(t * 2) / 10;
+          const s = Math.cos(t);
+          
+          dummy.position.set(
+            (particle.mx / 10) * a + xFactor + Math.cos((t / 10) * factor) + (Math.sin(t * 1) * factor) / 10,
+            (particle.my / 10) * b + yFactor + Math.sin((t / 10) * factor) + (Math.cos(t * 2) * factor) / 10,
+            (particle.my / 10) * b + zFactor + Math.cos((t / 10) * factor) + (Math.sin(t * 3) * factor) / 10
+          );
+          
+          // Keep them near the ground
+          dummy.position.y = Math.abs(dummy.position.y % 10) + 0.5;
+          
+          dummy.scale.set(s, s, s);
+          dummy.rotation.set(s * 5, s * 5, s * 5);
+          dummy.updateMatrix();
+          
+          firefliesRef.current!.setMatrixAt(i, dummy.matrix);
+        });
+        firefliesRef.current.instanceMatrix.needsUpdate = true;
+      }
+    }
+  });
+
+  return (
+    <instancedMesh ref={firefliesRef} args={[undefined, undefined, count]}>
+      <sphereGeometry args={[0.05, 4, 4]} />
+      <meshBasicMaterial color={[2, 3, 1]} toneMapped={false} />
+    </instancedMesh>
+  );
+}

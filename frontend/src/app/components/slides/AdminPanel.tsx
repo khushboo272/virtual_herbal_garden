@@ -17,9 +17,12 @@ import {
   TableRow,
 } from "../ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
+import { useState } from 'react';
 import { useAdminStats, useAdminPlants, useAdminUsers } from "../../../hooks/useAdmin";
 import { useAdminDashboard } from "../../../hooks/useDashboard";
 import { useAuth } from "../../../contexts/AuthContext";
+import { PlantUploadModal } from "../3d/PlantUploadModal";
+import { Cuboid } from "lucide-react";
 
 export function AdminPanel() {
   const { stats: apiStats } = useAdminStats();
@@ -29,6 +32,17 @@ export function AdminPanel() {
   const isSuperAdmin = hasMinRole('SUPER_ADMIN');
 
   const { data: dashData } = useAdminDashboard();
+
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [selectedPlant, setSelectedPlant] = useState<any>(null);
+
+  const openUploadModal = (plant: any) => {
+    // Map the simplified admin table plant shape to the expected IPlant shape if needed
+    // The PlantUploadModal expects at least _id, commonName, modelUrl etc.
+    const fullPlant = apiPlants.find(p => p._id === plant.id) || plant;
+    setSelectedPlant(fullPlant);
+    setUploadModalOpen(true);
+  };
 
   const stats = [
     { label: "Total Users", value: dashData?.stats?.totalUsers ?? apiStats?.totalUsers ?? 0, icon: Users, color: "bg-blue-100 text-blue-700", delta: dashData?.deltas?.newUsersThisWeek ? `+${dashData?.deltas?.newUsersThisWeek} this week` : undefined },
@@ -162,6 +176,9 @@ export function AdminPanel() {
                           <TableCell className="text-green-700">{plant.views.toLocaleString()}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
+                              <Button size="sm" variant="ghost" className="text-purple-600 hover:text-purple-700" onClick={() => openUploadModal(plant)}>
+                                <Cuboid className="w-4 h-4" />
+                              </Button>
                               <Button size="sm" variant="ghost" className="text-green-600 hover:text-green-700">
                                 <Edit className="w-4 h-4" />
                               </Button>
@@ -547,6 +564,13 @@ export function AdminPanel() {
           )}
         </Tabs>
       </div>
+
+      <PlantUploadModal 
+        isOpen={uploadModalOpen} 
+        onClose={() => setUploadModalOpen(false)} 
+        plant={selectedPlant}
+        onSuccess={() => { /* Admin plants don't have a direct refetch exported from the hook, relying on Socket.io for now */ }}
+      />
     </div>
   );
 }
