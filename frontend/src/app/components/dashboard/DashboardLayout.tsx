@@ -3,8 +3,8 @@
 // PRD §6.1, §6.2, §6.3
 // ──────────────────────────────────────────────────────────
 
-import { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import React, { useState, Fragment } from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, ChevronRight } from 'lucide-react';
 import { Input } from '../ui/input';
 import {
@@ -50,6 +50,15 @@ export function DashboardLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && searchQuery.trim()) {
+      navigate(`/library?q=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery('');
+    }
+  };
 
   const role = (user?.role || 'GUEST') as UserRole;
   const initials = (user?.displayName || 'U')
@@ -91,16 +100,18 @@ export function DashboardLayout() {
               <Breadcrumb>
                 <BreadcrumbList>
                   {breadcrumbs.map((crumb, idx) => (
-                    <BreadcrumbItem key={crumb.path}>
+                    <Fragment key={crumb.path}>
                       {idx > 0 && <BreadcrumbSeparator><ChevronRight className="w-3 h-3" /></BreadcrumbSeparator>}
-                      {crumb.isLast ? (
-                        <BreadcrumbPage className="text-green-800 font-medium">{crumb.label}</BreadcrumbPage>
-                      ) : (
-                        <BreadcrumbLink asChild>
-                          <Link to={crumb.path} className="text-green-600 hover:text-green-800">{crumb.label}</Link>
-                        </BreadcrumbLink>
-                      )}
-                    </BreadcrumbItem>
+                      <BreadcrumbItem>
+                        {crumb.isLast ? (
+                          <BreadcrumbPage className="text-green-800 font-medium">{crumb.label}</BreadcrumbPage>
+                        ) : (
+                          <BreadcrumbLink asChild>
+                            <Link to={crumb.path} className="text-green-600 hover:text-green-800">{crumb.label}</Link>
+                          </BreadcrumbLink>
+                        )}
+                      </BreadcrumbItem>
+                    </Fragment>
                   ))}
                 </BreadcrumbList>
               </Breadcrumb>
@@ -113,6 +124,9 @@ export function DashboardLayout() {
                   <Input
                     placeholder="Search plants, remedies..."
                     className="pl-9 w-56 h-9 border-green-200 focus:border-green-400 text-sm"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={handleSearch}
                   />
                 </div>
               </div>

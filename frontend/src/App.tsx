@@ -18,6 +18,31 @@ import { OAuthCallbackPage } from "./app/pages/OAuthCallbackPage";
 import { DashboardLayout } from "./app/components/dashboard/DashboardLayout";
 import { DashboardHome } from "./app/components/dashboard/DashboardHome";
 
+// Dashboard sub-pages — dedicated components per route
+import {
+  UserManagementPage,
+  ModerationQueuePage,
+  AnalyticsOverviewPage,
+  AIScannerStatsPage,
+  UserGrowthPage,
+  FeaturedContentPage,
+  ToursManagementPage,
+  CreateTourPage,
+  TourAnalyticsPage,
+  BookmarksPage,
+  MyGardenPage,
+  AIScannerPage,
+  ProfileSettingsPage,
+  HelpSupportPage,
+  GuidedToursPage,
+  ManagePlantsPage,
+  SystemOverviewPage,
+  FeatureFlagsPage,
+  RoleManagementPage,
+  AuditLogPage,
+  AIModelConfigPage,
+} from "./app/components/dashboard/pages";
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -42,13 +67,13 @@ export default function App() {
           {/* Dashboard home — role-switch renderer */}
           <Route index element={<DashboardHome />} />
 
-          {/* Sub-routes — stubs for now, will be filled per PRD */}
-          <Route path="garden" element={<DashboardHome />} />
-          <Route path="bookmarks" element={<DashboardHome />} />
-          <Route path="scanner" element={<DashboardHome />} />
-          <Route path="profile" element={<DashboardHome />} />
-          <Route path="help" element={<DashboardHome />} />
-          <Route path="tours" element={<DashboardHome />} />
+          {/* Shared sub-routes — all roles */}
+          <Route path="garden" element={<MyGardenPage />} />
+          <Route path="bookmarks" element={<BookmarksPage />} />
+          <Route path="scanner" element={<AIScannerPage />} />
+          <Route path="profile" element={<ProfileSettingsPage />} />
+          <Route path="help" element={<HelpSupportPage />} />
+          <Route path="tours" element={<GuidedToursPage />} />
 
           {/* Botanist sub-routes */}
           <Route path="contributions" element={<DashboardHome />} />
@@ -56,23 +81,24 @@ export default function App() {
           <Route path="contributions/new-remedy" element={<DashboardHome />} />
           <Route path="ai-feedback" element={<DashboardHome />} />
 
-          {/* Admin sub-routes */}
-          <Route path="moderation" element={<DashboardHome />} />
-          <Route path="analytics" element={<DashboardHome />} />
-          <Route path="analytics/scanner" element={<DashboardHome />} />
-          <Route path="analytics/users" element={<DashboardHome />} />
-          <Route path="featured" element={<DashboardHome />} />
-          <Route path="users" element={<DashboardHome />} />
-          <Route path="tours/manage" element={<DashboardHome />} />
-          <Route path="tours/manage/new" element={<DashboardHome />} />
-          <Route path="tours/analytics" element={<DashboardHome />} />
+          {/* Admin sub-routes — dedicated page components */}
+          <Route path="plants" element={<ManagePlantsPage />} />
+          <Route path="moderation" element={<ModerationQueuePage />} />
+          <Route path="analytics" element={<AnalyticsOverviewPage />} />
+          <Route path="analytics/scanner" element={<AIScannerStatsPage />} />
+          <Route path="analytics/users" element={<UserGrowthPage />} />
+          <Route path="featured" element={<FeaturedContentPage />} />
+          <Route path="users" element={<UserManagementPage />} />
+          <Route path="tours/manage" element={<ToursManagementPage />} />
+          <Route path="tours/manage/new" element={<CreateTourPage />} />
+          <Route path="tours/analytics" element={<TourAnalyticsPage />} />
 
           {/* Super Admin sub-routes */}
-          <Route path="system" element={<DashboardHome />} />
-          <Route path="system/feature-flags" element={<DashboardHome />} />
-          <Route path="system/role-management" element={<DashboardHome />} />
-          <Route path="system/audit-log" element={<DashboardHome />} />
-          <Route path="system/ai-model-config" element={<DashboardHome />} />
+          <Route path="system" element={<SystemOverviewPage />} />
+          <Route path="system/feature-flags" element={<FeatureFlagsPage />} />
+          <Route path="system/role-management" element={<RoleManagementPage />} />
+          <Route path="system/audit-log" element={<AuditLogPage />} />
+          <Route path="system/ai-model-config" element={<AIModelConfigPage />} />
         </Route>
 
         {/* ── Redirect aliases (keeps old URLs working) ── */}

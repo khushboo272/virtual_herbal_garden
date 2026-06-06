@@ -23,6 +23,7 @@ import { useAdminDashboard } from "../../../hooks/useDashboard";
 import { useAuth } from "../../../contexts/AuthContext";
 import { PlantUploadModal } from "../3d/PlantUploadModal";
 import { Cuboid } from "lucide-react";
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export function AdminPanel() {
   const { stats: apiStats } = useAdminStats();
@@ -32,6 +33,30 @@ export function AdminPanel() {
   const isSuperAdmin = hasMinRole('SUPER_ADMIN');
 
   const { data: dashData } = useAdminDashboard();
+
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  let activeTab = "plants";
+  if (location.pathname.includes("/users")) activeTab = "users";
+  else if (location.pathname.includes("/moderation")) activeTab = "moderation";
+  else if (location.pathname.includes("/analytics")) activeTab = "analytics";
+  else if (location.pathname.includes("/system")) activeTab = "system";
+  else if (location.pathname.includes("/new-plant") || location.pathname.includes("/add")) activeTab = "add";
+
+  const handleTabChange = (val: string) => {
+    if (val === "plants") navigate("/dashboard");
+    else if (val === "users") navigate("/dashboard/users");
+    else if (val === "moderation") navigate("/dashboard/moderation");
+    else if (val === "analytics") navigate("/dashboard/analytics");
+    else if (val === "system") navigate("/dashboard/system");
+    else if (val === "add") {
+       // Open upload modal via URL or just local state?
+       // Currently "Add New Plant" might be better as a modal toggle or separate route
+       // Given the existing UI, let's keep the tab but navigate to the fake route so it stays mounted
+       navigate("/dashboard/add");
+    }
+  };
 
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedPlant, setSelectedPlant] = useState<any>(null);
@@ -101,7 +126,7 @@ export function AdminPanel() {
         </div>
 
         {/* Main Content */}
-        <Tabs defaultValue="plants" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsList className="bg-green-100">
             <TabsTrigger value="plants" className="data-[state=active]:bg-white data-[state=active]:text-green-700">
               Manage Plants

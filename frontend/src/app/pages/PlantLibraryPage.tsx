@@ -1,11 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PlantLibrary } from "../components/slides/PlantLibrary";
 import { usePlants } from "../../hooks/usePlants";
 import { LoadingState, ErrorState, EmptyState } from "../../components/DataStates";
 
 export function PlantLibraryPage() {
+  const [searchParams] = useSearchParams();
+  const queryFromUrl = searchParams.get('q') || '';
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(queryFromUrl);
+
+  // Sync search when URL query changes (from global search)
+  useEffect(() => {
+    if (queryFromUrl) {
+      setSearch(queryFromUrl);
+    }
+  }, [queryFromUrl]);
   const { plants, total, totalPages, isLoading, error, refetch } = usePlants({
     page,
     limit: 12,

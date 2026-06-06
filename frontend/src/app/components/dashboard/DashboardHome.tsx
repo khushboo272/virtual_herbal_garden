@@ -1,12 +1,13 @@
 // ──────────────────────────────────────────────────────────
 // Dashboard Home — role-switch component (PRD §3.1)
 // Renders the correct dashboard home content based on role.
+// This component is ONLY used for the /dashboard index route.
 // ──────────────────────────────────────────────────────────
 
 import { useAuth } from '../../../contexts/AuthContext';
 import { UserDashboard } from '../slides/UserDashboard';
 import { BotanistPanel } from '../slides/BotanistPanel';
-import { AdminPanel } from '../slides/AdminPanel';
+import { AdminDashboardOverview } from './pages/AdminDashboardOverview';
 import { GuestDashboard } from './GuestDashboard';
 
 interface DashboardHomeProps {
@@ -25,7 +26,7 @@ export function DashboardHome({ onOpenSignIn }: DashboardHomeProps) {
   switch (role) {
     case 'SUPER_ADMIN':
     case 'ADMIN':
-      return <AdminPanel />;
+      return <AdminDashboardOverview />;
     case 'BOTANIST':
       return <BotanistPanel />;
     case 'USER':
