@@ -1,1 +1,0 @@
-import { redis } from './src/config/redis'; console.log(typeof redis.on);
