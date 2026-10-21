@@ -1,6 +1,5 @@
-// Plants Feature Module — barrel exports
-export { PlantLibraryPage } from '../../app/pages/PlantLibraryPage';
-export { PlantDetailPage } from '../../app/pages/PlantDetailPage';
-export { PlantLibrary } from '../../app/components/slides/PlantLibrary';
-export { PlantDetail } from '../../app/components/slides/PlantDetail';
-export { usePlants, usePlant } from '../../hooks/usePlants';
+// Plants feature module — now re-exports from the library feature module.
+// Existing consumers (3D garden, dashboard) continue to work unchanged.
+export { LibraryPage as PlantLibraryPage, PlantDetailPage } from '../library';
+export { PlantImage } from '../library/components/PlantImage';
+export { usePlantSearch, usePlant } from '../library';

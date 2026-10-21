@@ -7,7 +7,21 @@ import crypto from 'crypto';
 
 export class PlantController {
   async list(req: Request, res: Response) {
-    const result = await plantService.list(req.query as unknown as Parameters<typeof plantService.list>[0]);
+    // req.query has been validated + coerced by the plantQuerySchema middleware
+    const q = req.query as Record<string, unknown>;
+    const result = await plantService.list({
+      page: q.page as number,
+      limit: q.limit as number,
+      q: q.q as string | undefined,
+      search: q.search as string | undefined,
+      medicinalUse: q.medicinalUse as string[] | undefined,
+      region: q.region as string | undefined,
+      type: q.type as string | undefined,
+      category: q.category as string | undefined,
+      family: q.family as string | undefined,
+      tags: q.tags as string | undefined,
+      sort: q.sort as string | undefined,
+    });
     sendSuccess(res, result.plants, 200, result.meta);
   }
 
@@ -17,7 +31,7 @@ export class PlantController {
   }
 
   async autocomplete(req: Request, res: Response) {
-    const q = req.query.q as string || '';
+    const q = (req.query.q as string) || '';
     const results = await plantService.autocomplete(q);
     sendSuccess(res, results);
   }
@@ -88,6 +102,12 @@ export class PlantController {
     sendCreated(res, review);
   }
 
+  // ── 3D Garden / Model Upload ─────────────────────────────────────────────
+  // TODO: move to 3d-garden module — these routes are kept here for now
+  // because PUT /plants/:id/model, /model-lod, PATCH /:id/garden-position,
+  // DELETE /:id/model must remain at their current URLs until the 3D garden
+  // module is ready to own them.
+
   async uploadModel(req: Request, res: Response) {
     const { id } = req.params;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
@@ -102,7 +122,7 @@ export class PlantController {
       const url = await uploadToR2(
         files['model'][0].buffer,
         `assets-for-r2/models/plants/${plant.slug}-lod0.glb`,
-        'model/gltf-binary'
+        'model/gltf-binary',
       );
       plant.modelUrl = url;
     }
@@ -112,7 +132,6 @@ export class PlantController {
     await plant.save();
 
     req.app.get('io')?.emit('plantModelUpdated', { plantId: id, plantName: plant.commonName });
-
     sendSuccess(res, plant);
   }
 
@@ -130,7 +149,7 @@ export class PlantController {
       const url = await uploadToR2(
         files['model_lod1'][0].buffer,
         `assets-for-r2/models/plants/${plant.slug}-lod1.glb`,
-        'model/gltf-binary'
+        'model/gltf-binary',
       );
       plant.modelUrl_lod1 = url;
     }
@@ -139,7 +158,7 @@ export class PlantController {
       const url = await uploadToR2(
         files['model_lod2'][0].buffer,
         `assets-for-r2/models/plants/${plant.slug}-lod2.glb`,
-        'model/gltf-binary'
+        'model/gltf-binary',
       );
       plant.modelUrl_lod2 = url;
     }
@@ -165,10 +184,10 @@ export class PlantController {
 
     await plant.save();
 
-    req.app.get('io')?.emit('plantPositionUpdated', { 
-      plantId: id, 
+    req.app.get('io')?.emit('plantPositionUpdated', {
+      plantId: id,
       position: plant.globalPosition3D,
-      isVisible: plant.isVisibleInGarden 
+      isVisible: plant.isVisibleInGarden,
     });
 
     sendSuccess(res, plant);
@@ -200,14 +219,15 @@ export class PlantController {
     await plant.save();
 
     req.app.get('io')?.emit('plantModelUpdated', { plantId: id, plantName: plant.commonName });
-
     sendSuccess(res, { message: '3D models deleted successfully' });
   }
 
   async getGardenPlants(_req: Request, res: Response) {
     const Plant = (await import('./Plant.model')).default;
     const plants = await Plant.find({ isVisibleInGarden: true, isDeleted: false })
-      .select('commonName scientificName slug modelUrl modelUrl_lod1 modelUrl_lod2 globalPosition3D botanicalBed categories tags color placement3d images shortDescription partsUsed')
+      .select(
+        'commonName scientificName slug modelUrl modelUrl_lod1 modelUrl_lod2 globalPosition3D botanicalBed categories tags color placement3d images shortDescription partsUsed',
+      )
       .lean();
     sendSuccess(res, plants);
   }

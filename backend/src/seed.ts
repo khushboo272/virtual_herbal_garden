@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import Plant from './modules/plants/Plant.model';
+import Plant from './modules/library/Plant.model';
 import Tour from './modules/tours/Tour.model';
 import Remedy from './modules/remedies/Remedy.model';
 import SystemConfig from './modules/admin/SystemConfig.model';

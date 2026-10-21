@@ -10,7 +10,7 @@ export function AIPlantDetectionPage() {
     <AIPlantDetection
       isAuthenticated={isAuthenticated}
       onViewDetails={(plantName: string) => {
-        navigate(`/library?q=${encodeURIComponent(plantName)}`);
+        navigate(`/library?q=${encodeURIComponent(plantName)}&open=1`);
       }}
     />
   );

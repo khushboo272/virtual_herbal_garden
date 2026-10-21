@@ -4,8 +4,7 @@ import { RequireRole } from "./app/components/RequireRole";
 
 // Page components
 import { HomePageWrapper } from "./app/pages/HomePageWrapper";
-import { PlantLibraryPage } from "./app/pages/PlantLibraryPage";
-import { PlantDetailPage } from "./app/pages/PlantDetailPage";
+import { LibraryPage, PlantDetailPage } from './features/library';
 import { AIPlantDetectionPage } from "./features/ai-scanner";
 import { VirtualGarden3DPage } from "./app/pages/VirtualGarden3DPage";
 import { RemediesPageWrapper } from "./app/pages/RemediesPageWrapper";
@@ -50,7 +49,7 @@ export default function App() {
         {/* Pages with shared public navbar layout */}
         <Route element={<Layout />}>
           <Route path="/" element={<HomePageWrapper />} />
-          <Route path="/library" element={<PlantLibraryPage />} />
+          <Route path="/library" element={<LibraryPage />} />
           <Route path="/plant/:id" element={<PlantDetailPage />} />
           <Route path="/ai-detect" element={<RequireRole minimumRole="USER"><AIPlantDetectionPage /></RequireRole>} />
           <Route path="/remedies" element={<RemediesPageWrapper />} />

@@ -105,7 +105,7 @@ export class DetectionService {
     let plantSlug: string | null = null;
     let plantId: string | null = null;
     if (geminiResult.isPlant && geminiResult.scientificName) {
-      const Plant = (await import('../plants/Plant.model')).default;
+      const Plant = (await import('../library/Plant.model')).default;
       const match = await Plant.findOne({
         $or: [
           { scientificName: { $regex: `^${geminiResult.scientificName}$`, $options: 'i' } },

@@ -23,9 +23,11 @@ function ResultCard({ result }: { result: DetectionResult }) {
 
   function handleViewDetails() {
     if (result.plantSlug) {
-      navigate(`/plants/${result.plantSlug}`);
+      // Navigate directly to the plant detail page using its slug
+      navigate(`/plant/${result.plantSlug}`);
     } else if (result.topMatch?.scientificName) {
-      navigate(`/library?q=${encodeURIComponent(result.topMatch.scientificName)}`);
+      // No slug in DB — search library; open=1 triggers auto-navigate on exactMatch
+      navigate(`/library?q=${encodeURIComponent(result.topMatch.scientificName)}&open=1`);
     }
   }
 

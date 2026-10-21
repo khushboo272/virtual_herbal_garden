@@ -2,7 +2,7 @@ import User, { IUser } from './User.model';
 import Bookmark from './Bookmark.model';
 import Garden from '../garden/Garden.model';
 import Detection from '../ai-scanner/Detection.model';
-import Review from '../plants/Review.model';
+import Review from '../library/Review.model';
 import ActivityLog from '../notifications/ActivityLog.model';
 import { BookmarkEntityType, ActivityType, PaginationMeta } from '../../types';
 import { AppError } from '../../core/utils/apiResponse';

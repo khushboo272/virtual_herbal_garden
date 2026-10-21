@@ -12,6 +12,10 @@ export interface IPlant extends Document {
   partsUsed: PlantPart[];
   toxicityLevel: ToxicityLevel;
   ayurvedicNames: string[];
+  // Searchable aliases: common alternate names, local names, synonyms
+  aliases: string[];
+  // Plant classification type (herb, shrub, tree, climber, etc.)
+  plantType: string | null;
   regionNative: string[];
   growingConditions: IGrowingConditions;
   images: IPlantImage[];
@@ -73,7 +77,9 @@ const PlantImageSchema = new Schema<IPlantImage>(
 const PlantSchema = new Schema<IPlant>(
   {
     commonName: { type: String, required: true, trim: true },
+    // unique declared here on the field; the schema.index() call below is removed to avoid duplicate
     scientificName: { type: String, required: true, unique: true, trim: true },
+    // unique declared here on the field; the schema.index() call below is removed to avoid duplicate
     slug: { type: String, required: true, unique: true, lowercase: true },
     family: { type: String, required: true, trim: true },
     description: { type: String, required: true },
@@ -87,6 +93,10 @@ const PlantSchema = new Schema<IPlant>(
       default: ToxicityLevel.NONE,
     },
     ayurvedicNames: [{ type: String }],
+    // Aliases: searchable alternate names, local names, synonyms
+    aliases: [{ type: String }],
+    // Plant type classification (herb, shrub, tree, climber, grass, etc.)
+    plantType: { type: String, default: null },
     regionNative: [{ type: String }],
     growingConditions: { type: GrowingConditionsSchema, default: {} },
     images: [PlantImageSchema],
@@ -129,11 +139,39 @@ const PlantSchema = new Schema<IPlant>(
   { timestamps: true },
 );
 
-// Indexes per PRD
-PlantSchema.index({ slug: 1 }, { unique: true });
-PlantSchema.index({ scientificName: 1 }, { unique: true });
+// Full-text search index with field weights for relevance
+// scientificName + commonName + aliases weighted highest, then medicinalUses/tags
+PlantSchema.index(
+  {
+    commonName: 'text',
+    scientificName: 'text',
+    aliases: 'text',
+    medicinalUses: 'text',
+    tags: 'text',
+    ayurvedicNames: 'text',
+  },
+  {
+    weights: {
+      commonName: 20,
+      scientificName: 20,
+      aliases: 15,
+      ayurvedicNames: 10,
+      medicinalUses: 5,
+      tags: 3,
+    },
+    name: 'plant_text_search',
+  },
+);
+
+// Compound and simple indexes — declared ONLY here (not as unique:true above duplicated)
+// NOTE: unique:true on the schema field definition already creates an index.
+// Additional non-unique indexes below:
 PlantSchema.index({ isPublished: 1, isFeatured: 1 });
-PlantSchema.index({ tags: 1 });
+PlantSchema.index({ isPublished: 1, isDeleted: 1 });
 PlantSchema.index({ isDeleted: 1 });
+PlantSchema.index({ tags: 1 });
+PlantSchema.index({ regionNative: 1 });
+PlantSchema.index({ plantType: 1 });
+PlantSchema.index({ createdAt: -1 });
 
 export default mongoose.model<IPlant>('Plant', PlantSchema);

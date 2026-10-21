@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import Garden from '../src/modules/garden/Garden.model';
-import Plant from '../src/modules/plants/Plant.model';
+import Plant from '../src/modules/library/Plant.model';
 import User from '../src/modules/users/User.model';
 import { hashPassword } from '../src/core/utils/hash';
 

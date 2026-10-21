@@ -124,7 +124,11 @@ async function request<T>(
 // ── Convenience Methods ──────────────────────────────────
 
 export const api = {
-  get: <T>(endpoint: string, params?: Record<string, string | number | boolean | undefined>) => {
+  get: <T>(
+    endpoint: string,
+    params?: Record<string, string | number | boolean | undefined>,
+    options?: { signal?: AbortSignal },
+  ) => {
     const searchParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -134,7 +138,7 @@ export const api = {
       });
     }
     const query = searchParams.toString();
-    return request<T>(`${endpoint}${query ? `?${query}` : ''}`);
+    return request<T>(`${endpoint}${query ? `?${query}` : ''}`, { signal: options?.signal });
   },
 
   post: <T>(endpoint: string, body?: unknown) =>

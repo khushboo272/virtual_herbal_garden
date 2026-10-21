@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import authRoutes from '../modules/auth/auth.routes';
-import plantRoutes from '../modules/plants/plant.routes';
+import plantRoutes from '../modules/library/plant.routes';
 import remedyRoutes from '../modules/remedies/remedy.routes';
 import gardenRoutes from '../modules/garden/garden.routes';
 import aiRoutes from '../modules/ai-scanner/detection.routes';
