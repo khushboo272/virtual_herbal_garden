@@ -1,8 +1,7 @@
-import request from 'supertest';
 import express from 'express';
 import mongoose from 'mongoose';
-import User from '../src/models/User';
-import { hashPassword } from '../src/utils/hash';
+import User from '../src/modules/users/User.model';
+import { hashPassword } from '../src/core/utils/hash';
 
 // Minimal app for testing
 const app = express();
@@ -50,7 +49,7 @@ describe('Auth API', () => {
   describe('User Model Methods', () => {
     it('should hash and compare passwords correctly', async () => {
       const hash = await hashPassword('MySecurePassword1!');
-      const { comparePassword } = await import('../src/utils/hash');
+      const { comparePassword } = await import('../src/core/utils/hash');
       const isMatch = await comparePassword('MySecurePassword1!', hash);
       const isNotMatch = await comparePassword('WrongPassword1!', hash);
 

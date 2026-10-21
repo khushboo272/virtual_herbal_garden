@@ -204,7 +204,7 @@ export class PlantController {
     sendSuccess(res, { message: '3D models deleted successfully' });
   }
 
-  async getGardenPlants(req: Request, res: Response) {
+  async getGardenPlants(_req: Request, res: Response) {
     const Plant = (await import('./Plant.model')).default;
     const plants = await Plant.find({ isVisibleInGarden: true, isDeleted: false })
       .select('commonName scientificName slug modelUrl modelUrl_lod1 modelUrl_lod2 globalPosition3D botanicalBed categories tags color placement3d images shortDescription partsUsed')

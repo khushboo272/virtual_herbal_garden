@@ -66,6 +66,7 @@ export enum NotificationType {
   REPLY = 'REPLY',
   ADMIN = 'ADMIN',
   SYSTEM = 'SYSTEM',
+  SYSTEM_ALERT = 'SYSTEM_ALERT',
 }
 
 export enum AuditAction {

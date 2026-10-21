@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
-import Plant from '../src/models/Plant';
-import Review from '../src/models/Review';
-import User from '../src/models/User';
-import { hashPassword } from '../src/utils/hash';
-import { generateSlug } from '../src/utils/slug';
+import Plant from '../src/modules/plants/Plant.model';
+import Review from '../src/modules/plants/Review.model';
+import User from '../src/modules/users/User.model';
+import { hashPassword } from '../src/core/utils/hash';
+import { generateSlug } from '../src/core/utils/slug';
 
 import './setup';
 

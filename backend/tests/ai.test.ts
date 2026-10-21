@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
-import Detection from '../src/models/Detection';
-import User from '../src/models/User';
-import { hashPassword } from '../src/utils/hash';
+import Detection from '../src/modules/ai-detection/Detection.model';
+import User from '../src/modules/users/User.model';
+import { hashPassword } from '../src/core/utils/hash';
 
 import './setup';
 

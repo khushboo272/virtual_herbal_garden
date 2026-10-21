@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
-import Garden from '../src/models/Garden';
-import Plant from '../src/models/Plant';
-import User from '../src/models/User';
-import { hashPassword } from '../src/utils/hash';
+import Garden from '../src/modules/garden/Garden.model';
+import Plant from '../src/modules/plants/Plant.model';
+import User from '../src/modules/users/User.model';
+import { hashPassword } from '../src/core/utils/hash';
 
 import './setup';
 
