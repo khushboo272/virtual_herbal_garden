@@ -8,7 +8,7 @@ import './setup';
 import mongoose from 'mongoose';
 import User from '../src/modules/users/User.model';
 import Bookmark from '../src/modules/users/Bookmark.model';
-import Detection from '../src/modules/ai-detection/Detection.model';
+import Detection from '../src/modules/ai-scanner/Detection.model';
 import { hashPassword } from '../src/core/utils/hash';
 
 describe('UserService.getStats', () => {

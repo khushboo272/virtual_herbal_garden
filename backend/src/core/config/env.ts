@@ -69,6 +69,10 @@ const envSchema = z.object({
 
   // Socket.io CORS
   SOCKET_IO_CORS_ORIGIN: z.string().optional(),
+
+  // Gemini AI
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
 });
 
 export type Env = z.infer<typeof envSchema>;

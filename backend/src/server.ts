@@ -7,7 +7,6 @@ import { initializeChangeStreams } from './core/socket/changeStreams';
 import { logger } from './core/utils/logger';
 
 // Import workers to start them
-import './modules/ai-detection/detection.worker';
 import './modules/notifications/email.worker';
 
 async function bootstrap(): Promise<void> {

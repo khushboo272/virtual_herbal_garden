@@ -6,7 +6,7 @@ import { RequireRole } from "./app/components/RequireRole";
 import { HomePageWrapper } from "./app/pages/HomePageWrapper";
 import { PlantLibraryPage } from "./app/pages/PlantLibraryPage";
 import { PlantDetailPage } from "./app/pages/PlantDetailPage";
-import { AIPlantDetectionPage } from "./app/pages/AIPlantDetectionPage";
+import { AIPlantDetectionPage } from "./features/ai-scanner";
 import { VirtualGarden3DPage } from "./app/pages/VirtualGarden3DPage";
 import { RemediesPageWrapper } from "./app/pages/RemediesPageWrapper";
 import { VirtualTourPage } from "./app/pages/VirtualTourPage";

@@ -127,7 +127,7 @@ export interface Detection {
   _id: string;
   user: string;
   imageUrl: string;
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETE' | 'FAILED';
   result?: {
     plantId?: string;
     confidence: number;

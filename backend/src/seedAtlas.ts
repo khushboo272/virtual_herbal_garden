@@ -15,7 +15,7 @@ import Notification from './modules/notifications/Notification.model';
 import SystemConfig from './modules/admin/SystemConfig.model';
 import AuditLog from './modules/admin/AuditLog.model';
 import ActivityLog from './modules/notifications/ActivityLog.model';
-import Detection from './modules/ai-detection/Detection.model';
+import Detection from './modules/ai-scanner/Detection.model';
 import { UserRole, ToxicityLevel, PlantPart, DifficultyLevel, GrowthStage, BookmarkEntityType, NotificationType, ImageType, AuditAction, ActivityType, DetectionStatus } from './types';
 
 const MONGODB_URI = process.env.MONGODB_URI!;
