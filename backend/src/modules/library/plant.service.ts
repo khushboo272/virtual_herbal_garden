@@ -8,6 +8,7 @@ import { ActivityType, PaginationMeta } from '../../types';
 import { generateSlug } from '../../core/utils/slug';
 import { AppError } from '../../core/utils/apiResponse';
 import { redis } from '../../core/config/redis';
+import { HEALTH_CATEGORIES, getCategoryBySlug } from './health-categories';
 
 interface LibraryFilters {
   page: number;
@@ -16,6 +17,8 @@ interface LibraryFilters {
   q?: string;
   search?: string;
   medicinalUse?: string[];
+  // health is a HEALTH_CATEGORIES slug; matches medicinalUses or tags containing any keyword
+  health?: string;
   region?: string;
   type?: string;
   category?: string;
@@ -36,6 +39,7 @@ interface LibraryMeta extends PaginationMeta {
     medicinalUse: FacetBucket[];
     region: FacetBucket[];
     type: FacetBucket[];
+    health?: { slug: string; label: string; icon: string; count: number }[];
   };
 }
 
@@ -118,6 +122,20 @@ export class PlantService {
       baseQuery.medicinalUses = {
         $in: medicinalUses.map((u) => new RegExp(escapeRegex(u.trim()), 'i')),
       };
+    }
+    // health category filter: match medicinalUses OR tags containing any keyword
+    const { health } = filters;
+    if (health) {
+      const healthCat = getCategoryBySlug(health);
+      if (healthCat) {
+        const keywordPatterns = healthCat.keywords.map(
+          (kw) => new RegExp(escapeRegex(kw), 'i'),
+        );
+        baseQuery.$or = [
+          { medicinalUses: { $in: keywordPatterns } },
+          { tags: { $in: keywordPatterns } },
+        ];
+      }
     }
 
     // ── Full-text search ──────────────────────────────────────────────────
@@ -207,9 +225,10 @@ export class PlantService {
     }
 
     // ── exactMatch + facets (run against base query, no pagination) ───────
-    const [exactMatch, facets] = await Promise.all([
+    const [exactMatch, facets, healthFacets] = await Promise.all([
       resolveExactMatch(searchTerm),
       computeFacets(baseQuery),
+      getHealthCategoryCounts(),
     ]);
 
     return {
@@ -220,7 +239,7 @@ export class PlantService {
         total,
         totalPages: Math.ceil(total / limit),
         exactMatch,
-        facets,
+        facets: { ...facets, health: healthFacets },
       },
     };
   }
@@ -412,3 +431,88 @@ export class PlantService {
 }
 
 export const plantService = new PlantService();
+
+// ── Standalone helper functions for the home module ────────────────────────
+// These are intentionally lightweight read-only queries to keep the home
+// service decoupled from PlantService internals.
+
+/** Returns up to `limit` featured published plants, filling with newest if fewer than limit */
+export async function getFeaturedPlants(limit = 6): Promise<Partial<IPlant>[]> {
+  const fields = 'commonName scientificName slug images tags isFeatured avgRating createdAt';
+  const featured = await Plant.find({ isFeatured: true, isPublished: true, isDeleted: false })
+    .select(fields)
+    .limit(limit)
+    .lean();
+
+  if (featured.length >= limit) return featured as unknown as Partial<IPlant>[];
+
+  // Fill remaining slots with newest published (not already in the featured list)
+  const featuredIds = featured.map((p) => (p as { _id: unknown })._id);
+  const fill = await Plant.find({
+    _id: { $nin: featuredIds },
+    isPublished: true,
+    isDeleted: false,
+  })
+    .sort({ reviewCount: -1, createdAt: -1 })
+    .select(fields)
+    .limit(limit - featured.length)
+    .lean();
+
+  return [...featured, ...fill] as unknown as Partial<IPlant>[];
+}
+
+/** Returns up to `limit` newest published plants */
+export async function getRecentPlants(limit = 6): Promise<Partial<IPlant>[]> {
+  const plants = await Plant.find({ isPublished: true, isDeleted: false })
+    .sort({ createdAt: -1 })
+    .select('commonName scientificName slug images tags avgRating createdAt')
+    .limit(limit)
+    .lean();
+  return plants as unknown as Partial<IPlant>[];
+}
+
+/** Returns total published plant count */
+export async function getPublishedPlantCount(): Promise<number> {
+  return Plant.countDocuments({ isPublished: true, isDeleted: false });
+}
+
+/** Returns a single published plant chosen deterministically by date
+ *  (same for everyone all day; changes each day at midnight Asia/Kolkata)
+ */
+export async function getPlantOfTheDay(): Promise<Partial<IPlant> | null> {
+  const total = await getPublishedPlantCount();
+  if (total === 0) return null;
+
+  // Stable hash from YYYY-MM-DD in Asia/Kolkata timezone
+  const dateStr = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+  let hash = 0;
+  for (const ch of dateStr) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  const index = hash % total;
+
+  const plant = await Plant.findOne({ isPublished: true, isDeleted: false })
+    .sort({ _id: 1 })
+    .skip(index)
+    .select('commonName scientificName slug images tags avgRating')
+    .lean();
+
+  return plant as Partial<IPlant> | null;
+}
+
+/** Returns per-health-category published plant counts (only categories with count > 0) */
+export async function getHealthCategoryCounts(): Promise<{ slug: string; label: string; icon: string; count: number }[]> {
+  const results = await Promise.all(
+    HEALTH_CATEGORIES.map(async (cat) => {
+      const keywordPatterns = cat.keywords.map((kw) => new RegExp(escapeRegex(kw), 'i'));
+      const count = await Plant.countDocuments({
+        isPublished: true,
+        isDeleted: false,
+        $or: [
+          { medicinalUses: { $in: keywordPatterns } },
+          { tags: { $in: keywordPatterns } },
+        ],
+      });
+      return { slug: cat.slug, label: cat.label, icon: cat.icon, count };
+    }),
+  );
+  return results.filter((r) => r.count > 0);
+}

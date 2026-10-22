@@ -16,6 +16,7 @@ export async function searchPlants(
   const query: Record<string, string | number | undefined> = {
     q: params.q,
     medicinalUse: params.medicinalUse,
+    health: params.health,
     region: params.region,
     type: params.type,
     category: params.category,

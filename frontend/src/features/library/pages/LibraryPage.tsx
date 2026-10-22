@@ -14,6 +14,7 @@ export function LibraryPage() {
     params,
     setQ,
     setMedicinalUse,
+    setHealth,
     setRegion,
     setType,
     setSort,
@@ -55,6 +56,21 @@ export function LibraryPage() {
           <p className="text-green-600">
             Browse our comprehensive collection of medicinal plants
           </p>
+          {/* Health category active-filter chip */}
+          {params.health && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-sm text-green-700">Filtered by:</span>
+              <button
+                type="button"
+                id="library-health-chip"
+                onClick={() => setHealth('')}
+                className="flex items-center gap-1.5 px-3 py-1 bg-green-100 border border-green-300 text-green-800 text-sm rounded-full hover:bg-green-200 transition-colors"
+              >
+                {params.health.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                <span aria-hidden className="text-green-500 ml-1">&times;</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* ── Search + Controls row ────────────────────────────────── */}

@@ -106,3 +106,18 @@ export class RemedyService {
 }
 
 export const remedyService = new RemedyService();
+
+/**
+ * Returns up to `limit` published remedies for the home page.
+ * Exported as a standalone function so the home service doesn't need to
+ * instantiate RemedyService directly.
+ */
+export async function getFeaturedRemedies(limit = 3): Promise<IRemedy[]> {
+  const remedies = await Remedy.find({ isPublished: true, isDeleted: false })
+    .sort({ createdAt: -1 })
+    .select('title slug description tags preparationTime difficultyLevel plants')
+    .populate('plants', 'commonName slug images')
+    .limit(limit)
+    .lean();
+  return remedies as unknown as IRemedy[];
+}

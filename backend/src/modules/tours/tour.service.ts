@@ -51,3 +51,21 @@ export class TourService {
 }
 
 export const tourService = new TourService();
+
+/**
+ * Returns up to `limit` published tours for the home page.
+ * Exported as a standalone function so the home service stays decoupled.
+ */
+export async function getFeaturedTours(limit = 3): Promise<ITour[]> {
+  const tours = await Tour.find({ isPublished: true, isDeleted: false })
+    .sort({ createdAt: -1 })
+    .select('title slug description difficulty estimatedDuration')
+    .limit(limit)
+    .lean();
+  return tours as unknown as ITour[];
+}
+
+/** Returns total published tour count */
+export async function getPublishedTourCount(): Promise<number> {
+  return Tour.countDocuments({ isPublished: true, isDeleted: false });
+}

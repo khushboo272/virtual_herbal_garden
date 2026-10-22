@@ -10,6 +10,7 @@ interface UsePlantSearchReturn {
   // Imperative setters — each syncs to URL
   setQ: (q: string) => void;
   setMedicinalUse: (use: string) => void;
+  setHealth: (health: string) => void;
   setRegion: (region: string) => void;
   setType: (type: string) => void;
   setSort: (sort: SearchParams['sort']) => void;
@@ -47,6 +48,7 @@ export function usePlantSearch(): UsePlantSearchReturn {
   const params: SearchParams = {
     q: searchParams.get('q') || undefined,
     medicinalUse: searchParams.get('use') || undefined,
+    health: searchParams.get('health') || undefined,
     region: searchParams.get('region') || undefined,
     type: searchParams.get('type') || undefined,
     sort: (searchParams.get('sort') as SearchParams['sort']) || 'newest',
@@ -117,6 +119,7 @@ export function usePlantSearch(): UsePlantSearchReturn {
 
   const setQ = (q: string) => updateParam('q', q || undefined);
   const setMedicinalUse = (use: string) => updateParam('use', use || undefined);
+  const setHealth = (health: string) => updateParam('health', health || undefined);
   const setRegion = (region: string) => updateParam('region', region || undefined);
   const setType = (type: string) => updateParam('type', type || undefined);
   const setSort = (sort: SearchParams['sort']) => updateParam('sort', sort);
@@ -142,6 +145,7 @@ export function usePlantSearch(): UsePlantSearchReturn {
     params,
     setQ,
     setMedicinalUse,
+    setHealth,
     setRegion,
     setType,
     setSort,

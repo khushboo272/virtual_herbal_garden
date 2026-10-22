@@ -7,6 +7,7 @@ import aiRoutes from '../modules/ai-scanner/detection.routes';
 import userRoutes from '../modules/users/user.routes';
 import adminRoutes from '../modules/admin/admin.routes';
 import tourRoutes from '../modules/tours/tour.routes';
+import homeRoutes from '../modules/home/home.routes';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use('/ai', aiRoutes);
 router.use('/users', userRoutes);
 router.use('/admin', adminRoutes);
 router.use('/tours', tourRoutes);
+router.use('/home', homeRoutes);
 
 export default router;

@@ -1,4 +1,5 @@
-// Home Feature Module — barrel exports
-export { HomePageWrapper } from '../../app/pages/HomePageWrapper';
-export { MobileViewPage } from '../../app/pages/MobileViewPage';
-export { StyleGuidePage } from '../../app/pages/StyleGuidePage';
+// Home feature — barrel exports
+export { HomePage } from './pages/HomePage';
+export { useHome } from './hooks/useHome';
+export { getHome } from './api/homeApi';
+export type { HomeData, HomePlant, HomeCategory, HomeStats, PopularSearch } from './types/home.types';

@@ -43,6 +43,7 @@ export const updatePlantSchema = createPlantSchema.partial();
 // Query params for GET /plants
 // q              — full-text search string (safe, escaped on service layer)
 // medicinalUse   — one or more comma-separated use strings
+// health         — HEALTH_CATEGORIES slug (immunity | digestion | skin-care | ...)
 // region         — filter by regionNative value
 // type           — filter by plantType value
 // category       — Mongo ObjectId of a Category
@@ -56,6 +57,7 @@ export const plantQuerySchema = z.object({
     .union([z.string(), z.array(z.string())])
     .transform((v) => (Array.isArray(v) ? v : v.split(',')))
     .optional(),
+  health: z.string().max(50).optional(),
   region: z.string().max(100).optional(),
   type: z.string().max(100).optional(),
   category: z.string().optional(),

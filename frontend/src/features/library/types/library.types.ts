@@ -85,12 +85,14 @@ export interface LibraryMeta {
     medicinalUse: FacetBucket[];
     region: FacetBucket[];
     type: FacetBucket[];
+    health?: { slug: string; label: string; icon: string; count: number }[];
   };
 }
 
 export interface SearchParams {
   q?: string;
   medicinalUse?: string;
+  health?: string;
   region?: string;
   type?: string;
   category?: string;

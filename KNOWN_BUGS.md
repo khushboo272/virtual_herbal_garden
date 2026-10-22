@@ -30,3 +30,31 @@
 ## BUG-005 Home page badge says "Explore 200+ Medicinal Plants" but the database has ~10
 **Status:** OPEN — Home module.
 **Description:** The hero badge on the home page displays "Explore 200+ Medicinal Plants", but the actual plant count in the database is approximately 10–15. This is hardcoded copy in the Home component.
+
+---
+
+## BUG-005 Home page badge says "Explore 200+ Medicinal Plants" but the database has ~10
+**Status:** BEING FIXED in this task (Home module rebuild)
+**Description:** The hero badge on the home page displays "Explore 200+ Medicinal Plants", but the actual plant count in the database is approximately 10-15. This is hardcoded copy in the Home component.
+**Fix:** Home module now fetches stats.plants from /api/v1/home and renders the real count in the badge.
+
+---
+
+## BUG-006 Home hero search does nothing
+**Status:** BEING FIXED in this task
+**Description:** The search bar in the hero section is a decorative <Input> with no onChange, no state binding, and no navigation. Pressing Search or Enter has no effect.
+**Fix:** Hero search is now a real debounced autocomplete bar; Enter navigates to /library?q=...&open=1; selecting a suggestion goes to /plant/:slug.
+
+---
+
+## BUG-007 Browse by Category cards use fake counts and no filter
+**Status:** BEING FIXED in this task
+**Description:** Category cards in the Home page hard-code counts (24/18/32/15) and link to /library with no filter applied. No data comes from the database.
+**Fix:** Home API endpoint returns real per-category plant counts using keyword matching against medicinalUses/tags. Cards now link to /library?health=<slug>.
+
+---
+
+## BUG-008 Featured plants show broken images; data source is unclear
+**Status:** BEING FIXED in this task
+**Description:** Featured plant images show alt-text boxes. HomePageWrapper uses useFeaturedPlants (from usePlants.ts hook) which calls GET /plants/featured. Plant detail links use plant.id (ObjectId) instead of slug.
+**Fix:** Home API returns featured plants from the database using PlantImage component. Detail links use slug. PlantImage component provides leaf-icon fallback so images never appear broken.

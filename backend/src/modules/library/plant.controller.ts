@@ -15,6 +15,7 @@ export class PlantController {
       q: q.q as string | undefined,
       search: q.search as string | undefined,
       medicinalUse: q.medicinalUse as string[] | undefined,
+      health: q.health as string | undefined,
       region: q.region as string | undefined,
       type: q.type as string | undefined,
       category: q.category as string | undefined,
