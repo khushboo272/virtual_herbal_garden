@@ -28,33 +28,78 @@
 ---
 
 ## BUG-005 Home page badge says "Explore 200+ Medicinal Plants" but the database has ~10
-**Status:** OPEN — Home module.
-**Description:** The hero badge on the home page displays "Explore 200+ Medicinal Plants", but the actual plant count in the database is approximately 10–15. This is hardcoded copy in the Home component.
-
----
-
-## BUG-005 Home page badge says "Explore 200+ Medicinal Plants" but the database has ~10
-**Status:** BEING FIXED in this task (Home module rebuild)
-**Description:** The hero badge on the home page displays "Explore 200+ Medicinal Plants", but the actual plant count in the database is approximately 10-15. This is hardcoded copy in the Home component.
-**Fix:** Home module now fetches stats.plants from /api/v1/home and renders the real count in the badge.
+**Status:** FIXED (Home module rebuild)
+**Description:** The hero badge on the home page displays "Explore 200+ Medicinal Plants", but the actual plant count in the database is approximately 10–15. This was hardcoded copy in the Home component.
+**Fix:** Home module now fetches stats.plants dynamically from /api/v1/home and renders the real count in the badge.
 
 ---
 
 ## BUG-006 Home hero search does nothing
-**Status:** BEING FIXED in this task
-**Description:** The search bar in the hero section is a decorative <Input> with no onChange, no state binding, and no navigation. Pressing Search or Enter has no effect.
+**Status:** FIXED (Home module rebuild)
+**Description:** The search bar in the hero section was a decorative <Input> with no onChange, no state binding, and no navigation. Pressing Search or Enter had no effect.
 **Fix:** Hero search is now a real debounced autocomplete bar; Enter navigates to /library?q=...&open=1; selecting a suggestion goes to /plant/:slug.
 
 ---
 
 ## BUG-007 Browse by Category cards use fake counts and no filter
-**Status:** BEING FIXED in this task
-**Description:** Category cards in the Home page hard-code counts (24/18/32/15) and link to /library with no filter applied. No data comes from the database.
+**Status:** FIXED (Home module rebuild)
+**Description:** Category cards in the Home page hard-coded counts (24/18/32/15) and linked to /library with no filter applied. No data came from the database.
 **Fix:** Home API endpoint returns real per-category plant counts using keyword matching against medicinalUses/tags. Cards now link to /library?health=<slug>.
 
 ---
 
 ## BUG-008 Featured plants show broken images; data source is unclear
-**Status:** BEING FIXED in this task
-**Description:** Featured plant images show alt-text boxes. HomePageWrapper uses useFeaturedPlants (from usePlants.ts hook) which calls GET /plants/featured. Plant detail links use plant.id (ObjectId) instead of slug.
+**Status:** FIXED (Home module rebuild)
+**Description:** Featured plant images showed alt-text boxes. HomePageWrapper used useFeaturedPlants (from usePlants.ts hook) which called GET /plants/featured. Plant detail links used plant.id (ObjectId) instead of slug.
 **Fix:** Home API returns featured plants from the database using PlantImage component. Detail links use slug. PlantImage component provides leaf-icon fallback so images never appear broken.
+
+---
+
+## BUG-009 Remedies page is a static template
+**Status:** FIXED (Remedies module rebuild)
+**Description:** Remedies page was a static template with hard-coded plants, stock photos from Unsplash, fake "% Effective" values (92%, 88%, etc.), and fake dosages. It did not connect to the database.
+**Fix:** Completely rebuilt the Remedies module into a database-driven feature (`/api/v1/remedies`, `RemediesPage`, `RemedyDetailPage`) with server-side search, health category facets, difficulty/usage filters, and ingredient plant matching. All fake efficacy percentages and invented dosages were eliminated and replaced with traditional educational disclaimers.
+
+---
+
+## BUG-010 /remedies/:slug renders a blank white page
+**Status:** FIXED (Remedies module rebuild)
+**Description:** Clicking any remedy card on the Home page routed to /remedies/:slug, which rendered completely blank because no route existed in App.tsx and there was no 404 catch-all route.
+**Fix:** Added `/remedies/:slug` route rendering `RemedyDetailPage` in App.tsx, with full loading/error/not-found states, plant resolution, interactive steps checklist, and print view. Added catch-all `*` route rendering `NotFoundPage` across the app.
+
+---
+
+## BUG-011 Home tour cards link to /virtual-tour/:slug which has no route
+**Status:** FIXED (Virtual Tour module rebuild)
+**Description:** Guided tour cards on the Home page link to /virtual-tour/:slug, which had no route defined in App.tsx.
+**Fix:** Connected `/virtual-tour/:slug` route in `App.tsx` to `TourOverviewPage`, rendering dynamic checkpoints timeline, plant and remedy integration, educational disclaimer, and progress controls. Also updated `HomePage.tsx` so cards resolve to `/virtual-tour/:slug` safely and "All Tours" leads to `/virtual-tour`.
+
+---
+
+## BUG-012 /virtual-tour is static
+**Status:** FIXED (Virtual Tour module rebuild)
+**Description:** /virtual-tour is static with one hard-coded 6-checkpoint tour; the Tour API and the 3 DB tours (Your Kitchen Pharmacy, Stress Relief & Adaptogens, Ayurvedic Immunity Garden) are ignored.
+**Fix:** Replaced hard-coded static tour with a database-driven `ToursHubPage` supporting multi-faceted filtering (health categories, levels, plant slugs, keyword search, sorting), "Continue where you left off" resumption, dynamic TourCards, skeletons, empty states, and retry states. Deleted obsolete static checkpoint data.
+
+---
+
+## BUG-013 Tour progress exists only in localStorage
+**Status:** FIXED (Virtual Tour module rebuild)
+**Description:** Tour progress exists only in localStorage (lost across devices/users); "Continue Tour" is not backed by real authenticated progress.
+**Fix:** Introduced MongoDB `TourProgress` model with compound index `(userId, tourId)` and endpoints for `/tours/me/progress`, `/tours/:slug/progress`, `/tours/:slug/checkpoints/:key/complete`, `/tours/:slug/checkpoints/:key/quiz`, `/tours/:slug/progress/sync`, `/tours/:slug/rating`, and `/tours/:slug/progress` (DELETE restart). Server-side quiz scoring guarantees answers never leak to clients. Guests use local storage and automatically sync to their profile on sign-in or tour access.
+
+---
+
+## BUG-014 Admin tour management / create-tour / tour analytics pages use sample or stub data
+**Status:** FIXED (Virtual Tour module rebuild)
+**Description:** Admin tour management, create-tour, and tour analytics pages use sample or stub data, so admins cannot add or manage tours.
+**Fix:** Replaced static sample data and stubs with fully-functional `AdminToursListPage`, `AdminTourEditorPage`, and `AdminTourAnalyticsPage` protected under `RequireRole minimumRole="ADMIN"`. Admins can manage draft/published tours, re-order checkpoints with accessible up/down controls, configure quizzes with passing thresholds, preview drafts, and inspect funnel drop-off analytics.
+
+---
+
+## BUG-015 Browser tab title leaks from the previous page
+**Status:** FIXED (Virtual Tour module rebuild)
+**Description:** Browser tab title leaks from the previous page ("Traditional Herbal Remedies | ..." shown on /virtual-tour) due to unmanaged document.title without unmount cleanup.
+**Fix:** Created shared `useDocumentTitle` hook (`frontend/src/hooks/useDocumentTitle.ts`) that saves the previous document title and restores it upon component unmount. Applied across all tour pages and remedies pages (`RemediesPage`, `RemedyDetailPage`).
+
+

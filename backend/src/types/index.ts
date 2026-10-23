@@ -84,6 +84,7 @@ export enum ActivityType {
   REVIEW = 'REVIEW',
   GARDEN_UPDATE = 'GARDEN_UPDATE',
   BOOKMARK = 'BOOKMARK',
+  COMPLETE_TOUR = 'COMPLETE_TOUR',
 }
 
 export enum ImageType {
@@ -127,10 +128,11 @@ export interface IPlantImage {
 }
 
 export interface IIngredient {
-  plantId: Types.ObjectId;
-  partUsed: PlantPart;
+  plantId?: Types.ObjectId;
+  name?: string;
+  partUsed?: PlantPart;
   quantity: string;
-  unit: string;
+  unit?: string;
   notes?: string;
 }
 
@@ -172,6 +174,32 @@ export interface IDetectionFeedback {
   reviewedAt: Date;
 }
 
+export type TourLevel = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+
+export interface IQuizQuestion {
+  prompt: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+export interface ITourCheckpoint {
+  key: string;
+  order: number;
+  title: string;
+  summary: string;
+  body: string;
+  durationMinutes: number;
+  plantSlugs: string[];
+  remedySlugs: string[];
+  keyTakeaways: string[];
+  audioUrl?: string;
+  quiz?: {
+    passScore: number;
+    questions: IQuizQuestion[];
+  };
+}
+
 export interface ITourStop {
   order: number;
   plant: Types.ObjectId;
@@ -209,6 +237,8 @@ export interface PaginationMeta {
   limit: number;
   total: number;
   totalPages: number;
+  facets?: Record<string, unknown>;
+  exactMatch?: string | null;
 }
 
 export interface PaginationQuery {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Heart, Share2, Leaf, MapPin, Star, Sparkles,
-  AlertCircle, Lock, BookOpen, ChevronRight, Loader2
+  AlertCircle, Lock, BookOpen, ChevronRight, Loader2, Map
 } from 'lucide-react';
 import { PlantImage } from '../components/PlantImage';
 import { usePlant, usePlantReviews } from '../hooks/usePlant';
@@ -11,6 +11,8 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { PlantViewer3DModal } from '../../../app/components/PlantViewer3DModal';
 import { getRelated } from '../api/libraryApi';
 import type { LibraryPlant, PlantReview } from '../types/library.types';
+import { getRemediesByPlant, RemedyCard, type Remedy } from '../../remedies';
+import { getToursByPlant, TourCard, type TourSummary } from '../../tours';
 
 // ── Star rating input ──────────────────────────────────────────────────────
 
@@ -114,6 +116,9 @@ export function PlantDetailPage() {
   const [reviewError, setReviewError] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState(false);
 
+  const [plantRemedies, setPlantRemedies] = useState<Remedy[]>([]);
+  const [plantTours, setPlantTours] = useState<TourSummary[]>([]);
+
   // Load related plants
   useEffect(() => {
     if (!plant?._id) return;
@@ -121,6 +126,18 @@ export function PlantDetailPage() {
       .then(setRelated)
       .catch(() => setRelated([]));
   }, [plant?._id]);
+
+  // Load remedies using this plant
+  useEffect(() => {
+    if (!plant?.slug) return;
+    getRemediesByPlant(plant.slug, 3)
+      .then(setPlantRemedies)
+      .catch(() => setPlantRemedies([]));
+
+    getToursByPlant(plant.slug, 3)
+      .then(setPlantTours)
+      .catch(() => setPlantTours([]));
+  }, [plant?.slug]);
 
   if (isLoading) {
     return (
@@ -464,6 +481,57 @@ export function PlantDetailPage() {
             <div className="flex gap-4 overflow-x-auto pb-2">
               {related.map((r) => (
                 <RelatedPlantCard key={r._id} plant={r} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Remedies using this plant ──────────────────────────────── */}
+        {plantRemedies.length > 0 && (
+          <section className="mb-10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-green-900">
+                  Remedies using {plant.commonName}
+                </h2>
+                <p className="text-xs text-gray-500">Traditional herbal preparations featuring this plant</p>
+              </div>
+              <Link
+                to={`/remedies?plant=${plant.slug}`}
+                className="flex items-center gap-1 text-sm text-green-600 hover:text-green-800 transition-colors font-medium"
+              >
+                See all <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {plantRemedies.map((r) => (
+                <RemedyCard key={r._id || r.id || r.slug} remedy={r} compact />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Featured in Tours ──────────────────────────────────────── */}
+        {plantTours.length > 0 && (
+          <section className="mb-10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-green-900 flex items-center gap-2">
+                  <Map className="w-5 h-5 text-emerald-600" />
+                  Featured in Guided Tours
+                </h2>
+                <p className="text-xs text-gray-500">Explore this plant as part of an interactive tour</p>
+              </div>
+              <Link
+                to={`/virtual-tour?plant=${plant.slug}`}
+                className="flex items-center gap-1 text-sm text-green-600 hover:text-green-800 transition-colors font-medium"
+              >
+                View all in Tours <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {plantTours.map((t) => (
+                <TourCard key={t.id || t.slug} tour={t} />
               ))}
             </div>
           </section>

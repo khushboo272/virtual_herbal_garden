@@ -7,8 +7,17 @@ import { HomePage } from "./features/home";
 import { LibraryPage, PlantDetailPage } from './features/library';
 import { AIPlantDetectionPage } from "./features/ai-scanner";
 import { VirtualGarden3DPage } from "./app/pages/VirtualGarden3DPage";
-import { RemediesPageWrapper } from "./app/pages/RemediesPageWrapper";
-import { VirtualTourPage } from "./app/pages/VirtualTourPage";
+import { RemediesPage, RemedyDetailPage } from "./features/remedies";
+import { NotFoundPage } from "./app/pages/NotFoundPage";
+import {
+  ToursHubPage,
+  TourOverviewPage,
+  TourCheckpointPage,
+  TourCompletionPage,
+  AdminToursListPage,
+  AdminTourEditorPage,
+  AdminTourAnalyticsPage,
+} from "./features/tours";
 import { MobileViewPage } from "./app/pages/MobileViewPage";
 import { StyleGuidePage } from "./app/pages/StyleGuidePage";
 import { OAuthCallbackPage } from "./app/pages/OAuthCallbackPage";
@@ -25,9 +34,6 @@ import {
   AIScannerStatsPage,
   UserGrowthPage,
   FeaturedContentPage,
-  ToursManagementPage,
-  CreateTourPage,
-  TourAnalyticsPage,
   BookmarksPage,
   MyGardenPage,
   AIScannerPage,
@@ -52,10 +58,15 @@ export default function App() {
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/plant/:id" element={<PlantDetailPage />} />
           <Route path="/ai-detect" element={<RequireRole minimumRole="USER"><AIPlantDetectionPage /></RequireRole>} />
-          <Route path="/remedies" element={<RemediesPageWrapper />} />
-          <Route path="/virtual-tour" element={<VirtualTourPage />} />
+          <Route path="/remedies" element={<RemediesPage />} />
+          <Route path="/remedies/:slug" element={<RemedyDetailPage />} />
+          <Route path="/virtual-tour" element={<ToursHubPage />} />
+          <Route path="/virtual-tour/:slug" element={<TourOverviewPage />} />
+          <Route path="/virtual-tour/:slug/complete" element={<TourCompletionPage />} />
+          <Route path="/virtual-tour/:slug/:key" element={<TourCheckpointPage />} />
           <Route path="/mobile" element={<MobileViewPage />} />
           <Route path="/style-guide" element={<StyleGuidePage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
 
         {/* ── Dashboard — unified route with sidebar layout (PRD §3.1) ── */}
@@ -88,9 +99,10 @@ export default function App() {
           <Route path="analytics/users" element={<UserGrowthPage />} />
           <Route path="featured" element={<FeaturedContentPage />} />
           <Route path="users" element={<UserManagementPage />} />
-          <Route path="tours/manage" element={<ToursManagementPage />} />
-          <Route path="tours/manage/new" element={<CreateTourPage />} />
-          <Route path="tours/analytics" element={<TourAnalyticsPage />} />
+          <Route path="tours/manage" element={<RequireRole minimumRole="ADMIN"><AdminToursListPage /></RequireRole>} />
+          <Route path="tours/manage/new" element={<RequireRole minimumRole="ADMIN"><AdminTourEditorPage /></RequireRole>} />
+          <Route path="tours/manage/:id" element={<RequireRole minimumRole="ADMIN"><AdminTourEditorPage /></RequireRole>} />
+          <Route path="tours/analytics" element={<RequireRole minimumRole="ADMIN"><AdminTourAnalyticsPage /></RequireRole>} />
 
           {/* Super Admin sub-routes */}
           <Route path="system" element={<SystemOverviewPage />} />

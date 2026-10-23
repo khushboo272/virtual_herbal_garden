@@ -9,7 +9,8 @@ import { createRemedySchema, updateRemedySchema, remedyQuerySchema } from './rem
 const router = Router();
 
 router.get('/', validate(remedyQuerySchema, 'query'), remedyController.list);
-router.get('/:slug', remedyController.getBySlug);
+router.get('/:id/related', remedyController.getRelated);
+router.get('/:slug', remedyController.getBySlugOrId);
 router.post('/', authenticate(), requireRole(UserRole.BOTANIST), validate(createRemedySchema), remedyController.create);
 router.patch('/:id', authenticate(), requireRole(UserRole.BOTANIST), validate(updateRemedySchema), remedyController.update);
 router.delete('/:id', authenticate(), requireRole(UserRole.ADMIN), remedyController.delete);

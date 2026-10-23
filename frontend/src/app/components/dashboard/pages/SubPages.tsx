@@ -122,69 +122,7 @@ export function FeaturedContentPage() {
   );
 }
 
-// ── Create Tour — /dashboard/tours/manage/new ────────────
-export function CreateTourPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-green-900">Create New Tour</h1>
-        <p className="text-green-600 mt-1">Design a new guided virtual tour through the garden</p>
-      </div>
-      <Card className="border-2 border-green-200 bg-white">
-        <CardHeader><CardTitle className="text-green-900">Tour Builder</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-gray-500">The tour builder interface will allow you to:</p>
-          <ul className="list-disc list-inside text-gray-600 space-y-1">
-            <li>Set a tour name and description</li>
-            <li>Add stops at specific plants in the garden</li>
-            <li>Write narration text for each stop</li>
-            <li>Set camera angles and transitions</li>
-            <li>Preview the tour before publishing</li>
-          </ul>
-          <Button className="bg-green-600 hover:bg-green-700 mt-4">
-            <Plus className="w-4 h-4 mr-2" />
-            Start Building
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
-// ── Tour Analytics — /dashboard/tours/analytics ──────────
-export function TourAnalyticsPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-green-900">Tour Analytics</h1>
-        <p className="text-green-600 mt-1">View engagement metrics for guided tours</p>
-      </div>
-      <div className="grid md:grid-cols-3 gap-4">
-        <Card className="border-2 border-teal-200 bg-white">
-          <CardContent className="pt-6">
-            <Map className="w-8 h-8 text-teal-600 mb-2" />
-            <p className="text-3xl font-bold text-teal-900">3</p>
-            <p className="text-sm text-teal-600">Published Tours</p>
-          </CardContent>
-        </Card>
-        <Card className="border-2 border-teal-200 bg-white">
-          <CardContent className="pt-6">
-            <BarChart3 className="w-8 h-8 text-teal-600 mb-2" />
-            <p className="text-3xl font-bold text-teal-900">557</p>
-            <p className="text-sm text-teal-600">Total Views</p>
-          </CardContent>
-        </Card>
-        <Card className="border-2 border-teal-200 bg-white">
-          <CardContent className="pt-6">
-            <Map className="w-8 h-8 text-teal-600 mb-2" />
-            <p className="text-3xl font-bold text-teal-900">72%</p>
-            <p className="text-sm text-teal-600">Completion Rate</p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
 
 // ── Bookmarks — /dashboard/bookmarks ─────────────────────
 export function BookmarksPage() {

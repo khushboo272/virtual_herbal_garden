@@ -516,3 +516,66 @@ export async function getHealthCategoryCounts(): Promise<{ slug: string; label: 
   );
   return results.filter((r) => r.count > 0);
 }
+
+export interface ResolvedPlantSummary {
+  id: string;
+  slug: string;
+  commonName: string;
+  scientificName: string;
+  image: string;
+}
+
+/**
+ * Matches ingredient names/keywords against the library's commonName, scientificName, and aliases.
+ * Returns unique published plant summaries.
+ */
+export async function findPlantsByNames(names: string[]): Promise<ResolvedPlantSummary[]> {
+  if (!names || names.length === 0) return [];
+
+  const searchTerms = names
+    .map((n) => n.trim())
+    .filter((n) => n.length > 0);
+
+  if (searchTerms.length === 0) return [];
+
+  const clauses: Record<string, unknown>[] = [];
+  for (const term of searchTerms) {
+    const escaped = escapeRegex(term);
+    clauses.push({ commonName: { $regex: escaped, $options: 'i' } });
+    clauses.push({ scientificName: { $regex: escaped, $options: 'i' } });
+    clauses.push({ aliases: { $regex: escaped, $options: 'i' } });
+
+    // Also match meaningful individual words (e.g. "Tulsi Leaves" -> "Tulsi")
+    const words = term
+      .split(/\s+/)
+      .filter(
+        (w) =>
+          w.length >= 3 &&
+          !/^(fresh|leaves|root|powder|dry|crushed|boiled|ground|warm|cold|extract|juice|decoction|oil|paste|tea|water|milk|tsp|tbsp|cup|cups|pinch)$/i.test(
+            w,
+          ),
+      );
+    for (const word of words) {
+      const escWord = escapeRegex(word);
+      clauses.push({ commonName: { $regex: escWord, $options: 'i' } });
+      clauses.push({ scientificName: { $regex: escWord, $options: 'i' } });
+      clauses.push({ aliases: { $regex: escWord, $options: 'i' } });
+    }
+  }
+
+  const plants = await Plant.find({
+    isPublished: true,
+    isDeleted: false,
+    $or: clauses,
+  })
+    .select('commonName scientificName slug images')
+    .lean();
+
+  return plants.map((p) => ({
+    id: String(p._id),
+    slug: p.slug,
+    commonName: p.commonName,
+    scientificName: p.scientificName,
+    image: p.images?.[0]?.url || '',
+  }));
+}

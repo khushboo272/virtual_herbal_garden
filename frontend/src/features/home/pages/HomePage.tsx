@@ -305,8 +305,9 @@ function RemedyCard({ remedy }: { remedy: FeaturedRemedy }) {
 // ── Tour mini card ────────────────────────────────────────────────────────────
 
 function TourCard({ tour }: { tour: FeaturedTour }) {
+  const target = tour.slug ? `/virtual-tour/${tour.slug}` : '/virtual-tour';
   return (
-    <Link to={tour.slug ? `/virtual-tour/${tour.slug}` : '/virtual-tour'} className="no-underline group">
+    <Link to={target} className="no-underline group">
       <Card className="border-2 border-green-100 hover:border-green-300 hover:shadow-lg transition-all">
         <CardContent className="p-5">
           <div className="flex items-center gap-2 mb-2">

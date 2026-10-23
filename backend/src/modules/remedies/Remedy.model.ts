@@ -16,8 +16,14 @@ export interface IRemedy extends Document {
   preparationSteps: IPreparationStep[];
   dosage: string;
   contraindications: string[];
+  precautions?: string[];
   difficultyLevel: DifficultyLevel;
+  difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
   preparationTime: number;
+  prepTimeMinutes?: number;
+  usage?: 'INTERNAL' | 'TOPICAL' | 'INHALATION';
+  traditionalSource?: string;
+  image?: string;
   images: IRemedyImage[];
   tags: string[];
   isPublished: boolean;
@@ -30,9 +36,10 @@ export interface IRemedy extends Document {
 const IngredientSchema = new Schema<IIngredient>(
   {
     plantId: { type: Schema.Types.ObjectId, ref: 'Plant' },
+    name: { type: String },
     partUsed: { type: String, enum: Object.values(PlantPart) },
     quantity: { type: String, required: true },
-    unit: { type: String, required: true },
+    unit: { type: String },
     notes: String,
   },
   { _id: false },
@@ -60,19 +67,33 @@ const RemedyImageSchema = new Schema<IRemedyImage>(
 const RemedySchema = new Schema<IRemedy>(
   {
     title: { type: String, required: true, trim: true },
-    slug: { type: String, unique: true, lowercase: true },
+    slug: { type: String, lowercase: true },
     description: { type: String, required: true },
     plants: [{ type: Schema.Types.ObjectId, ref: 'Plant' }],
     ingredients: [IngredientSchema],
     preparationSteps: [PreparationStepSchema],
     dosage: { type: String, required: true },
     contraindications: [{ type: String }],
+    precautions: [{ type: String }],
     difficultyLevel: {
       type: String,
       enum: Object.values(DifficultyLevel),
       default: DifficultyLevel.EASY,
     },
+    difficulty: {
+      type: String,
+      enum: ['EASY', 'MEDIUM', 'HARD', 'ADVANCED'],
+      default: 'EASY',
+    },
     preparationTime: { type: Number, required: true },
+    prepTimeMinutes: { type: Number },
+    usage: {
+      type: String,
+      enum: ['INTERNAL', 'TOPICAL', 'INHALATION'],
+      default: 'INTERNAL',
+    },
+    traditionalSource: { type: String },
+    image: { type: String },
     images: [RemedyImageSchema],
     tags: [{ type: String, lowercase: true }],
     isPublished: { type: Boolean, default: false },
@@ -82,11 +103,10 @@ const RemedySchema = new Schema<IRemedy>(
   { timestamps: true },
 );
 
-// Indexes per PRD
+// Indexes declared once to prevent duplicate index warnings
 RemedySchema.index({ slug: 1 }, { unique: true });
 RemedySchema.index({ plants: 1 });
 RemedySchema.index({ tags: 1 });
-RemedySchema.index({ isPublished: 1 });
-RemedySchema.index({ isDeleted: 1 });
+RemedySchema.index({ isPublished: 1, isDeleted: 1 });
 
 export default mongoose.model<IRemedy>('Remedy', RemedySchema);

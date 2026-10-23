@@ -8,9 +8,16 @@ export class RemedyController {
     sendSuccess(res, result.remedies, 200, result.meta);
   }
 
-  async getBySlug(req: Request, res: Response) {
-    const remedy = await remedyService.getBySlug(req.params.slug);
+  async getBySlugOrId(req: Request, res: Response) {
+    const identifier = req.params.slugOrId || req.params.slug || req.params.id;
+    const remedy = await remedyService.getBySlugOrId(identifier);
     sendSuccess(res, remedy);
+  }
+
+  async getRelated(req: Request, res: Response) {
+    const identifier = req.params.id || req.params.slug;
+    const related = await remedyService.getRelated(identifier);
+    sendSuccess(res, related);
   }
 
   async create(req: Request, res: Response) {
