@@ -96,3 +96,8 @@ TODO_LIST.md
 cloudflare.txt
 *.secret
 credentials*.txt
+
+# Local assets for bulk upload to R2
+assets/*
+!assets/README.md
+

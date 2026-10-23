@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Clock, CheckCircle2, ChevronRight, BookOpen } from 'lucide-react';
-import { PlantImage } from '../../library';
+import { ThemedImage } from '../../../components/common/ThemedImage';
 import type { Tour, TourLevel } from '../types/tour.types';
 
 interface TourCardProps {
@@ -24,9 +24,12 @@ export function TourCard({ tour, progressPercent }: TourCardProps) {
     <div className="group flex flex-col bg-white rounded-2xl border border-green-100 shadow-sm hover:shadow-md hover:border-green-300 transition-all duration-200 overflow-hidden">
       {/* Cover Image & Badges */}
       <div className="relative aspect-[16/9] w-full bg-green-50 overflow-hidden">
-        <PlantImage
+        <ThemedImage
           src={imageUrl}
           alt={tour.title}
+          title={tour.title}
+          category={tour.healthCategory}
+          aspectRatio="video"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
         />
 

@@ -137,6 +137,37 @@ export async function deleteTour(id: string): Promise<void> {
   await api.delete(`/tours/${id}`);
 }
 
+export async function uploadTourCover(
+  id: string,
+  file: File,
+): Promise<{ coverImage: string; coverThumb: string }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await api.upload<{ coverImage: string; coverThumb: string }>(
+    `/tours/${id}/cover`,
+    formData,
+  );
+  return res.data;
+}
+
+export async function deleteTourCover(id: string): Promise<void> {
+  await api.delete(`/tours/${id}/cover`);
+}
+
+export async function uploadCheckpointImage(
+  id: string,
+  key: string,
+  file: File,
+): Promise<{ imageUrl: string }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await api.upload<{ imageUrl: string }>(
+    `/tours/${id}/checkpoints/${key}/image`,
+    formData,
+  );
+  return res.data;
+}
+
 /**
  * Returns up to 3 tours featuring a given plant slug.
  * Exported from barrel for cross-module integration (PlantDetailPage).

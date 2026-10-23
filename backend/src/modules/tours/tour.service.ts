@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Tour, { ITour } from './Tour.model';
 import TourProgress from './TourProgress.model';
+import '../library/Plant.model';
 import ActivityLog from '../notifications/ActivityLog.model';
 import { notificationService } from '../notifications/notification.service';
 import { HEALTH_CATEGORIES } from '../library/health-categories';
@@ -8,6 +9,9 @@ import { PaginationMeta, UserRole, ActivityType, NotificationType, TourLevel } f
 import { generateSlug } from '../../core/utils/slug';
 import { AppError } from '../../core/utils/apiResponse';
 import { logger } from '../../core/utils/logger';
+import { putImage, deleteObject } from '../../core/storage/r2Storage';
+import { tourCoverKey, tourCoverThumbKey, tourCheckpointKey, publicUrl } from '../../core/storage/assetKeys';
+import { validateImageMagicBytes, processTourCover, processTourCheckpointImage } from '../../core/utils/imageProcessor';
 
 export interface TourListFilters {
   q?: string;
@@ -62,8 +66,71 @@ function checkQuizRateLimit(userId: string): void {
   quizSubmissions.set(userId, validTimestamps);
 }
 
-function sanitizeTourForClient(tourDoc: any): any {
+export function normalizeTourDoc(tourDoc: any): any {
   const tour = tourDoc.toObject ? tourDoc.toObject() : { ...tourDoc };
+
+  // Normalize level
+  tour.level =
+    tour.level ||
+    (tour.difficulty === 'EASY'
+      ? 'BEGINNER'
+      : tour.difficulty === 'MEDIUM'
+      ? 'INTERMEDIATE'
+      : tour.difficulty === 'HARD'
+      ? 'ADVANCED'
+      : undefined) ||
+    'BEGINNER';
+
+  // Normalize summary / description
+  tour.summary = tour.summary || tour.description || '';
+  tour.description = tour.description || tour.summary || '';
+
+  // Normalize coverImage
+  tour.coverImage = tour.coverImage || tour.coverImageUrl || null;
+  tour.coverImageUrl = tour.coverImageUrl || tour.coverImage || null;
+
+  // Normalize estimatedMinutes
+  tour.estimatedMinutes = tour.estimatedMinutes || tour.estimatedDuration || 10;
+  tour.estimatedDuration = tour.estimatedDuration || tour.estimatedMinutes || 10;
+
+  // Convert legacy stops to checkpoints if checkpoints missing or empty
+  if ((!tour.checkpoints || tour.checkpoints.length === 0) && Array.isArray(tour.stops) && tour.stops.length > 0) {
+    tour.checkpoints = tour.stops.map((stop: any, idx: number) => {
+      const title = stop.title || `Stop ${stop.order || idx + 1}`;
+      const baseKey = title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+      const key = baseKey || `cp-${stop.order || idx + 1}`;
+
+      const plantSlugs: string[] = [];
+      if (stop.plant) {
+        if (typeof stop.plant === 'object' && stop.plant.slug) {
+          plantSlugs.push(stop.plant.slug);
+        } else if (typeof stop.plant === 'string' && !mongoose.Types.ObjectId.isValid(stop.plant)) {
+          plantSlugs.push(stop.plant);
+        }
+      }
+
+      return {
+        key,
+        order: stop.order || idx + 1,
+        title,
+        summary: stop.description || '',
+        body: stop.description || '',
+        durationMinutes: 3,
+        plantSlugs,
+        remedySlugs: [],
+        keyTakeaways: [],
+      };
+    });
+  }
+
+  return tour;
+}
+
+function sanitizeTourForClient(tourDoc: any): any {
+  const tour = normalizeTourDoc(tourDoc);
   if (tour.checkpoints && Array.isArray(tour.checkpoints)) {
     tour.checkpoints = tour.checkpoints.map((cp: any) => {
       const sanitizedCp = { ...cp };
@@ -91,26 +158,36 @@ export class TourService {
     const limit = Math.min(48, Math.max(1, filters.limit || 12));
     const skip = (page - 1) * limit;
 
-    const query: Record<string, any> = {
-      isPublished: true,
-      isDeleted: false,
-    };
+    const conditions: any[] = [
+      { isPublished: true },
+      { isDeleted: false },
+      {
+        $or: [
+          { 'checkpoints.0': { $exists: true } },
+          { 'stops.0': { $exists: true } },
+        ],
+      },
+    ];
 
     // Text search
     if (filters.q && filters.q.trim()) {
       const escaped = filters.q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const searchRegex = new RegExp(escaped, 'i');
-      query.$or = [
-        { title: searchRegex },
-        { summary: searchRegex },
-        { description: searchRegex },
-        { tags: searchRegex },
-        { 'checkpoints.title': searchRegex },
-        { 'checkpoints.summary': searchRegex },
-        { 'checkpoints.body': searchRegex },
-        { 'checkpoints.plantSlugs': searchRegex },
-        { 'checkpoints.remedySlugs': searchRegex },
-      ];
+      conditions.push({
+        $or: [
+          { title: searchRegex },
+          { summary: searchRegex },
+          { description: searchRegex },
+          { tags: searchRegex },
+          { 'checkpoints.title': searchRegex },
+          { 'checkpoints.summary': searchRegex },
+          { 'checkpoints.body': searchRegex },
+          { 'checkpoints.plantSlugs': searchRegex },
+          { 'checkpoints.remedySlugs': searchRegex },
+          { 'stops.title': searchRegex },
+          { 'stops.description': searchRegex },
+        ],
+      });
     }
 
     // Health Category filter
@@ -119,36 +196,41 @@ export class TourService {
       const matchedCat = HEALTH_CATEGORIES.find((c) => c.slug.toLowerCase() === healthSlug);
       if (matchedCat) {
         const keywordRegexes = matchedCat.keywords.map((kw) => new RegExp(kw, 'i'));
-        query.$or = [
-          ...(query.$or || []),
-          { healthCategory: healthSlug },
-          { tags: { $in: matchedCat.keywords } },
-          { summary: { $in: keywordRegexes } },
-          { description: { $in: keywordRegexes } },
-        ];
+        conditions.push({
+          $or: [
+            { healthCategory: healthSlug },
+            { tags: { $in: matchedCat.keywords } },
+            { summary: { $in: keywordRegexes } },
+            { description: { $in: keywordRegexes } },
+          ],
+        });
       } else {
-        query.healthCategory = healthSlug;
+        conditions.push({ healthCategory: healthSlug });
       }
     }
 
     // Level filter
     if (filters.level) {
-      query.$or = [
-        ...(query.$or || []),
-        { level: filters.level },
-        { difficulty: filters.level === 'BEGINNER' ? 'EASY' : filters.level === 'INTERMEDIATE' ? 'MEDIUM' : 'HARD' },
-      ];
+      conditions.push({
+        $or: [
+          { level: filters.level },
+          { difficulty: filters.level === 'BEGINNER' ? 'EASY' : filters.level === 'INTERMEDIATE' ? 'MEDIUM' : 'HARD' },
+        ],
+      });
     }
 
     // Plant filter (matches plant slug)
     if (filters.plant && filters.plant.trim()) {
       const plantSlug = filters.plant.trim().toLowerCase();
-      query.$or = [
-        ...(query.$or || []),
-        { 'checkpoints.plantSlugs': plantSlug },
-        { tags: plantSlug },
-      ];
+      conditions.push({
+        $or: [
+          { 'checkpoints.plantSlugs': plantSlug },
+          { tags: plantSlug },
+        ],
+      });
     }
+
+    const query = conditions.length > 1 ? { $and: conditions } : conditions[0];
 
     // Sorting
     let sortObj: Record<string, 1 | -1> = { isFeatured: -1, sortOrder: 1, createdAt: -1 };
@@ -161,8 +243,15 @@ export class TourService {
     const [toursDocs, total, allPublishedTours] = await Promise.all([
       Tour.find(query).sort(sortObj).skip(skip).limit(limit).lean(),
       Tour.countDocuments(query),
-      Tour.find({ isPublished: true, isDeleted: false })
-        .select('healthCategory level difficulty tags summary description')
+      Tour.find({
+        isPublished: true,
+        isDeleted: false,
+        $or: [
+          { 'checkpoints.0': { $exists: true } },
+          { 'stops.0': { $exists: true } },
+        ],
+      })
+        .select('healthCategory level difficulty tags summary description checkpoints stops')
         .lean(),
     ]);
 
@@ -188,23 +277,23 @@ export class TourService {
     const levelFacets = Object.entries(levelCounts).map(([name, count]) => ({ name, count }));
 
     const tourSummaries: TourCardSummary[] = toursDocs.map((t: any) => {
-      const checkpoints = t.checkpoints || [];
+      const norm = normalizeTourDoc(t);
+      const checkpoints = norm.checkpoints || [];
       const cpDuration = checkpoints.reduce((acc: number, c: any) => acc + (c.durationMinutes || 0), 0);
-      const estMin = t.estimatedMinutes || (cpDuration > 0 ? cpDuration : t.estimatedDuration) || 10;
-      const count = checkpoints.length > 0 ? checkpoints.length : (t.stops ? t.stops.length : 0);
-      const lvl = t.level || (t.difficulty === 'EASY' ? 'BEGINNER' : t.difficulty === 'MEDIUM' ? 'INTERMEDIATE' : 'ADVANCED') || 'BEGINNER';
+      const estMin = norm.estimatedMinutes || (cpDuration > 0 ? cpDuration : 10);
+      const count = checkpoints.length;
 
       return {
-        id: String(t._id),
-        slug: t.slug,
-        title: t.title,
-        summary: t.summary || t.description || '',
-        coverImage: t.coverImage || t.coverImageUrl || null,
-        healthCategory: t.healthCategory,
-        level: lvl as TourLevel,
+        id: String(norm._id),
+        slug: norm.slug,
+        title: norm.title,
+        summary: norm.summary,
+        coverImage: norm.coverImage,
+        healthCategory: norm.healthCategory,
+        level: norm.level as TourLevel,
         estimatedMinutes: estMin,
         checkpointCount: count,
-        isFeatured: Boolean(t.isFeatured),
+        isFeatured: Boolean(norm.isFeatured),
       };
     });
 
@@ -237,6 +326,7 @@ export class TourService {
 
     const tour = await Tour.findOne(filter)
       .populate('createdBy', 'displayName avatarUrl')
+      .populate('stops.plant', 'slug title name')
       .lean();
 
     if (!tour) {
@@ -257,8 +347,15 @@ export class TourService {
    * Internal retrieval of raw tour with full quiz answers for scoring.
    */
   async getRawTourBySlug(slug: string): Promise<ITour> {
-    const tour = await Tour.findOne({ slug, isDeleted: false });
+    const tour = await Tour.findOne({ slug, isDeleted: false }).populate('stops.plant', 'slug title name');
     if (!tour) throw new AppError('Tour not found', 404, 'NOT_FOUND');
+
+    if ((!tour.checkpoints || tour.checkpoints.length === 0) && tour.stops && tour.stops.length > 0) {
+      const normalized = normalizeTourDoc(tour);
+      tour.checkpoints = normalized.checkpoints;
+      tour.level = normalized.level;
+    }
+
     return tour;
   }
 
@@ -815,6 +912,96 @@ export class TourService {
       logger.error('Failed to log tour completion or notify user', err);
     }
   }
+
+  /**
+   * Uploads and processes a high-res cover and thumbnail to Cloudflare R2.
+   */
+  async uploadTourCover(idOrSlug: string, buffer: Buffer): Promise<{ coverImage: string; coverThumb: string }> {
+    const mime = validateImageMagicBytes(buffer);
+    if (!mime) {
+      throw new AppError('Invalid image format. Accepted: JPEG, PNG, WebP', 400, 'INVALID_FORMAT');
+    }
+
+    const tour = await this.getRawTour(idOrSlug);
+    const { full, thumb } = await processTourCover(buffer);
+
+    const coverKey = tourCoverKey(tour.slug);
+    const thumbKey = tourCoverThumbKey(tour.slug);
+
+    await Promise.all([
+      putImage({ key: coverKey, buffer: full, contentType: 'image/webp' }),
+      putImage({ key: thumbKey, buffer: thumb, contentType: 'image/webp' }),
+    ]);
+
+    const version = Date.now();
+    const coverUrl = publicUrl(coverKey, version);
+    const thumbUrl = publicUrl(thumbKey, version);
+
+    tour.coverImage = coverUrl;
+    tour.coverImageUrl = coverUrl;
+    await tour.save();
+
+    return { coverImage: coverUrl, coverThumb: thumbUrl };
+  }
+
+  /**
+   * Deletes the tour cover and thumbnail from Cloudflare R2 and clears tour model fields.
+   */
+  async deleteTourCover(idOrSlug: string): Promise<void> {
+    const tour = await this.getRawTour(idOrSlug);
+    const coverKey = tourCoverKey(tour.slug);
+    const thumbKey = tourCoverThumbKey(tour.slug);
+
+    await Promise.all([
+      deleteObject(coverKey),
+      deleteObject(thumbKey),
+    ]);
+
+    tour.coverImage = '';
+    tour.coverImageUrl = '';
+    await tour.save();
+  }
+
+  /**
+   * Uploads and optimizes a checkpoint image to Cloudflare R2.
+   */
+  async uploadCheckpointImage(idOrSlug: string, checkpointKeyStr: string, buffer: Buffer): Promise<{ imageUrl: string }> {
+    const mime = validateImageMagicBytes(buffer);
+    if (!mime) {
+      throw new AppError('Invalid image format. Accepted: JPEG, PNG, WebP', 400, 'INVALID_FORMAT');
+    }
+
+    const tour = await this.getRawTour(idOrSlug);
+    const cp = (tour.checkpoints || []).find((c: any) => c.key === checkpointKeyStr);
+    if (!cp) {
+      throw new AppError(`Checkpoint "${checkpointKeyStr}" not found in tour`, 404, 'CHECKPOINT_NOT_FOUND');
+    }
+
+    const processed = await processTourCheckpointImage(buffer);
+    const cpKey = tourCheckpointKey(tour.slug, checkpointKeyStr);
+
+    await putImage({ key: cpKey, buffer: processed, contentType: 'image/webp' });
+
+    const url = publicUrl(cpKey, Date.now());
+    cp.imageUrl = url;
+    await tour.save();
+
+    return { imageUrl: url };
+  }
+
+  private async getRawTour(idOrSlug: string): Promise<any> {
+    let query: any;
+    if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
+      query = { _id: idOrSlug, isDeleted: false };
+    } else {
+      query = { slug: idOrSlug, isDeleted: false };
+    }
+    const tour = await Tour.findOne(query);
+    if (!tour) {
+      throw new AppError('Tour not found', 404, 'TOUR_NOT_FOUND');
+    }
+    return tour;
+  }
 }
 
 export const tourService = new TourService();
@@ -824,28 +1011,46 @@ export const tourService = new TourService();
  * Standalone export so the home service stays decoupled.
  */
 export async function getFeaturedTours(limit = 3): Promise<any[]> {
-  const tours = await Tour.find({ isPublished: true, isDeleted: false })
+  const tours = await Tour.find({
+    isPublished: true,
+    isDeleted: false,
+    $or: [
+      { 'checkpoints.0': { $exists: true } },
+      { 'stops.0': { $exists: true } },
+    ],
+  })
     .sort({ isFeatured: -1, createdAt: -1 })
-    .select('title slug description summary difficulty level estimatedDuration estimatedMinutes coverImage coverImageUrl checkpoints')
+    .select('title slug description summary difficulty level estimatedDuration estimatedMinutes coverImage coverImageUrl checkpoints stops')
     .limit(limit)
     .lean();
 
-  return tours.map((t: any) => ({
-    _id: t._id,
-    id: String(t._id),
-    title: t.title,
-    slug: t.slug,
-    description: t.summary || t.description || '',
-    summary: t.summary || t.description || '',
-    difficulty: t.difficulty || 'EASY',
-    level: t.level || 'BEGINNER',
-    estimatedDuration: t.estimatedDuration || t.estimatedMinutes || 10,
-    estimatedMinutes: t.estimatedMinutes || t.estimatedDuration || 10,
-    coverImageUrl: t.coverImage || t.coverImageUrl || null,
-  }));
+  return tours.map((t: any) => {
+    const norm = normalizeTourDoc(t);
+    return {
+      _id: norm._id,
+      id: String(norm._id),
+      title: norm.title,
+      slug: norm.slug,
+      description: norm.summary,
+      summary: norm.summary,
+      difficulty: norm.difficulty || 'EASY',
+      level: norm.level,
+      estimatedDuration: norm.estimatedMinutes,
+      estimatedMinutes: norm.estimatedMinutes,
+      coverImageUrl: norm.coverImage,
+    };
+  });
 }
 
-/** Returns total published tour count */
+/** Returns total published tour count with at least one checkpoint */
 export async function getPublishedTourCount(): Promise<number> {
-  return Tour.countDocuments({ isPublished: true, isDeleted: false });
+  return Tour.countDocuments({
+    isPublished: true,
+    isDeleted: false,
+    $or: [
+      { 'checkpoints.0': { $exists: true } },
+      { 'stops.0': { $exists: true } },
+    ],
+  });
 }
+

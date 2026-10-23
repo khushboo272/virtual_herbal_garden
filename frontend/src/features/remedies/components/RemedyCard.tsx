@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Clock, Flame, Heart, ArrowRight, Sparkles } from 'lucide-react';
-import { PlantImage } from '../../library';
+import { ThemedImage } from '../../../components/common/ThemedImage';
 import type { Remedy } from '../types/remedy.types';
 import { useRemedyFavorite } from '../hooks/useRemedyFavorite';
 
@@ -13,10 +13,12 @@ export function RemedyCard({ remedy, compact = false }: RemedyCardProps) {
   const navigate = useNavigate();
   const { isFavorite, toggle, isAuthenticated } = useRemedyFavorite(remedy._id || remedy.id || '');
 
-  // Resolve best image URL: remedy.image -> first image in remedy.images -> first plant's image
-  const imageUrl =
-    remedy.image ||
-    remedy.images?.[0]?.url ||
+  // Resolve best image URL with strict fallback hierarchy:
+  // 1. Own remedy cover image
+  // 2. First linked plant image
+  // 3. Category-themed placeholder
+  const ownImage = remedy.image || remedy.images?.[0]?.url || '';
+  const plantFallback =
     remedy.plants?.[0]?.images?.[0]?.url ||
     remedy.resolvedPlants?.[0]?.image ||
     '';
@@ -46,9 +48,12 @@ export function RemedyCard({ remedy, compact = false }: RemedyCardProps) {
     return (
       <div className="bg-white rounded-xl border border-green-100 hover:border-green-300 hover:shadow-md transition-all overflow-hidden flex flex-col h-full group">
         <div className="relative">
-          <PlantImage
-            src={imageUrl}
+          <ThemedImage
+            src={ownImage}
+            fallbackSrc={plantFallback}
             alt={remedy.title}
+            title={remedy.title}
+            category={remedy.tags?.[0]}
             heightClass="h-32"
             className="w-full"
           />
@@ -99,9 +104,12 @@ export function RemedyCard({ remedy, compact = false }: RemedyCardProps) {
     <div className="bg-white rounded-2xl border border-green-100/80 shadow-sm hover:shadow-lg hover:border-green-300 transition-all duration-200 overflow-hidden flex flex-col h-full group">
       {/* Top Image + Badges */}
       <div className="relative overflow-hidden bg-green-50">
-        <PlantImage
-          src={imageUrl}
+        <ThemedImage
+          src={ownImage}
+          fallbackSrc={plantFallback}
           alt={remedy.title}
+          title={remedy.title}
+          category={remedy.tags?.[0]}
           heightClass="h-48"
           className="w-full transform group-hover:scale-105 transition-transform duration-300"
         />

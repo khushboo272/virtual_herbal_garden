@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { tourService } from './tour.service';
-import { sendSuccess, sendCreated } from '../../core/utils/apiResponse';
+import { sendSuccess, sendCreated, AppError } from '../../core/utils/apiResponse';
 import { UserRole } from '../../types';
 
 export class TourController {
@@ -119,6 +119,24 @@ export class TourController {
   async delete(req: Request, res: Response) {
     await tourService.softDelete(req.params.id);
     sendSuccess(res, { message: 'Tour deleted successfully' });
+  }
+
+  async uploadCover(req: Request, res: Response) {
+    if (!req.file) throw new AppError('No image file uploaded', 400, 'NO_FILE');
+    const result = await tourService.uploadTourCover(req.params.id, req.file.buffer);
+    sendSuccess(res, result);
+  }
+
+  async deleteCover(req: Request, res: Response) {
+    await tourService.deleteTourCover(req.params.id);
+    sendSuccess(res, { message: 'Cover removed successfully' });
+  }
+
+  async uploadCheckpointImage(req: Request, res: Response) {
+    if (!req.file) throw new AppError('No image file uploaded', 400, 'NO_FILE');
+    const { id, key } = req.params;
+    const result = await tourService.uploadCheckpointImage(id, key, req.file.buffer);
+    sendSuccess(res, result);
   }
 }
 

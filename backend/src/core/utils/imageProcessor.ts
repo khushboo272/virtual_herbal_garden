@@ -35,6 +35,22 @@ export async function processAvatar(buffer: Buffer): Promise<Buffer> {
   return sharp(buffer).resize(256, 256, { fit: 'cover' }).webp({ quality: 85 }).toBuffer();
 }
 
+export async function processTourCover(buffer: Buffer): Promise<{ full: Buffer; thumb: Buffer }> {
+  const [full, thumb] = await Promise.all([
+    sharp(buffer).resize(1600, 900, { fit: 'cover' }).webp({ quality: 85 }).toBuffer(),
+    sharp(buffer).resize(640, 360, { fit: 'cover' }).webp({ quality: 80 }).toBuffer(),
+  ]);
+  return { full, thumb };
+}
+
+export async function processTourCheckpointImage(buffer: Buffer): Promise<Buffer> {
+  return sharp(buffer).resize(1200, 800, { fit: 'inside' }).webp({ quality: 85 }).toBuffer();
+}
+
+export async function processRemedyCover(buffer: Buffer): Promise<Buffer> {
+  return sharp(buffer).resize(1200, 800, { fit: 'cover' }).webp({ quality: 85 }).toBuffer();
+}
+
 // Validate image by magic bytes (not file extension) per PRD §9.1
 export function validateImageMagicBytes(buffer: Buffer): string | null {
   const header = buffer.subarray(0, 12);

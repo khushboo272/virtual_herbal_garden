@@ -52,7 +52,7 @@ describe('Garden API', () => {
       scale: 1.5,
       growthStage: 'SPROUT',
       plantedAt: new Date(),
-    } as mongoose.AnyObject);
+    } as any);
     await garden.save();
 
     const found = await Garden.findById(garden._id);
@@ -72,7 +72,7 @@ describe('Garden API', () => {
       }],
     });
 
-    const entryId = garden.plants[0]._id;
+    const entryId = (garden.plants[0] as any)._id;
     await Garden.findOneAndUpdate(
       { user: userId, 'plants._id': entryId },
       { $set: { 'plants.$.position': { x: 5, y: 0, z: 10 } } },
@@ -94,7 +94,7 @@ describe('Garden API', () => {
       }],
     });
 
-    const entryId = garden.plants[0]._id;
+    const entryId = (garden.plants[0] as any)._id;
     await Garden.findOneAndUpdate(
       { user: userId },
       { $pull: { plants: { _id: entryId } } },

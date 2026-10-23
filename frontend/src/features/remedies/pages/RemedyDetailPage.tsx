@@ -19,6 +19,7 @@ import { useRemedy } from '../hooks/useRemedy';
 import { useRemedyFavorite, useShare } from '../hooks/useRemedyFavorite';
 import { RemedyCard } from '../components/RemedyCard';
 import { PlantImage } from '../../library';
+import { ThemedImage } from '../../../components/common/ThemedImage';
 
 export function RemedyDetailPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -176,6 +177,19 @@ export function RemedyDetailPage() {
               <span className="hidden sm:inline">Print</span>
             </button>
           </div>
+        </div>
+
+        {/* ── Remedy Hero Visual Banner ───────────────────────────────── */}
+        <div className="relative aspect-[21/9] sm:aspect-[24/9] w-full bg-green-950 rounded-3xl overflow-hidden shadow-sm mb-6 print:hidden">
+          <ThemedImage
+            src={remedy.image || remedy.images?.[0]?.url}
+            fallbackSrc={remedy.plants?.[0]?.images?.[0]?.url || remedy.resolvedPlants?.[0]?.image}
+            alt={remedy.title}
+            title={remedy.title}
+            category={remedy.tags?.[0]}
+            aspectRatio="wide"
+            className="w-full h-full object-cover"
+          />
         </div>
 
         {/* ── Remedy Header ────────────────────────────────────────────── */}

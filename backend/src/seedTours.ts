@@ -3,7 +3,10 @@ import dotenv from 'dotenv';
 import path from 'path';
 import Tour from './modules/tours/Tour.model';
 import User from './modules/users/User.model';
+import Plant from './modules/library/Plant.model';
+import Remedy from './modules/remedies/Remedy.model';
 import { UserRole } from './types';
+import { connectDB, disconnectDB } from './core/config/db';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
@@ -1277,38 +1280,91 @@ const TOURS_SEED_DATA = [
 ];
 
 export async function seedTours(): Promise<void> {
-  const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/virtual_herbal_garden';
   console.log('🌱 Connecting to database...');
-  await mongoose.connect(mongoUri);
+  await connectDB();
+  const dbName = mongoose.connection.name;
+  console.log(`Connected to database: ${dbName}`);
+
+  const toursBefore = await Tour.find({ isDeleted: false });
+  console.log(`\n=== BEFORE TOURS SEED: ${toursBefore.length} tours ===`);
+  for (const t of toursBefore) {
+    console.log(`- "${t.title}" (${t.slug}): checkpoints=${t.checkpoints?.length ?? 0}, stops=${t.stops?.length ?? 0}`);
+  }
 
   const admin = await User.findOne({ role: UserRole.ADMIN }) || await User.findOne();
   if (!admin) {
     console.error('❌ No user found in database to assign as tour creator. Run seedAtlas.ts first.');
-    await mongoose.disconnect();
+    await disconnectDB();
     process.exit(1);
   }
 
   console.log(`👤 Using user ${admin.displayName} (${admin._id}) as author.`);
 
+  // Query existing plant and remedy slugs in database
+  const existingPlants = await Plant.find().select('slug').lean();
+  const existingPlantSlugs = new Set(existingPlants.map((p: any) => p.slug));
+
+  const existingRemedies = await Remedy.find().select('slug').lean();
+  const existingRemedySlugs = new Set(existingRemedies.map((r: any) => r.slug));
+
+  const missingPlantSlugs = new Set<string>();
+  const missingRemedySlugs = new Set<string>();
+
   let createdCount = 0;
   let updatedCount = 0;
 
   for (const tourData of TOURS_SEED_DATA) {
-    const existing = await Tour.findOne({ slug: tourData.slug });
+    // Filter plantSlugs and remedySlugs only when they exist in database
+    const filteredCheckpoints = tourData.checkpoints.map((cp) => {
+      const plantSlugs = (cp.plantSlugs || []).filter((s) => {
+        if (existingPlantSlugs.has(s)) return true;
+        missingPlantSlugs.add(s);
+        return false;
+      });
+      const remedySlugs = (cp.remedySlugs || []).filter((s) => {
+        if (existingRemedySlugs.has(s)) return true;
+        missingRemedySlugs.add(s);
+        return false;
+      });
+      return {
+        ...cp,
+        plantSlugs,
+        remedySlugs,
+      };
+    });
+
+    let existing = await Tour.findOne({ slug: tourData.slug });
+    if (!existing) {
+      existing = await Tour.findOne({ title: { $regex: new RegExp(`^${tourData.title}$`, 'i') } });
+      if (existing) {
+        console.log(`🔄 Found existing tour by title "${existing.title}". Updating slug from "${existing.slug}" to "${tourData.slug}".`);
+        existing.slug = tourData.slug;
+      }
+    }
+
     if (!existing) {
       await Tour.create({
         ...tourData,
+        checkpoints: filteredCheckpoints,
         createdBy: admin._id,
       });
-      console.log(`✅ Created tour: "${tourData.title}" (${tourData.slug}) with ${tourData.checkpoints.length} checkpoints.`);
+      console.log(`✅ Created tour: "${tourData.title}" (${tourData.slug}) with ${filteredCheckpoints.length} checkpoints.`);
       createdCount++;
     } else {
-      // Idempotent: only fill in missing checkpoints/fields without overwriting custom edits
       let modified = false;
-      if (!existing.checkpoints || existing.checkpoints.length === 0) {
-        existing.checkpoints = tourData.checkpoints as any;
+
+      // Fill in or upgrade checkpoints if missing, empty, or legacy without quizzes
+      const needsCheckpoints =
+        !existing.checkpoints ||
+        existing.checkpoints.length === 0 ||
+        existing.checkpoints.length < filteredCheckpoints.length ||
+        !existing.checkpoints.some((c: any) => c.quiz?.questions?.length > 0);
+
+      if (needsCheckpoints) {
+        existing.checkpoints = filteredCheckpoints as any;
         modified = true;
       }
+
       if (!existing.healthCategory && tourData.healthCategory) {
         existing.healthCategory = tourData.healthCategory;
         modified = true;
@@ -1325,9 +1381,18 @@ export async function seedTours(): Promise<void> {
         existing.coverImage = tourData.coverImage;
         modified = true;
       }
+      if (!existing.estimatedMinutes && tourData.estimatedMinutes) {
+        existing.estimatedMinutes = tourData.estimatedMinutes;
+        modified = true;
+      }
+      if (existing.sequential === undefined && tourData.sequential !== undefined) {
+        existing.sequential = tourData.sequential;
+        modified = true;
+      }
+
       if (modified) {
         await existing.save();
-        console.log(`🔄 Updated missing fields for existing tour: "${existing.title}" (${existing.slug}).`);
+        console.log(`🔄 Updated tour with checkpoints & fields: "${existing.title}" (${existing.slug}) -> ${existing.checkpoints?.length} checkpoints.`);
         updatedCount++;
       } else {
         console.log(`⏭️  Tour already up-to-date: "${existing.title}" (${existing.slug}). Skipped.`);
@@ -1335,8 +1400,19 @@ export async function seedTours(): Promise<void> {
     }
   }
 
-  console.log(`\n🎉 Tour seeding complete! Created: ${createdCount}, Updated: ${updatedCount}, Total Tours: ${TOURS_SEED_DATA.length}`);
-  await mongoose.disconnect();
+  // Report missing slugs
+  console.log('\n=== SLUG VERIFICATION REPORT ===');
+  console.log(`Missing plant slugs (${missingPlantSlugs.size}):`, Array.from(missingPlantSlugs).join(', ') || 'None (all plant slugs found)');
+  console.log(`Missing remedy slugs (${missingRemedySlugs.size}):`, Array.from(missingRemedySlugs).join(', ') || 'None (all remedy slugs found)');
+
+  const toursAfter = await Tour.find({ isDeleted: false });
+  console.log(`\n=== AFTER TOURS SEED: ${toursAfter.length} tours (Created: ${createdCount}, Updated: ${updatedCount}) ===`);
+  for (const t of toursAfter) {
+    console.log(`- "${t.title}" (${t.slug}): checkpoints=${t.checkpoints?.length ?? 0}, stops=${t.stops?.length ?? 0}, level=${t.level ?? 'undefined'}`);
+  }
+
+  console.log(`\n🎉 Tour seeding complete! Total tours in collection: ${toursAfter.length}`);
+  await disconnectDB();
 }
 
 if (require.main === module) {

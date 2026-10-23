@@ -82,3 +82,16 @@ export async function getRemedyBookmarks(): Promise<
   );
   return Array.isArray(res.data) ? res.data : [];
 }
+
+// ── Remedy Image Uploads ───────────────────────────────────────────────────
+
+export async function uploadRemedyImage(id: string, file: File): Promise<{ imageUrl: string }> {
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await api.upload<{ imageUrl: string }>(`/remedies/${id}/image`, formData);
+  return res.data;
+}
+
+export async function deleteRemedyImage(id: string): Promise<void> {
+  await api.delete(`/remedies/${id}/image`);
+}

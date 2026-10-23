@@ -185,27 +185,29 @@ export function useTourProgress(slug: string, checkpoints: TourCheckpoint[] = EM
           setIsLoading(false);
         }
       } else {
-        // Guest mode — use functional updater to avoid depending on `progress` object.
-        return new Promise<TourProgress>((resolve) => {
-          setProgress((prev) => {
-            const nextKeys = Array.from(new Set([...prev.completedKeys, key]));
-            const total = checkpointCountRef.current || 1;
-            const pct = Math.min(100, Math.round((nextKeys.length / total) * 100));
-            const updated: TourProgress = {
-              ...prev,
-              completedKeys: nextKeys,
-              lastCheckpointKey: key,
-              percent: pct,
-              completedAt:
-                nextKeys.length === checkpointCountRef.current && checkpointCountRef.current > 0
-                  ? new Date().toISOString()
-                  : null,
-            };
-            saveGuestProgress(slug, { completedKeys: nextKeys, lastCheckpointKey: key });
-            resolve(updated);
-            return updated;
-          });
-        });
+        // Guest mode — update state and localStorage directly without deadlocking in test act()
+        const guestData = loadGuestProgress(slug);
+        const nextKeys = Array.from(new Set([...guestData.completedKeys, key]));
+        const total = checkpointCountRef.current || 1;
+        const pct = Math.min(100, Math.round((nextKeys.length / total) * 100));
+        const updated: TourProgress = {
+          tourId: '',
+          slug,
+          completedKeys: nextKeys,
+          lastCheckpointKey: key,
+          percent: pct,
+          quizResults: {},
+          startedAt: new Date().toISOString(),
+          completedAt:
+            nextKeys.length === checkpointCountRef.current && checkpointCountRef.current > 0
+              ? new Date().toISOString()
+              : null,
+          rating: null,
+          ratingComment: null,
+        };
+        saveGuestProgress(slug, { completedKeys: nextKeys, lastCheckpointKey: key });
+        setProgress(updated);
+        return updated;
       }
     },
     // Removed `progress` and `checkpoints.length` from deps — use refs instead.

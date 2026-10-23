@@ -15,7 +15,10 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "seed:remedies": "tsx src/seedRemedies.ts",
-    "seed:tours": "tsx src/seedTours.ts"
+    "seed:tours": "tsx src/seedTours.ts",
+    "backfill:tours": "tsx src/scripts/backfillTours.ts",
+    "r2:check": "tsx src/scripts/r2Check.ts",
+    "assets:upload": "tsx src/scripts/uploadAssets.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",

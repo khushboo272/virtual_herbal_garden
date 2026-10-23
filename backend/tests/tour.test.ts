@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import Tour from '../src/modules/tours/Tour.model';
 import User from '../src/modules/users/User.model';
+import '../src/modules/library/Plant.model';
 import { hashPassword } from '../src/core/utils/hash';
 import { tourService } from '../src/modules/tours/tour.service';
 import { UserRole } from '../src/types';
@@ -230,4 +231,62 @@ describe('Tour Service & Controller Logic', () => {
     expect(detail.completionRate).toBe(100);
     expect(detail.perCheckpoint.length).toBe(2);
   });
+
+  it('should normalize legacy tour documents with stops into checkpoints', async () => {
+    const legacyTour = await Tour.create({
+      title: 'Legacy Herb Trail',
+      slug: `legacy-trail-${Date.now()}`,
+      description: 'A legacy tour using stops array',
+      difficulty: 'EASY',
+      isPublished: true,
+      createdBy: adminId,
+      stops: [
+        {
+          order: 1,
+          title: 'Legacy Tulsi Stop',
+          description: 'A holy basil stop',
+          plant: new mongoose.Types.ObjectId(),
+        },
+        {
+          order: 2,
+          title: 'Legacy Neem Stop',
+          description: 'A bitter neem stop',
+          plant: new mongoose.Types.ObjectId(),
+        },
+      ],
+      checkpoints: [],
+    });
+
+    const clientTour = await tourService.getBySlugOrId(legacyTour.slug);
+    expect(clientTour.checkpoints).toBeDefined();
+    expect(clientTour.checkpoints.length).toBe(2);
+    expect(clientTour.checkpoints[0].title).toBe('Legacy Tulsi Stop');
+    expect(clientTour.checkpoints[0].key).toBe('legacy-tulsi-stop');
+    expect(clientTour.level).toBe('BEGINNER');
+  });
+
+  it('should exclude published tours with 0 checkpoints from public list', async () => {
+    const emptyPublished = await Tour.create({
+      title: 'Empty Published Tour',
+      slug: `empty-pub-${Date.now()}`,
+      isPublished: true,
+      createdBy: adminId,
+      checkpoints: [],
+      stops: [],
+    });
+
+    const result = await tourService.list({});
+    const found = result.tours.find((t: any) => t.slug === emptyPublished.slug);
+    expect(found).toBeUndefined();
+  });
+
+  it('should sanitize client responses so quiz questions have no correctIndex or explanation', async () => {
+    const tour = await createTestTour();
+    const clientTour = await tourService.getBySlugOrId(tour.slug);
+    const cpWithQuiz = clientTour.checkpoints.find((c: any) => c.quiz && c.quiz.questions?.length > 0);
+    expect(cpWithQuiz).toBeDefined();
+    expect(cpWithQuiz.quiz.questions[0].correctIndex).toBeUndefined();
+    expect(cpWithQuiz.quiz.questions[0].explanation).toBeUndefined();
+  });
 });
+

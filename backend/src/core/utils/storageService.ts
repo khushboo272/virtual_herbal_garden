@@ -8,6 +8,8 @@ import { s3Client, S3_BUCKET, CDN_BASE } from '../config/s3';
 import { processImage, processAvatar, validateImageMagicBytes } from '../utils/imageProcessor';
 import { AppError } from '../utils/apiResponse';
 import { logger } from './logger';
+import { userAvatarKey, scanKey, publicUrl } from '../storage/assetKeys';
+import { putImage } from '../storage/r2Storage';
 
 interface UploadResult {
   url: string;
@@ -58,10 +60,10 @@ export class StorageService {
     }
 
     const processed = await processAvatar(buffer);
-    const key = `users/${userId}/avatar/avatar.webp`;
+    const key = userAvatarKey(userId);
 
-    await this.putObject(key, processed, 'image/webp');
-    return `${CDN_BASE}/${key}`;
+    await putImage({ key, buffer: processed, contentType: 'image/webp', isImmutable: false });
+    return publicUrl(key, Date.now());
   }
 
   async uploadDetectionImage(buffer: Buffer, jobId: string): Promise<string> {
@@ -70,9 +72,9 @@ export class StorageService {
       throw new AppError('Invalid image format', 400, 'INVALID_FORMAT');
     }
 
-    const key = `ai/uploads/${jobId}/original.webp`;
-    await this.putObject(key, buffer, mime);
-    return `${CDN_BASE}/${key}`;
+    const key = scanKey(jobId, jobId);
+    await putImage({ key, buffer, contentType: mime, isImmutable: true });
+    return publicUrl(key);
   }
 
   async deleteFile(key: string): Promise<void> {

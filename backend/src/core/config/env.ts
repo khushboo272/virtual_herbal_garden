@@ -61,6 +61,7 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('debug'),
 
   // Cloudflare R2
+  R2_ACCOUNT_ID: z.string().optional(),
   R2_ENDPOINT: z.string().optional(),
   R2_ACCESS_KEY_ID: z.string().optional(),
   R2_SECRET_ACCESS_KEY: z.string().optional(),

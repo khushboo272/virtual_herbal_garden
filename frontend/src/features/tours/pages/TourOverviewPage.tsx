@@ -14,14 +14,17 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
+import { useAuth } from '../../../contexts/AuthContext';
 import { useTour } from '../hooks/useTour';
 import { useTourProgress } from '../hooks/useTourProgress';
-import { PlantImage } from '../../library';
+import { ThemedImage } from '../../../components/common/ThemedImage';
 import { TourEducationalBanner } from '../components/TourStates';
 
 export function TourOverviewPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
   // Support preview mode for draft tours
   const isPreview = window.location.search.includes('preview=1');
@@ -114,17 +117,22 @@ export function TourOverviewPage() {
         {/* Tour Header Card */}
         <div className="bg-white rounded-3xl border border-green-100 shadow-sm overflow-hidden mb-8">
           <div className="relative aspect-[21/9] sm:aspect-[24/9] w-full bg-green-900 overflow-hidden">
-            <PlantImage
+            <ThemedImage
               src={tour.coverImage || tour.coverImageUrl || ''}
               alt={tour.title}
-              className="w-full h-full object-cover opacity-85"
+              title={tour.title}
+              category={tour.healthCategory}
+              aspectRatio="wide"
+              className="w-full h-full object-cover opacity-90"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
             <div className="absolute bottom-6 left-6 right-6 text-white">
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30">
-                  {tour.level}
-                </span>
+                {(tour.level || (tour.difficulty === 'EASY' ? 'BEGINNER' : tour.difficulty === 'MEDIUM' ? 'INTERMEDIATE' : tour.difficulty === 'HARD' ? 'ADVANCED' : undefined)) && (
+                  <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-white/20 backdrop-blur-md text-white border border-white/30">
+                    {tour.level || (tour.difficulty === 'EASY' ? 'BEGINNER' : tour.difficulty === 'MEDIUM' ? 'INTERMEDIATE' : 'ADVANCED')}
+                  </span>
+                )}
                 <span className="flex items-center gap-1 text-xs text-emerald-200">
                   <Clock className="w-3.5 h-3.5" />
                   {tour.estimatedMinutes || tour.estimatedDuration || 10} minutes
@@ -146,63 +154,88 @@ export function TourOverviewPage() {
             </p>
 
             {/* Progress Card & Actions */}
-            <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center justify-between text-xs font-semibold text-emerald-900 mb-1.5">
-                  <span>Your Learning Progress</span>
-                  <span className="text-emerald-700 font-bold">{percent}%</span>
+            {checkpoints.length === 0 ? (
+              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-6 text-center">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Clock className="w-6 h-6" />
                 </div>
-                <div className="h-2.5 w-full bg-emerald-200/60 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-emerald-600 rounded-full transition-all duration-500"
-                    style={{ width: `${percent}%` }}
-                  />
-                </div>
-                <div className="text-xs text-emerald-800 mt-2">
-                  {checkpoints.filter((c) => isCompleted(c.key)).length} of {checkpoints.length} checkpoints completed
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                {allCompleted ? (
-                  <button
-                    onClick={restart}
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-semibold text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                <h3 className="text-base font-bold text-gray-900 mb-1">
+                  This tour is being prepared
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-600 max-w-md mx-auto mb-4">
+                  Checkpoints and interactive lessons for this tour are currently being curated. Please check back soon!
+                </p>
+                {isAdmin && (
+                  <Link
+                    to={`/admin/tours/${tour.id || tour._id || slug}/edit`}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white transition-colors shadow-xs"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    Restart Tour
-                  </button>
-                ) : (
-                  <>
-                    {percent > 0 && (
-                      <button
-                        onClick={restart}
-                        title="Restart from beginning"
-                        className="p-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => navigate(`/virtual-tour/${tour.slug}/${nextCheckpoint.key}`)}
-                      className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm bg-emerald-700 hover:bg-emerald-800 text-white transition-all shadow-xs cursor-pointer"
-                    >
-                      <Play className="w-4 h-4 fill-white" />
-                      {percent > 0 ? 'Continue Tour' : 'Start Tour'}
-                    </button>
-                  </>
+                    Edit tour
+                  </Link>
                 )}
               </div>
-            </div>
+            ) : (
+              <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between text-xs font-semibold text-emerald-900 mb-1.5">
+                    <span>Your Learning Progress</span>
+                    <span className="text-emerald-700 font-bold">{percent}%</span>
+                  </div>
+                  <div className="h-2.5 w-full bg-emerald-200/60 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-600 rounded-full transition-all duration-500"
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                  <div className="text-xs text-emerald-800 mt-2">
+                    {checkpoints.filter((c) => isCompleted(c.key)).length} of {checkpoints.length} checkpoints completed
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  {allCompleted ? (
+                    <button
+                      onClick={restart}
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl font-semibold text-xs border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      Restart Tour
+                    </button>
+                  ) : (
+                    <>
+                      {percent > 0 && (
+                        <button
+                          onClick={restart}
+                          title="Restart from beginning"
+                          className="p-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                      )}
+                      {nextCheckpoint && (
+                        <button
+                          onClick={() => navigate(`/virtual-tour/${tour.slug}/${nextCheckpoint.key}`)}
+                          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm bg-emerald-700 hover:bg-emerald-800 text-white transition-all shadow-xs cursor-pointer"
+                        >
+                          <Play className="w-4 h-4 fill-white" />
+                          {percent > 0 ? 'Continue Tour' : 'Start Tour'}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Checkpoint Timeline */}
-        <div className="mb-12">
-          <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-emerald-600" />
-            Tour Checkpoints & Timeline
-          </h2>
+        {checkpoints.length > 0 && (
+          <div className="mb-12">
+            <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-emerald-600" />
+              Tour Checkpoints & Timeline
+            </h2>
 
           <div className="space-y-4">
             {checkpoints.map((cp, idx) => {
@@ -299,6 +332,7 @@ export function TourOverviewPage() {
             })}
           </div>
         </div>
+        )}
 
         {/* "What You Will Cover" Section */}
         {(plantsCovered.length > 0 || remediesCovered.length > 0) && (

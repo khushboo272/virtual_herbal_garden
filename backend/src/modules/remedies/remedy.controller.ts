@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { remedyService } from './remedy.service';
-import { sendSuccess, sendCreated } from '../../core/utils/apiResponse';
+import { sendSuccess, sendCreated, AppError } from '../../core/utils/apiResponse';
 
 export class RemedyController {
   async list(req: Request, res: Response) {
@@ -38,6 +38,17 @@ export class RemedyController {
   async publish(req: Request, res: Response) {
     const remedy = await remedyService.publish(req.params.id);
     sendSuccess(res, remedy);
+  }
+
+  async uploadImage(req: Request, res: Response) {
+    if (!req.file) throw new AppError('No image file provided', 400, 'NO_FILE');
+    const result = await remedyService.uploadImage(req.params.id, req.file.buffer);
+    sendSuccess(res, result);
+  }
+
+  async deleteImage(req: Request, res: Response) {
+    await remedyService.deleteImage(req.params.id);
+    sendSuccess(res, { message: 'Remedy image removed' });
   }
 }
 

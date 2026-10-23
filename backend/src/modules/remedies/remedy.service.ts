@@ -6,6 +6,9 @@ import { findPlantsByNames, ResolvedPlantSummary } from '../library/plant.servic
 import { PaginationMeta } from '../../types';
 import { generateSlug } from '../../core/utils/slug';
 import { AppError } from '../../core/utils/apiResponse';
+import { putImage, deleteObject } from '../../core/storage/r2Storage';
+import { remedyCoverKey, publicUrl } from '../../core/storage/assetKeys';
+import { validateImageMagicBytes, processRemedyCover } from '../../core/utils/imageProcessor';
 
 export interface RemedyFilters {
   page?: number;
@@ -331,6 +334,52 @@ export class RemedyService {
     remedy.isPublished = !remedy.isPublished;
     await remedy.save();
     return remedy;
+  }
+
+  async uploadImage(idOrSlug: string, buffer: Buffer): Promise<{ imageUrl: string }> {
+    const mime = validateImageMagicBytes(buffer);
+    if (!mime) {
+      throw new AppError('Invalid image format. Accepted: JPEG, PNG, WebP', 400, 'INVALID_FORMAT');
+    }
+
+    let query: any;
+    if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
+      query = { _id: idOrSlug, isDeleted: false };
+    } else {
+      query = { slug: idOrSlug, isDeleted: false };
+    }
+    const remedy = await Remedy.findOne(query);
+    if (!remedy) throw new AppError('Remedy not found', 404, 'NOT_FOUND');
+
+    const processed = await processRemedyCover(buffer);
+    const coverKey = remedyCoverKey(remedy.slug);
+
+    await putImage({ key: coverKey, buffer: processed, contentType: 'image/webp' });
+
+    const url = publicUrl(coverKey, Date.now());
+    remedy.image = url;
+    remedy.images = [{ url, isPrimary: true, alt: remedy.title }];
+    await remedy.save();
+
+    return { imageUrl: url };
+  }
+
+  async deleteImage(idOrSlug: string): Promise<void> {
+    let query: any;
+    if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
+      query = { _id: idOrSlug, isDeleted: false };
+    } else {
+      query = { slug: idOrSlug, isDeleted: false };
+    }
+    const remedy = await Remedy.findOne(query);
+    if (!remedy) throw new AppError('Remedy not found', 404, 'NOT_FOUND');
+
+    const coverKey = remedyCoverKey(remedy.slug);
+    await deleteObject(coverKey);
+
+    remedy.image = '';
+    remedy.images = [];
+    await remedy.save();
   }
 }
 

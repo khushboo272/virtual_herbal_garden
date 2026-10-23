@@ -5,6 +5,7 @@ import * as toursApi from '../api/toursApi';
 import { useTourProgress } from '../hooks/useTourProgress';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import { ToursHubPage } from '../pages/ToursHubPage';
+import { TourOverviewPage } from '../pages/TourOverviewPage';
 import { TourCheckpointPage } from '../pages/TourCheckpointPage';
 import { AdminTourEditorPage } from '../admin/AdminTourEditorPage';
 import { RequireRole } from '../../../app/components/RequireRole';
@@ -29,6 +30,9 @@ vi.mock('../api/toursApi', () => ({
   publishTour: vi.fn(),
   unpublishTour: vi.fn(),
   deleteTour: vi.fn(),
+  uploadTourCover: vi.fn(),
+  deleteTourCover: vi.fn(),
+  uploadCheckpointImage: vi.fn(),
   getToursByPlant: vi.fn().mockResolvedValue([]),
 }));
 
@@ -412,4 +416,65 @@ describe('Tours Module Frontend', () => {
       expect(screen.getByText('Home Redirect')).toBeInTheDocument();
     });
   });
+
+  // ── 7. TourOverviewPage (Regression for BUG-016 & BUG-018) ──
+  describe('TourOverviewPage', () => {
+    it('renders a non-empty timeline when a tour has checkpoints', async () => {
+      vi.mocked(toursApi.getTour).mockResolvedValue(mockTour);
+      vi.mocked(toursApi.getTourProgress).mockResolvedValue({
+        tourId: mockTour.id,
+        slug: mockTour.slug,
+        percent: 0,
+        completedKeys: [],
+        quizResults: {},
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/virtual-tour/kitchen-pharmacy']}>
+          <Routes>
+            <Route path="/virtual-tour/:slug" element={<TourOverviewPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'Your Kitchen Pharmacy' })).toBeInTheDocument();
+        expect(screen.getByText('Tour Checkpoints & Timeline')).toBeInTheDocument();
+        expect(screen.getByText('Turmeric (Haridra)')).toBeInTheDocument();
+        expect(screen.getByText('Ginger (Sunthi)')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /start tour/i })).toBeInTheDocument();
+      });
+    });
+
+    it('shows "This tour is being prepared" and no Start button when tour has 0 checkpoints', async () => {
+      const tourWithoutCheckpoints: Tour = {
+        ...mockTour,
+        checkpoints: [],
+        checkpointCount: 0,
+      };
+      vi.mocked(toursApi.getTour).mockResolvedValue(tourWithoutCheckpoints);
+      vi.mocked(toursApi.getTourProgress).mockResolvedValue({
+        tourId: mockTour.id,
+        slug: mockTour.slug,
+        percent: 0,
+        completedKeys: [],
+        quizResults: {},
+      });
+
+      render(
+        <MemoryRouter initialEntries={['/virtual-tour/kitchen-pharmacy']}>
+          <Routes>
+            <Route path="/virtual-tour/:slug" element={<TourOverviewPage />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('This tour is being prepared')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /start tour/i })).toBeNull();
+        expect(screen.queryByText('Tour Checkpoints & Timeline')).toBeNull();
+      });
+    });
+  });
 });
+

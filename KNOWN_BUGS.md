@@ -22,8 +22,9 @@
 ---
 
 ## BUG-004 AI Scanner "Recent Scans" loses images and shows "Unknown" entries
-**Status:** OPEN — not part of the library task.
-**Probable causes:** `imageUrl` is empty when storage is not configured; history includes FAILED/PENDING records. Planned fix: store a small thumbnail data URL on Detection when storage is unavailable, show only COMPLETE scans in Recent Scans, and show FAILED scans as a clear failed state.
+**Status:** FIXED (R2 Storage & Uploads Task 5)
+**Description:** In AI Scanner, "Recent Scans" lost images when cloud storage was unconfigured or failed, and history included incomplete/pending/failed scans with missing details.
+**Fix:** In `detection.service.ts`, when R2/S3 upload fails or credentials are unset, automatically generates a 256px JPEG base64 data URL thumbnail onto the `Detection` record (`imageUrl: dataUrl`, `imageThumbnailUrl: dataUrl`) and continues Gemini analysis without throwing or losing the scan. `getHistory()` filters strictly for `status: COMPLETE` so failed or incomplete scans never clutter the user's scan history.
 
 ---
 
@@ -101,5 +102,42 @@
 **Status:** FIXED (Virtual Tour module rebuild)
 **Description:** Browser tab title leaks from the previous page ("Traditional Herbal Remedies | ..." shown on /virtual-tour) due to unmanaged document.title without unmount cleanup.
 **Fix:** Created shared `useDocumentTitle` hook (`frontend/src/hooks/useDocumentTitle.ts`) that saves the previous document title and restores it upon component unmount. Applied across all tour pages and remedies pages (`RemediesPage`, `RemedyDetailPage`).
+
+---
+
+## BUG-016 Tour detail pages show "0 checkpoints" and an empty timeline for every DB tour
+**Status:** FIXED (Tours Fix Part A)
+**Description:** Tour detail pages (/virtual-tour/:slug) showed "0 checkpoints" and an empty timeline for every database tour. Root cause: legacy documents in MongoDB stored checkpoints under the legacy field name `stops` instead of `checkpoints`, with unmapped difficulty fields.
+**Fix:** Added backward-compatible runtime document normalization in `backend/src/modules/tours/tour.service.ts` (`normalizeTourDoc()`) which automatically maps legacy `stops` arrays to `checkpoints` and `difficulty` to `level`, sanitizes server-scored quizzes, backfilled legacy database records via `backfillTours.ts`, and seeded complete 4–6 checkpoint tours.
+
+---
+
+## BUG-017 Only 3 tours exist; the planned extra tour paths are missing
+**Status:** FIXED (Tours Fix Part A)
+**Description:** Only 3 legacy tours existed in the database; the 4 planned additional tour paths (Virtual Herbal Garden Tour, Skin & Wound Healing Trail, Digestive Health Trail, Respiratory Relief Walk) were missing.
+**Fix:** Created and executed `seedTours.ts` providing 7 fully-featured tours (25+ rich checkpoints), each with complete plant associations, educational instructions, traditional safety precautions, and server-scored quizzes.
+
+---
+
+## BUG-018 Tour header shows an empty level pill; a tour with no checkpoints still shows "Start Tour" and an empty timeline with no explanation
+**Status:** FIXED (Tours Fix Part A)
+**Description:** Tour header showed an empty level pill when level was unmapped. A tour with no checkpoints still showed "Start Tour" and an empty timeline without explaining that the tour was still being authored.
+**Fix:** Updated `frontend/src/features/tours/pages/TourOverviewPage.tsx` to handle level fallbacks cleanly (`tour.level || tour.difficulty || 'All Levels'`), added a prominent "This tour is being prepared" informational state when checkpoints count is 0, and concealed the "Start Tour" button and timeline until content is published. Ensured public listings only show published tours with $\ge 1$ checkpoint.
+
+---
+
+## BUG-019 Tour/remedy/plant cover images are plain placeholders and there is no upload flow
+**Status:** FIXED (R2 Storage & Uploads Part B)
+**Description:** Tour, remedy, and plant cover images were plain placeholders with no direct upload flow or dynamic category styling.
+**Fix:** Added authenticated, role-protected upload endpoints (`POST /api/v1/tours/:id/cover`, `DELETE /api/v1/tours/:id/cover`, `POST /api/v1/tours/:id/checkpoints/:key/image`, `POST /api/v1/remedies/:id/image`, `DELETE /api/v1/remedies/:id/image`) with Sharp image processing (WebP conversion, thumbnails, optimal sizing). Built reusable `ImageUploader` component with drag-and-drop in Admin Tour Editor. Created `ThemedImage` component in frontend offering vibrant category-gradient SVG fallbacks when remote images are absent.
+
+---
+
+## BUG-020 R2 object keys are not organized per module
+**Status:** FIXED (R2 Storage & Uploads Part B)
+**Description:** Cloudflare R2 object keys were not organized in predictable per-module directories.
+**Fix:** Implemented domain-partitioned key hierarchy in `backend/src/core/storage/assetKeys.ts` with dedicated key builders (`plants/`, `remedies/`, `tours/`, `scans/`, `users/`, `_system/`). Enforced lowercase hyphenated slug sanitization, path traversal blocking, zero-padded numbering, and proper HTTP Cache-Control header tagging (`immutable` for numbered items, 1h for mutable assets).
+
+
 
 

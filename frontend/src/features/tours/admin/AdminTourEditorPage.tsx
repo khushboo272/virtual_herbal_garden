@@ -15,7 +15,16 @@ import {
   CheckCircle2,
   Lock,
 } from 'lucide-react';
-import { getTour, createTour, updateTour, publishTour } from '../api/toursApi';
+import {
+  getTour,
+  createTour,
+  updateTour,
+  publishTour,
+  uploadTourCover,
+  deleteTourCover,
+  uploadCheckpointImage,
+} from '../api/toursApi';
+import { ImageUploader } from './ImageUploader';
 import type { TourCheckpointAdmin, TourLevel } from '../types/tour.types';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 
@@ -432,6 +441,30 @@ export function AdminTourEditorPage() {
           </div>
         </div>
 
+        <div className="pt-2 border-t border-gray-100">
+          <ImageUploader
+            label="Tour Cover Image (R2 Upload)"
+            currentImageUrl={coverImage}
+            aspectRatio="wide"
+            helperText="Upload a high-resolution hero photo (JPEG, PNG, WebP max 5MB). Automatically resized and uploaded to Cloudflare R2."
+            onUpload={async (file) => {
+              if (isEditing && id) {
+                const res = await uploadTourCover(id, file);
+                setCoverImage(res.coverImage);
+              } else {
+                const localPreview = URL.createObjectURL(file);
+                setCoverImage(localPreview);
+              }
+            }}
+            onRemove={async () => {
+              if (isEditing && id) {
+                await deleteTourCover(id);
+              }
+              setCoverImage('');
+            }}
+          />
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1">Tags (comma separated)</label>
@@ -645,6 +678,27 @@ export function AdminTourEditorPage() {
                           className="w-full p-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:bg-white"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <ImageUploader
+                        label="Checkpoint Illustration / Photo (R2 Upload)"
+                        currentImageUrl={cp.imageUrl}
+                        aspectRatio="video"
+                        helperText="High-res botanical photo or illustration (JPEG, PNG, WebP max 5MB) for this tour step."
+                        onUpload={async (file) => {
+                          if (isEditing && id && cp.key) {
+                            const res = await uploadCheckpointImage(id, cp.key, file);
+                            updateCheckpointField(idx, 'imageUrl', res.imageUrl);
+                          } else {
+                            const localPreview = URL.createObjectURL(file);
+                            updateCheckpointField(idx, 'imageUrl', localPreview);
+                          }
+                        }}
+                        onRemove={() => {
+                          updateCheckpointField(idx, 'imageUrl', '');
+                        }}
+                      />
                     </div>
 
                     <div>

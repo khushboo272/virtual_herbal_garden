@@ -150,6 +150,7 @@ export interface IRemedyImage {
 }
 
 export interface IGardenPlant {
+  _id?: Types.ObjectId;
   plant: Types.ObjectId;
   position: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number };

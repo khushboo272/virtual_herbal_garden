@@ -3,6 +3,7 @@ import { tourController } from './tour.controller';
 import { authenticate } from '../../core/middleware/auth';
 import { requireRole } from '../../core/middleware/rbac';
 import { validate } from '../../core/middleware/validate';
+import { uploadSingle } from '../../core/middleware/upload';
 import { UserRole } from '../../types';
 import {
   createTourSchema,
@@ -33,6 +34,9 @@ router.post('/:id/publish', authenticate(), requireRole(UserRole.ADMIN), tourCon
 router.patch('/:id/unpublish', authenticate(), requireRole(UserRole.ADMIN), tourController.unpublish);
 router.patch('/:id', authenticate(), requireRole(UserRole.ADMIN), validate(updateTourSchema), tourController.update);
 router.delete('/:id', authenticate(), requireRole(UserRole.ADMIN), tourController.delete);
+router.post('/:id/cover', authenticate(), requireRole(UserRole.ADMIN), uploadSingle, tourController.uploadCover);
+router.delete('/:id/cover', authenticate(), requireRole(UserRole.ADMIN), tourController.deleteCover);
+router.post('/:id/checkpoints/:key/image', authenticate(), requireRole(UserRole.ADMIN), uploadSingle, tourController.uploadCheckpointImage);
 
 // ── User tour progress mutations ─────────────────────────────────────────────
 router.get('/:slug/progress', authenticate(), tourController.getTourProgress);

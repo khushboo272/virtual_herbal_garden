@@ -5,8 +5,9 @@ import { DetectionStatus, PaginationMeta } from '../../types';
 import { AppError } from '../../core/utils/apiResponse';
 import { env } from '../../core/config/env';
 import { identifyPlant } from './gemini.client';
-import { storageService } from '../../core/utils/storageService';
 import { logger } from '../../core/utils/logger';
+import { scanKey } from '../../core/storage/assetKeys';
+import { putImage } from '../../core/storage/r2Storage';
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 const MAX_LONG_SIDE_PX = 1024;
@@ -76,13 +77,28 @@ export class DetectionService {
     const detectionId = (detection._id as mongoose.Types.ObjectId).toString();
     const startTime = Date.now();
 
-    // 5. Store original image — fire and forget, never fail the detection
+    // 5. Store original image to R2 — with BUG-004 data URL fallback if storage fails
     let imageUrl = '';
+    let imageThumbnailUrl: string | null = null;
     try {
-      imageUrl = await storageService.uploadDetectionImage(fileBuffer, detectionId);
+      const key = scanKey(userId || 'anonymous', detectionId);
+      imageUrl = await putImage({
+        key,
+        buffer: fileBuffer,
+        contentType: mimeType,
+        isImmutable: true,
+      });
       await Detection.findByIdAndUpdate(detectionId, { imageUrl });
     } catch (storageErr) {
-      logger.warn('[DetectionService] Storage unavailable, continuing without image URL:', storageErr);
+      logger.warn('[DetectionService] Storage unavailable, generating data URL fallback:', storageErr);
+      const thumbBuf = await sharp(fileBuffer)
+        .resize(256, 256, { fit: 'cover' })
+        .jpeg({ quality: 75 })
+        .toBuffer();
+      const dataUrl = `data:image/jpeg;base64,${thumbBuf.toString('base64')}`;
+      imageUrl = dataUrl;
+      imageThumbnailUrl = dataUrl;
+      await Detection.findByIdAndUpdate(detectionId, { imageUrl, imageThumbnailUrl });
     }
 
     // 6. Call Gemini
@@ -192,9 +208,10 @@ export class DetectionService {
     limit: number,
   ): Promise<{ detections: ReturnType<typeof buildDetectionResponse>[]; meta: PaginationMeta }> {
     const skip = (page - 1) * limit;
+    const filter = { user: userId, status: DetectionStatus.COMPLETE };
     const [detections, total] = await Promise.all([
-      Detection.find({ user: userId }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      Detection.countDocuments({ user: userId }),
+      Detection.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Detection.countDocuments(filter),
     ]);
 
     return {
