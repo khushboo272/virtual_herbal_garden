@@ -138,6 +138,115 @@
 **Description:** Cloudflare R2 object keys were not organized in predictable per-module directories.
 **Fix:** Implemented domain-partitioned key hierarchy in `backend/src/core/storage/assetKeys.ts` with dedicated key builders (`plants/`, `remedies/`, `tours/`, `scans/`, `users/`, `_system/`). Enforced lowercase hyphenated slug sanitization, path traversal blocking, zero-padded numbering, and proper HTTP Cache-Control header tagging (`immutable` for numbered items, 1h for mutable assets).
 
+---
+
+## BUG-021 Botanist contribution routes all render the same placeholder console
+**Status:** FIXED (Botanist Dashboard & Contributions)
+**Description:** Botanist contribution routes (`/dashboard/contributions*`, `/dashboard/ai-feedback`) all render the same static placeholder console with mock numbers and no real backend interaction.
+**Fix:** Created full Botanist feature under `frontend/src/features/botanist/` and backend module `backend/src/modules/contributions/`. Built dedicated pages for `BotanistDashboardHome`, `MyContributionsPage` (with real status tabs, search, metrics, and pagination), `PlantEditorPage`, `RemedyEditorPage`, `SubmissionDetailsPage`, and `AIFeedbackQueuePage`. Wired all metric counters and contribution tables to real database endpoints.
+
+---
+
+## BUG-022 "New Remedy Draft" shows the plant form
+**Status:** FIXED (Botanist Dashboard & Contributions)
+**Description:** Clicking "New Remedy Draft" in the dashboard opens the plant creation form instead of a dedicated remedy editor.
+**Fix:** Created a dedicated `RemedyEditorPage` (`/dashboard/contributions/new-remedy` and `/dashboard/contributions/remedy/:id`) with ailment tags, preparation time, difficulty, structured step-by-step preparation builder, ingredients with live plant autocomplete and dosage notes, traditional safety precautions, academic references, and medicinal safety compliance checks.
+
+---
+
+## BUG-023 AI Feedback Queue is a placeholder
+**Status:** FIXED (Botanist Dashboard & Contributions)
+**Description:** The AI Feedback Queue renders mock static detections and is not connected to real scans, has no filter functionality, and cannot submit verification feedback.
+**Fix:** Implemented backend endpoints `GET /ai/feedback-queue` (anonymized scans without user identifiers), `POST /ai/detect/:id/feedback` (single verdict per botanist with update support), and `GET /ai/feedback-stats`. Built frontend `AIFeedbackQueuePage` (`/dashboard/ai-feedback`) supporting filter tabs (All, Pending Review, Reviewed by Me), verdict submission (Correct, Incorrect with plant picker, Not a plant, Unsure), review comments, and real-time community accuracy counters.
+
+---
+
+## BUG-024 Bookmarks, My Garden, Help & Contact are static
+**Status:** FIXED (Botanist Dashboard & Contributions)
+**Description:** The shared dashboard pages for Bookmarks, My Garden, and Help & Support are static placeholders not connected to user database records or APIs.
+**Fix:** Built `frontend/src/features/dashboard/shared/` containing real implementations:
+- `BookmarksPage` (`/dashboard/bookmarks`): Tabbed plant/remedy/tour views, pagination, detail navigation, undoable deletion toasts via Sonner, and fallback imagery.
+- `MyGardenPage` (`/dashboard/garden`): Real plot list with auto-positioning, inline notes editing, growth stage selector (Seedling, Vegetative, Flowering, Mature, Harvested), 3D garden launch button, and deletion confirmation modal.
+- `SettingsProfilePage` (`/dashboard/profile`): Display name and bio editing, R2 avatar upload preview (`users/<userId>/avatar.webp`), Google OAuth detection, password change modal, sign-out from all sessions, and account deletion safeguard.
+- `HelpSupportPage` (`/dashboard/help`): Role-aware FAQ accordion (with contributor guidelines for Botanists), rate-limited support ticket submission (3 requests/hour), and ticket history list.
+
+---
+
+## BUG-025 Dashboard header search does nothing
+**Status:** FIXED (Botanist Dashboard & Contributions)
+**Description:** The search input in the dashboard top header is purely decorative with no event listeners, autocomplete dropdown, or navigation.
+**Fix:** Built `HeaderSearchDropdown` component integrated into `DashboardLayout`. Features debounced querying of `GET /contributions/search` (or public library/remedy endpoints), grouped visual results for Plants and Remedies, full keyboard navigation (Arrow Up/Down, Enter to select, Escape to dismiss), outside click handling, and quick navigation to detail pages.
+
+---
+
+## BUG-026 Browser tab title is stale on dashboard pages
+**Status:** FIXED (Botanist Dashboard & Contributions)
+**Description:** Dashboard pages do not set specific browser tab titles or clean up upon unmount, causing stale titles across page navigations.
+**Fix:** Connected `useDocumentTitle` hook to all Botanist and Shared Dashboard pages (`Botanist Dashboard | ...`, `My Contributions | ...`, `Edit Plant | ...`, `Edit Remedy | ...`, `Submission Details | ...`, `AI Feedback Queue | ...`, `Bookmarks | ...`, `My Garden | ...`, `Settings & Profile | ...`, `Help & Support | ...`) with automatic unmount restoration.
+
+---
+
+## BUG-027 "Contribute" navbar link goes to the generic dashboard and contribution routes have no per-route role guard
+**Status:** FIXED (Botanist Dashboard & Contributions)
+**Description:** The "Contribute" navbar link directs to the generic `/dashboard` and contribution sub-routes lack per-route role authorization guards, allowing unauthorized roles or causing disorientation.
+**Fix:** Updated `NavbarExpert.tsx` so "Contribute" routes directly to `/dashboard/contributions`. Protected all botanist contribution and AI feedback routes in `App.tsx` using `<RequireRole minimumRole="BOTANIST">`, which gracefully redirects unauthorized users to `/` and fires an informative toast error.
+
+---
+
+## BUG-028 Plant form lacks fields the library needs and there is no review workflow
+**Status:** FIXED (Botanist Dashboard & Contributions)
+**Description:** The contribution plant form lacks key fields needed by the library (gallery images, cultivation requirements, safety precautions, sources/references, aliases) and there is no structured submission/review/changes-requested workflow.
+**Fix:** Extended `Plant` and `Remedy` schemas with `status`, `owner`, `submittedAt`, `reviewNotes`, and `references`. Built `PlantEditorPage` with full scientific taxonomy, health benefits, cultivation parameters, safety precautions, gallery uploads, and mandatory citation validation. Implemented complete 5-state lifecycle (`DRAFT` -> `PENDING_REVIEW` -> `PUBLISHED` or `CHANGES_REQUESTED` or `REJECTED`) with live completeness checklist ("Ready for review: X/Y"), medicinal safety keyword scanning, autosave debounce with localStorage recovery, and Admin review/changes-requested endpoints.
+
+---
+
+## BUG-029 Admin top navbar lacks AI Scanner, Remedies and Virtual Tour
+**Status:** OPEN
+**Description:** The navigation bar for ADMIN and SUPER_ADMIN roles lacks direct links to AI Scanner, Remedies, and Virtual Tour, inconsistent with the public and regular user navigation.
+
+---
+
+## BUG-030 Browser tab titles are stale on admin pages and User Growth breadcrumb reads "Analytics > User Management"
+**Status:** OPEN
+**Description:** Browser tab document titles are stale or incorrect across admin routes (e.g. showing "AI Feedback Queue..." or "Create New Tour..."), and the User Growth page breadcrumb incorrectly maps to "Analytics > User Management".
+
+---
+
+## BUG-031 "Active Today" / "Daily Active Users" always show 0 although users are logged in
+**Status:** OPEN
+**Description:** The admin dashboard overview and analytics cards show 0 for Active Today / Daily Active Users because user activity timestamps (`lastActiveAt`) are not actively maintained or tracked on authenticated requests.
+
+---
+
+## BUG-032 Moderation Queue has a Tours tab with no source of pending tours and no real review UI
+**Status:** OPEN
+**Description:** Moderation queue includes a "Tours" tab despite tours having no submission or pending-review lifecycle, and the queue lacks comprehensive preview, content safety, duplicate checking, and review decision UI.
+
+---
+
+## BUG-033 User Management shows every user as USER, "Change Role" is disabled for everyone, and lacks management controls
+**Status:** OPEN
+**Description:** User Management table displays all users with the USER role regardless of their actual database role, role modification is completely disabled, and there is no user search/filter, pagination, drawer details, ban/unban, or force-logout action.
+
+---
+
+## BUG-034 No content management for all plants/remedies (publish/unpublish/feature/delete)
+**Status:** OPEN
+**Description:** Administrators have no unified content management view to audit, filter, publish, unpublish, feature, or safely delete all plants and remedies across the platform.
+
+---
+
+## BUG-035 No way to apply for the BOTANIST role and no review of applications
+**Status:** OPEN
+**Description:** Platform users have no workflow or interface to apply for the BOTANIST role, and administrators have no queue to evaluate, approve, or reject contributor applications with feedback.
+
+---
+
+## BUG-036 Admin child routes lack per-route role guards
+**Status:** OPEN
+**Description:** Admin sub-routes in the dashboard rely solely on parent navigation and lack dedicated per-route role guards (`RequireRole`), which can allow unauthorized role elevation if routes are accessed directly.
+
+
 
 
 

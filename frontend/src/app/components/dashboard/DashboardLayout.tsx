@@ -3,10 +3,9 @@
 // PRD §6.1, §6.2, §6.3
 // ──────────────────────────────────────────────────────────
 
-import React, { useState, Fragment } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, ChevronRight } from 'lucide-react';
-import { Input } from '../ui/input';
+import React, { useState, useEffect, Fragment } from 'react';
+import { Outlet, Link, useLocation } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -18,7 +17,7 @@ import {
 import { DashboardSidebar } from './DashboardSidebar';
 import { Navbar } from '../../../components/navbar/Navbar';
 import { useAuth } from '../../../contexts/AuthContext';
-import { cn } from '../ui/utils';
+import { HeaderSearchDropdown } from '../../../features/dashboard/shared';
 import type { UserRole } from './roleNavConfig';
 
 /** Maps route segments to human-readable breadcrumb labels */
@@ -47,34 +46,43 @@ const BREADCRUMB_LABELS: Record<string, string> = {
 };
 
 export function DashboardLayout() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const navigate = useNavigate();
-
-  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && searchQuery.trim()) {
-      navigate(`/library?q=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery('');
-    }
-  };
+  const [badgeCounts, setBadgeCounts] = useState<Record<string, number>>({});
 
   const role = (user?.role || 'GUEST') as UserRole;
-  const initials = (user?.displayName || 'U')
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+
+  useEffect(() => {
+    if (role === 'BOTANIST') {
+      import('../../../features/botanist/api/contributionsApi')
+        .then(({ getAIFeedbackStats }) => getAIFeedbackStats())
+        .then((s) => {
+          if (s && typeof s.pendingCount === 'number') {
+            setBadgeCounts({ pendingCorrections: s.pendingCount });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [role]);
 
   // Build breadcrumbs from pathname
   const pathSegments = location.pathname.split('/').filter(Boolean);
-  const breadcrumbs = pathSegments.map((segment, idx) => ({
-    label: BREADCRUMB_LABELS[segment] || segment.charAt(0).toUpperCase() + segment.slice(1),
-    path: '/' + pathSegments.slice(0, idx + 1).join('/'),
-    isLast: idx === pathSegments.length - 1,
-  }));
+  const breadcrumbs = pathSegments.map((segment, idx) => {
+    let label = BREADCRUMB_LABELS[segment];
+    if (!label) {
+      if (/^[0-9a-fA-F]{24}$/.test(segment)) {
+        label = 'Draft Details';
+      } else {
+        label = (segment.charAt(0).toUpperCase() + segment.slice(1)).replace(/[-_]/g, ' ');
+      }
+    }
+    return {
+      label,
+      path: '/' + pathSegments.slice(0, idx + 1).join('/'),
+      isLast: idx === pathSegments.length - 1,
+    };
+  });
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -89,6 +97,7 @@ export function DashboardLayout() {
           role={role}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          badgeCounts={badgeCounts}
         />
 
         {/* Main content area */}
@@ -116,18 +125,10 @@ export function DashboardLayout() {
                 </BreadcrumbList>
               </Breadcrumb>
 
-              {/* Right side — search only */}
+              {/* Right side — debounced grouped search */}
               <div className="flex items-center gap-3">
-                {/* Search */}
-                <div className="relative hidden md:block">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="Search plants, remedies..."
-                    className="pl-9 w-56 h-9 border-green-200 focus:border-green-400 text-sm"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={handleSearch}
-                  />
+                <div className="hidden sm:block">
+                  <HeaderSearchDropdown />
                 </div>
               </div>
             </div>

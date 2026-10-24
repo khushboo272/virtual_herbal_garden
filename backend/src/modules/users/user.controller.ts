@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { userService } from './user.service';
 import { notificationService } from '../notifications/notification.service';
 import { storageService } from '../../core/utils/storageService';
-import { BookmarkEntityType } from '../../types';
+import { BookmarkEntityType, PaginationMeta } from '../../types';
 import { sendSuccess, sendCreated, AppError } from '../../core/utils/apiResponse';
 
 export class UserController {
@@ -24,9 +24,15 @@ export class UserController {
   }
 
   async getBookmarks(req: Request, res: Response) {
-    const entityType = req.query.entityType as BookmarkEntityType | undefined;
-    const bookmarks = await userService.getBookmarks(req.user!.sub, entityType);
-    sendSuccess(res, bookmarks);
+    const type = (req.query.type || req.query.entityType) as BookmarkEntityType | string | undefined;
+    const page = req.query.page ? Number(req.query.page) : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const result = await userService.getBookmarks(req.user!.sub, { type: type as string, page, limit });
+    if (result && typeof result === 'object' && 'meta' in result) {
+      sendSuccess(res, (result as { bookmarks: unknown[] }).bookmarks, 200, (result as { meta: PaginationMeta }).meta);
+    } else {
+      sendSuccess(res, result);
+    }
   }
 
   async createBookmark(req: Request, res: Response) {
@@ -36,6 +42,11 @@ export class UserController {
 
   async deleteBookmark(req: Request, res: Response) {
     await userService.deleteBookmark(req.user!.sub, req.params.id);
+    sendSuccess(res, { message: 'Bookmark removed' });
+  }
+
+  async deleteBookmarkByEntity(req: Request, res: Response) {
+    await userService.deleteBookmarkByEntity(req.user!.sub, req.params.type, req.params.entityId);
     sendSuccess(res, { message: 'Bookmark removed' });
   }
 
@@ -77,7 +88,7 @@ export class UserController {
   }
 
   async deleteAccount(req: Request, res: Response) {
-    await userService.deleteAccount(req.user!.sub);
+    await userService.deleteAccount(req.user!.sub, req.body);
     res.clearCookie('refreshToken', { path: '/api/v1/auth' });
     sendSuccess(res, { message: 'Account deleted successfully' });
   }

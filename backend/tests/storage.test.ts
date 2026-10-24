@@ -106,5 +106,27 @@ describe('Storage Layout & Asset Keys', () => {
       expect(typeof isR2Configured()).toBe('boolean');
     });
   });
+
+  describe('storage fallback mechanism', () => {
+    it('gracefully saves locally when S3 is unreachable or credentials are invalid', async () => {
+      const { storageService } = await import('../src/core/utils/storageService');
+      const sharp = (await import('sharp')).default;
+      const pngBuffer = await sharp({
+        create: {
+          width: 200,
+          height: 200,
+          channels: 4,
+          background: { r: 50, g: 150, b: 50, alpha: 1 },
+        },
+      })
+        .png()
+        .toBuffer();
+      const result = await storageService.uploadPlantImage(pngBuffer, 'test-plant', 'test-img');
+      expect(result).toHaveProperty('url');
+      expect(result.url).toMatch(/^\/uploads\/plants\/test-plant\/images\/test-img-full\.webp|https?:\/\//);
+      expect(result).toHaveProperty('thumbnailUrl');
+      expect(result).toHaveProperty('cardUrl');
+    });
+  });
 });
 

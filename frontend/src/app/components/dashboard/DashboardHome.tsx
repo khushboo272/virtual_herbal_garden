@@ -6,7 +6,7 @@
 
 import { useAuth } from '../../../contexts/AuthContext';
 import { UserDashboard } from '../slides/UserDashboard';
-import { BotanistPanel } from '../slides/BotanistPanel';
+import { BotanistDashboardHome } from '../../../features/botanist';
 import { AdminDashboardOverview } from './pages/AdminDashboardOverview';
 import { GuestDashboard } from './GuestDashboard';
 
@@ -28,7 +28,7 @@ export function DashboardHome({ onOpenSignIn }: DashboardHomeProps) {
     case 'ADMIN':
       return <AdminDashboardOverview />;
     case 'BOTANIST':
-      return <BotanistPanel />;
+      return <BotanistDashboardHome />;
     case 'USER':
     default:
       return <UserDashboard user={user} />;

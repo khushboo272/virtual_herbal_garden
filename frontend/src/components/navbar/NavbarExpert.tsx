@@ -10,7 +10,7 @@ import { NavbarMobileDrawer } from './NavbarMobileDrawer';
 
 const EXPERT_LINKS: NavLink[] = [
   ...PUBLIC_LINKS,
-  { label: 'Contribute', route: '/contribute', icon: PlusCircle }
+  { label: 'Contribute', route: '/dashboard/contributions', icon: PlusCircle }
 ];
 
 export const NavbarExpert = () => {

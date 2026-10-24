@@ -5,6 +5,8 @@ import {
   IIngredient,
   IPreparationStep,
   IRemedyImage,
+  ContentStatus,
+  IReviewNote,
 } from '../../types';
 
 export interface IRemedy extends Document {
@@ -27,8 +29,14 @@ export interface IRemedy extends Document {
   images: IRemedyImage[];
   tags: string[];
   isPublished: boolean;
+  isFeatured?: boolean;
+  status: ContentStatus;
+  owner: Types.ObjectId;
   isDeleted: boolean;
   createdBy: Types.ObjectId;
+  reviewNotes: IReviewNote[];
+  submittedAt: Date | null;
+  references: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +68,20 @@ const RemedyImageSchema = new Schema<IRemedyImage>(
     url: { type: String, required: true },
     alt: String,
     isPrimary: { type: Boolean, default: false },
+  },
+  { _id: false },
+);
+
+const ReviewNoteSchema = new Schema<IReviewNote>(
+  {
+    at: { type: Date, default: Date.now },
+    byUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    action: {
+      type: String,
+      enum: ['SUBMITTED', 'APPROVED', 'CHANGES_REQUESTED', 'REJECTED', 'WITHDRAWN'],
+      required: true,
+    },
+    comment: { type: String, default: null },
   },
   { _id: false },
 );
@@ -97,16 +119,42 @@ const RemedySchema = new Schema<IRemedy>(
     images: [RemedyImageSchema],
     tags: [{ type: String, lowercase: true }],
     isPublished: { type: Boolean, default: false },
+    isFeatured: { type: Boolean, default: false },
+    status: {
+      type: String,
+      enum: Object.values(ContentStatus),
+      default: ContentStatus.DRAFT,
+    },
+    owner: { type: Schema.Types.ObjectId, ref: 'User' },
     isDeleted: { type: Boolean, default: false },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    reviewNotes: { type: [ReviewNoteSchema], default: [] },
+    submittedAt: { type: Date, default: null },
+    references: [{ type: String }],
   },
   { timestamps: true },
 );
+
+RemedySchema.pre('save', function (next) {
+  if (this.isModified('status')) {
+    this.isPublished = this.status === ContentStatus.PUBLISHED;
+  } else if (this.isModified('isPublished') && !this.isModified('status')) {
+    if (this.isPublished && this.status !== ContentStatus.PUBLISHED) {
+      this.status = ContentStatus.PUBLISHED;
+    }
+  }
+  if (!this.owner && this.createdBy) {
+    this.owner = this.createdBy;
+  }
+  next();
+});
 
 // Indexes declared once to prevent duplicate index warnings
 RemedySchema.index({ slug: 1 }, { unique: true });
 RemedySchema.index({ plants: 1 });
 RemedySchema.index({ tags: 1 });
 RemedySchema.index({ isPublished: 1, isDeleted: 1 });
+RemedySchema.index({ status: 1 });
+RemedySchema.index({ owner: 1 });
 
 export default mongoose.model<IRemedy>('Remedy', RemedySchema);

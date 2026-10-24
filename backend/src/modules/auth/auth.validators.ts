@@ -35,3 +35,8 @@ export const setup2faSchema = z.object({});
 export const verify2faSchema = z.object({
   totpCode: z.string().length(6, 'TOTP code must be 6 digits'),
 });
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+});

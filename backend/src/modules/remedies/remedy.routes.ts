@@ -11,10 +11,12 @@ const router = Router();
 
 router.get('/', validate(remedyQuerySchema, 'query'), remedyController.list);
 router.get('/:id/related', remedyController.getRelated);
-router.get('/:slug', remedyController.getBySlugOrId);
+router.get('/:slug', authenticate(true), remedyController.getBySlugOrId);
 router.post('/', authenticate(), requireRole(UserRole.BOTANIST), validate(createRemedySchema), remedyController.create);
 router.patch('/:id', authenticate(), requireRole(UserRole.BOTANIST), validate(updateRemedySchema), remedyController.update);
+router.put('/:id', authenticate(), requireRole(UserRole.BOTANIST), validate(updateRemedySchema), remedyController.update);
 router.post('/:id/image', authenticate(), requireRole(UserRole.BOTANIST), uploadSingle, remedyController.uploadImage);
+router.post('/:id/cover', authenticate(), requireRole(UserRole.BOTANIST), uploadSingle, remedyController.uploadImage);
 router.delete('/:id/image', authenticate(), requireRole(UserRole.BOTANIST), remedyController.deleteImage);
 router.delete('/:id', authenticate(), requireRole(UserRole.ADMIN), remedyController.delete);
 router.post('/:id/publish', authenticate(), requireRole(UserRole.ADMIN), remedyController.publish);

@@ -25,6 +25,7 @@ export interface IDetection extends Document {
   modelVersion: string;
   processingTimeMs: number | null;
   feedback: IDetectionFeedback | null;
+  feedbacks: IDetectionFeedback[];
   errorMessage: string | null;
   expiresAt: Date;
   geminiResult: IGeminiResult | null;
@@ -45,9 +46,15 @@ const PredictionSchema = new Schema<IPrediction>(
 const FeedbackSchema = new Schema<IDetectionFeedback>(
   {
     reviewer: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    isCorrect: { type: Boolean, required: true },
+    verdict: {
+      type: String,
+      enum: ['CORRECT', 'INCORRECT', 'NOT_A_PLANT', 'UNSURE'],
+      required: false,
+    },
+    isCorrect: { type: Boolean, required: false },
     correctPlant: { type: Schema.Types.ObjectId, ref: 'Plant' },
     notes: String,
+    comment: String,
     reviewedAt: { type: Date, default: Date.now },
   },
   { _id: false },
@@ -91,6 +98,7 @@ const DetectionSchema = new Schema<IDetection>(
     modelVersion: { type: String, required: true },
     processingTimeMs: { type: Number, default: null },
     feedback: { type: FeedbackSchema, default: null },
+    feedbacks: { type: [FeedbackSchema], default: [] },
     errorMessage: { type: String, default: null },
     expiresAt: { type: Date, required: true },
     geminiResult: { type: GeminiResultSchema, default: null },

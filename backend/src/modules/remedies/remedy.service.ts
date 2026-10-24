@@ -3,12 +3,13 @@ import Remedy, { IRemedy } from './Remedy.model';
 import Plant from '../library/Plant.model';
 import { HEALTH_CATEGORIES } from '../library/health-categories';
 import { findPlantsByNames, ResolvedPlantSummary } from '../library/plant.service';
-import { PaginationMeta } from '../../types';
+import { PaginationMeta, UserRole } from '../../types';
 import { generateSlug } from '../../core/utils/slug';
 import { AppError } from '../../core/utils/apiResponse';
 import { putImage, deleteObject } from '../../core/storage/r2Storage';
 import { remedyCoverKey, publicUrl } from '../../core/storage/assetKeys';
 import { validateImageMagicBytes, processRemedyCover } from '../../core/utils/imageProcessor';
+import { assertCanModifyContent } from '../../core/policies/contentOwnership';
 
 export interface RemedyFilters {
   page?: number;
@@ -192,7 +193,12 @@ export class RemedyService {
     };
   }
 
-  async getBySlugOrId(slugOrId: string): Promise<RemedyDetailResult> {
+  async getBySlugOrId(
+    slugOrId: string,
+    userId?: string,
+    userRole?: string,
+    isPreview = false,
+  ): Promise<RemedyDetailResult> {
     const isObjectId = mongoose.Types.ObjectId.isValid(slugOrId);
     const remedy = await Remedy.findOne({
       $or: [
@@ -206,6 +212,16 @@ export class RemedyService {
       .lean();
 
     if (!remedy) throw new AppError('Remedy not found', 404, 'NOT_FOUND');
+
+    if (!remedy.isPublished) {
+      const isOwner =
+        userId &&
+        (remedy.owner?.toString() === userId || remedy.createdBy?.toString() === userId);
+      const isAdmin = userRole === UserRole.ADMIN || userRole === UserRole.SUPER_ADMIN;
+      if (!isPreview || (!isOwner && !isAdmin)) {
+        throw new AppError('Remedy not found', 404, 'NOT_FOUND');
+      }
+    }
 
     // Resolve plants from ingredient names using the library export
     const ingredientNames = (remedy.ingredients || [])
@@ -244,8 +260,13 @@ export class RemedyService {
   }
 
   // Alias for backward compatibility with existing tests/callers
-  async getBySlug(slug: string): Promise<RemedyDetailResult> {
-    return this.getBySlugOrId(slug);
+  async getBySlug(
+    slug: string,
+    userId?: string,
+    userRole?: string,
+    isPreview = false,
+  ): Promise<RemedyDetailResult> {
+    return this.getBySlugOrId(slug, userId, userRole, isPreview);
   }
 
   async getRelated(remedyIdOrSlug: string, limit = 3): Promise<IRemedy[]> {
@@ -295,6 +316,7 @@ export class RemedyService {
       ...data,
       slug,
       createdBy: userId,
+      owner: userId,
     });
     return remedy;
   }
@@ -310,9 +332,7 @@ export class RemedyService {
       throw new AppError('Remedy not found', 404, 'NOT_FOUND');
     }
 
-    if (userRole === 'BOTANIST' && remedy.createdBy.toString() !== userId) {
-      throw new AppError('You can only edit your own remedies', 403, 'FORBIDDEN');
-    }
+    assertCanModifyContent(remedy, userId, userRole, 'update');
 
     if (data.title && data.title !== remedy.title) {
       data.slug = generateSlug(data.title);
@@ -336,7 +356,12 @@ export class RemedyService {
     return remedy;
   }
 
-  async uploadImage(idOrSlug: string, buffer: Buffer): Promise<{ imageUrl: string }> {
+  async uploadImage(
+    idOrSlug: string,
+    buffer: Buffer,
+    userId?: string,
+    userRole?: string,
+  ): Promise<{ imageUrl: string }> {
     const mime = validateImageMagicBytes(buffer);
     if (!mime) {
       throw new AppError('Invalid image format. Accepted: JPEG, PNG, WebP', 400, 'INVALID_FORMAT');
@@ -351,6 +376,10 @@ export class RemedyService {
     const remedy = await Remedy.findOne(query);
     if (!remedy) throw new AppError('Remedy not found', 404, 'NOT_FOUND');
 
+    if (userId && userRole) {
+      assertCanModifyContent(remedy, userId, userRole, 'upload');
+    }
+
     const processed = await processRemedyCover(buffer);
     const coverKey = remedyCoverKey(remedy.slug);
 
@@ -364,7 +393,7 @@ export class RemedyService {
     return { imageUrl: url };
   }
 
-  async deleteImage(idOrSlug: string): Promise<void> {
+  async deleteImage(idOrSlug: string, userId?: string, userRole?: string): Promise<void> {
     let query: any;
     if (mongoose.Types.ObjectId.isValid(idOrSlug)) {
       query = { _id: idOrSlug, isDeleted: false };
@@ -373,6 +402,10 @@ export class RemedyService {
     }
     const remedy = await Remedy.findOne(query);
     if (!remedy) throw new AppError('Remedy not found', 404, 'NOT_FOUND');
+
+    if (userId && userRole) {
+      assertCanModifyContent(remedy, userId, userRole, 'delete');
+    }
 
     const coverKey = remedyCoverKey(remedy.slug);
     await deleteObject(coverKey);

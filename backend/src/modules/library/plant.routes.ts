@@ -19,6 +19,7 @@ const router = Router();
 router.get('/', validate(plantQuerySchema, 'query'), plantController.list);
 router.get('/featured', plantController.featured);
 router.get('/search/autocomplete', plantController.autocomplete);
+router.get('/autocomplete', plantController.autocomplete);
 router.get('/garden', plantController.getGardenPlants);
 // :slug accepts both slug strings and Mongo ObjectIds
 router.get('/:slug', authenticate(true), plantController.getBySlug);
@@ -34,6 +35,13 @@ router.post(
   plantController.create,
 );
 router.patch(
+  '/:id',
+  authenticate(),
+  requireRole(UserRole.BOTANIST),
+  validate(updatePlantSchema),
+  plantController.update,
+);
+router.put(
   '/:id',
   authenticate(),
   requireRole(UserRole.BOTANIST),

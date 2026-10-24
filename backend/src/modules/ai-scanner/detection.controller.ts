@@ -32,6 +32,19 @@ export class DetectionController {
     sendSuccess(res, detection);
   }
 
+  async getFeedbackQueue(req: Request, res: Response) {
+    const result = await detectionService.getFeedbackQueue(
+      req.user!.sub,
+      req.query as unknown as Parameters<typeof detectionService.getFeedbackQueue>[1],
+    );
+    sendSuccess(res, result.items, 200, result.meta);
+  }
+
+  async getFeedbackStats(req: Request, res: Response) {
+    const stats = await detectionService.getFeedbackStats(req.user!.sub);
+    sendSuccess(res, stats);
+  }
+
   async getStats(_req: Request, res: Response) {
     const stats = await detectionService.getStats();
     sendSuccess(res, stats);

@@ -5,7 +5,7 @@ import { requireRole } from '../../core/middleware/rbac';
 import { validate } from '../../core/middleware/validate';
 import { uploadSingle } from '../../core/middleware/upload';
 import { UserRole } from '../../types';
-import { detectionFeedbackSchema } from './detection.validators';
+import { detectionFeedbackSchema, feedbackQueueQuerySchema } from './detection.validators';
 
 const router = Router();
 
@@ -56,6 +56,19 @@ router.post(
   requireRole(UserRole.BOTANIST),
   validate(detectionFeedbackSchema),
   detectionController.addFeedback,
+);
+router.get(
+  '/feedback-queue',
+  authenticate(),
+  requireRole(UserRole.BOTANIST),
+  validate(feedbackQueueQuerySchema, 'query'),
+  detectionController.getFeedbackQueue,
+);
+router.get(
+  '/feedback-stats',
+  authenticate(),
+  requireRole(UserRole.BOTANIST),
+  detectionController.getFeedbackStats,
 );
 router.get('/stats', authenticate(), requireRole(UserRole.ADMIN), detectionController.getStats);
 

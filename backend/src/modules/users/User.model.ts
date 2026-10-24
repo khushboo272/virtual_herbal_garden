@@ -13,6 +13,7 @@ export interface IUser extends Document {
   totpSecret: string | null;
   isActive: boolean;
   banReason: string | null;
+  bannedUntil: Date | null;
   oauthAccounts: IOAuthAccount[];
   loginAttempts: number;
   lockUntil: Date | null;
@@ -58,6 +59,7 @@ const UserSchema = new Schema<IUser>(
     totpSecret: { type: String, default: null },
     isActive: { type: Boolean, default: true },
     banReason: { type: String, default: null },
+    bannedUntil: { type: Date, default: null },
     oauthAccounts: [OAuthAccountSchema],
     loginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date, default: null },

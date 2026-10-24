@@ -7,6 +7,12 @@ import ActivityLog from '../notifications/ActivityLog.model';
 import { BookmarkEntityType, ActivityType, PaginationMeta } from '../../types';
 import { AppError } from '../../core/utils/apiResponse';
 
+import mongoose from 'mongoose';
+import Plant from '../library/Plant.model';
+import Remedy from '../remedies/Remedy.model';
+import Tour from '../tours/Tour.model';
+import { comparePassword } from '../../core/utils/hash';
+
 export class UserService {
   async getProfile(userId: string): Promise<IUser> {
     const user = await User.findById(userId).select('-passwordHash -totpSecret');
@@ -14,8 +20,16 @@ export class UserService {
     return user;
   }
 
-  async updateProfile(userId: string, data: { displayName?: string; bio?: string }): Promise<IUser> {
-    const user = await User.findByIdAndUpdate(userId, { $set: data }, { new: true })
+  async updateProfile(
+    userId: string,
+    data: { displayName?: string; name?: string; bio?: string },
+  ): Promise<IUser> {
+    const updateData: Record<string, unknown> = {};
+    const name = data.displayName || data.name;
+    if (name) updateData.displayName = name;
+    if (data.bio !== undefined) updateData.bio = data.bio;
+
+    const user = await User.findByIdAndUpdate(userId, { $set: updateData }, { new: true })
       .select('-passwordHash -totpSecret');
     if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
     return user;
@@ -28,10 +42,124 @@ export class UserService {
     return user;
   }
 
-  async getBookmarks(userId: string, entityType?: BookmarkEntityType) {
+  async getBookmarks(
+    userId: string,
+    options?: {
+      type?: string;
+      entityType?: BookmarkEntityType;
+      page?: number;
+      limit?: number;
+    },
+  ): Promise<{ bookmarks: unknown[]; meta: PaginationMeta } | unknown[]> {
     const query: Record<string, unknown> = { user: userId };
-    if (entityType) query.entityType = entityType;
-    return Bookmark.find(query).sort({ createdAt: -1 }).lean();
+
+    const typeFilter = options?.type || options?.entityType;
+    if (typeFilter && typeFilter !== 'ALL' && typeFilter !== 'all') {
+      const normalized = typeFilter.toUpperCase();
+      query.entityType = normalized;
+    }
+
+    const page = options?.page;
+    const limit = options?.limit;
+    const isPaginated = page !== undefined && limit !== undefined;
+
+    let bookmarkQuery = Bookmark.find(query).sort({ createdAt: -1 });
+    let total = 0;
+
+    if (isPaginated) {
+      const skip = (page - 1) * limit;
+      total = await Bookmark.countDocuments(query);
+      bookmarkQuery = bookmarkQuery.skip(skip).limit(limit);
+    }
+
+    const bookmarks = await bookmarkQuery.lean();
+
+    // Populate items in parallel
+    const populated = await Promise.all(
+      bookmarks.map(async (bm) => {
+        let item: {
+          id: string;
+          title: string;
+          subtitle?: string;
+          slug: string;
+          image: string;
+          type: 'plant' | 'remedy' | 'tour' | 'article';
+        } | null = null;
+
+        const entityIdStr = bm.entityId?.toString();
+
+        if (bm.entityType === BookmarkEntityType.PLANT) {
+          const plant = await Plant.findById(bm.entityId)
+            .select('commonName scientificName slug images isPublished isDeleted')
+            .lean();
+          if (plant && !plant.isDeleted) {
+            item = {
+              id: plant._id.toString(),
+              title: plant.commonName,
+              subtitle: plant.scientificName,
+              slug: plant.slug,
+              image: plant.images?.[0]?.url || '',
+              type: 'plant',
+            };
+          }
+        } else if (bm.entityType === BookmarkEntityType.REMEDY) {
+          const remedy = await Remedy.findById(bm.entityId)
+            .select('title description slug image images isPublished isDeleted')
+            .lean();
+          if (remedy && !remedy.isDeleted) {
+            item = {
+              id: remedy._id.toString(),
+              title: remedy.title,
+              subtitle: remedy.description,
+              slug: remedy.slug,
+              image: remedy.image || remedy.images?.[0]?.url || '',
+              type: 'remedy',
+            };
+          }
+        } else if (bm.entityType === BookmarkEntityType.TOUR) {
+          const tour = await Tour.findById(bm.entityId)
+            .select('title summary description slug coverImage coverImageUrl isPublished isDeleted')
+            .lean();
+          if (tour && !tour.isDeleted) {
+            item = {
+              id: tour._id.toString(),
+              title: tour.title,
+              subtitle: tour.summary || tour.description,
+              slug: tour.slug,
+              image: tour.coverImage || tour.coverImageUrl || '',
+              type: 'tour',
+            };
+          }
+        } else if (bm.entityType === BookmarkEntityType.ARTICLE) {
+          item = {
+            id: entityIdStr,
+            title: 'Article',
+            slug: '',
+            image: '',
+            type: 'article',
+          };
+        }
+
+        return {
+          ...bm,
+          item,
+        };
+      }),
+    );
+
+    if (isPaginated) {
+      return {
+        bookmarks: populated,
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        } as PaginationMeta,
+      };
+    }
+
+    return populated;
   }
 
   async createBookmark(userId: string, data: {
@@ -46,8 +174,33 @@ export class UserService {
     return bookmark;
   }
 
-  async deleteBookmark(userId: string, bookmarkId: string): Promise<void> {
-    const r = await Bookmark.findOneAndDelete({ _id: bookmarkId, user: userId });
+  async deleteBookmark(userId: string, idOrEntityId: string): Promise<void> {
+    const isObjectId = mongoose.Types.ObjectId.isValid(idOrEntityId);
+    if (!isObjectId) {
+      throw new AppError('Invalid identifier', 400, 'INVALID_ID');
+    }
+
+    const objId = new mongoose.Types.ObjectId(idOrEntityId);
+    const r = await Bookmark.findOneAndDelete({
+      user: userId,
+      $or: [{ _id: objId }, { entityId: objId }],
+    });
+
+    if (!r) throw new AppError('Bookmark not found', 404, 'NOT_FOUND');
+  }
+
+  async deleteBookmarkByEntity(userId: string, entityType: string, entityId: string): Promise<void> {
+    const isObjectId = mongoose.Types.ObjectId.isValid(entityId);
+    if (!isObjectId) {
+      throw new AppError('Invalid entity identifier', 400, 'INVALID_ID');
+    }
+
+    const r = await Bookmark.findOneAndDelete({
+      user: userId,
+      entityType: entityType.toUpperCase(),
+      entityId: new mongoose.Types.ObjectId(entityId),
+    });
+
     if (!r) throw new AppError('Bookmark not found', 404, 'NOT_FOUND');
   }
 
@@ -116,7 +269,37 @@ export class UserService {
     };
   }
 
-  async deleteAccount(userId: string): Promise<void> {
+  async deleteAccount(
+    userId: string,
+    confirmation?: { password?: string; confirmation?: string },
+  ): Promise<void> {
+    const user = await User.findById(userId);
+    if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
+
+    if (user.passwordHash) {
+      if (!confirmation?.password && confirmation?.confirmation !== 'DELETE') {
+        throw new AppError(
+          'Password or typed confirmation "DELETE" is required to delete your account',
+          400,
+          'CONFIRMATION_REQUIRED',
+        );
+      }
+      if (confirmation?.password) {
+        const isMatch = await comparePassword(confirmation.password, user.passwordHash);
+        if (!isMatch) {
+          throw new AppError('Incorrect password', 400, 'INCORRECT_PASSWORD');
+        }
+      }
+    } else {
+      if (confirmation?.confirmation !== 'DELETE') {
+        throw new AppError(
+          'Type "DELETE" to confirm deletion of your account',
+          400,
+          'CONFIRMATION_REQUIRED',
+        );
+      }
+    }
+
     await Promise.all([
       User.findByIdAndDelete(userId),
       Garden.deleteOne({ user: userId }),

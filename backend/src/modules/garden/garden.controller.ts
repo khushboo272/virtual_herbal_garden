@@ -8,6 +8,11 @@ export class GardenController {
     sendSuccess(res, garden);
   }
 
+  async getPlants(req: Request, res: Response) {
+    const garden = await gardenService.getGarden(req.user!.sub);
+    sendSuccess(res, garden.plants);
+  }
+
   async addPlant(req: Request, res: Response) {
     const garden = await gardenService.addPlant(req.user!.sub, req.body);
     sendCreated(res, garden);

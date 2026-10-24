@@ -11,6 +11,7 @@ const router = Router();
 router.use(authenticate(), requireRole(UserRole.USER));
 
 router.get('/', gardenController.getGarden);
+router.get('/plants', gardenController.getPlants);
 router.post('/plants', validate(addGardenPlantSchema), gardenController.addPlant);
 router.patch('/plants/:pid', validate(updateGardenPlantSchema), gardenController.updatePlant);
 router.delete('/plants/:pid', gardenController.removePlant);

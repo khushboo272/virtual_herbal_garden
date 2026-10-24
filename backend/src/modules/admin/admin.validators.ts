@@ -21,6 +21,10 @@ export const rejectPlantSchema = z.object({
   feedback: z.string().min(1).max(2000),
 });
 
+export const requestChangesSchema = z.object({
+  comment: z.string().min(1).max(2000),
+});
+
 export const adminUserQuerySchema = z.object({
   page: z.coerce.number().positive().default(1),
   limit: z.coerce.number().positive().max(100).default(20),

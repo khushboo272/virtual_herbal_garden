@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "sonner";
 import { Layout } from "./app/Layout";
 import { RequireRole } from "./app/components/RequireRole";
 
@@ -34,11 +35,7 @@ import {
   AIScannerStatsPage,
   UserGrowthPage,
   FeaturedContentPage,
-  BookmarksPage,
-  MyGardenPage,
   AIScannerPage,
-  ProfileSettingsPage,
-  HelpSupportPage,
   GuidedToursPage,
   ManagePlantsPage,
   SystemOverviewPage,
@@ -48,9 +45,27 @@ import {
   AIModelConfigPage,
 } from "./app/components/dashboard/pages";
 
+// Shared dashboard pages (real implementations)
+import {
+  BookmarksPage,
+  MyGardenPage,
+  SettingsProfilePage,
+  HelpSupportPage,
+} from "./features/dashboard/shared";
+
+// Botanist pages (real implementations)
+import {
+  MyContributionsPage,
+  PlantEditorPage,
+  RemedyEditorPage,
+  SubmissionDetailsPage,
+  AIFeedbackQueuePage,
+} from "./features/botanist";
+
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster richColors position="top-right" />
       <Routes>
         {/* Pages with shared public navbar layout */}
         <Route element={<Layout />}>
@@ -81,15 +96,39 @@ export default function App() {
           <Route path="garden" element={<MyGardenPage />} />
           <Route path="bookmarks" element={<BookmarksPage />} />
           <Route path="scanner" element={<AIScannerPage />} />
-          <Route path="profile" element={<ProfileSettingsPage />} />
+          <Route path="profile" element={<SettingsProfilePage />} />
           <Route path="help" element={<HelpSupportPage />} />
           <Route path="tours" element={<GuidedToursPage />} />
 
-          {/* Botanist sub-routes */}
-          <Route path="contributions" element={<DashboardHome />} />
-          <Route path="contributions/new-plant" element={<DashboardHome />} />
-          <Route path="contributions/new-remedy" element={<DashboardHome />} />
-          <Route path="ai-feedback" element={<DashboardHome />} />
+          {/* Botanist sub-routes — protected with BOTANIST role */}
+          <Route
+            path="contributions"
+            element={<RequireRole minimumRole="BOTANIST"><MyContributionsPage /></RequireRole>}
+          />
+          <Route
+            path="contributions/new-plant"
+            element={<RequireRole minimumRole="BOTANIST"><PlantEditorPage /></RequireRole>}
+          />
+          <Route
+            path="contributions/new-remedy"
+            element={<RequireRole minimumRole="BOTANIST"><RemedyEditorPage /></RequireRole>}
+          />
+          <Route
+            path="contributions/plant/:id"
+            element={<RequireRole minimumRole="BOTANIST"><PlantEditorPage /></RequireRole>}
+          />
+          <Route
+            path="contributions/remedy/:id"
+            element={<RequireRole minimumRole="BOTANIST"><RemedyEditorPage /></RequireRole>}
+          />
+          <Route
+            path="contributions/:type/:id/review"
+            element={<RequireRole minimumRole="BOTANIST"><SubmissionDetailsPage /></RequireRole>}
+          />
+          <Route
+            path="ai-feedback"
+            element={<RequireRole minimumRole="BOTANIST"><AIFeedbackQueuePage /></RequireRole>}
+          />
 
           {/* Admin sub-routes — dedicated page components */}
           <Route path="plants" element={<ManagePlantsPage />} />
@@ -113,7 +152,7 @@ export default function App() {
         </Route>
 
         {/* ── Redirect aliases (keeps old URLs working) ── */}
-        <Route path="/contribute" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/contribute" element={<Navigate to="/dashboard/contributions" replace />} />
         <Route path="/admin" element={<Navigate to="/dashboard" replace />} />
 
         {/* Full-screen page without navbar (immersive experience) */}

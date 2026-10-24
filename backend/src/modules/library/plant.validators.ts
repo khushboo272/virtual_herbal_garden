@@ -19,26 +19,51 @@ const growingConditionsSchema = z.object({
 
 export const createPlantSchema = z.object({
   commonName: z.string().min(1).max(200),
-  scientificName: z.string().min(1).max(300),
-  family: z.string().min(1).max(200),
-  description: z.string().min(10),
+  scientificName: z.string().min(1).max(300).optional(),
+  family: z.string().max(200).optional().default('Unclassified'),
+  description: z.string().optional().default('Botanical plant draft details.'),
   shortDescription: z.string().max(500).optional(),
-  medicinalUses: z.array(z.string()).min(1),
-  partsUsed: z.array(z.enum(['leaves', 'roots', 'bark', 'seeds', 'flowers', 'resin'])).optional(),
+  medicinalUses: z
+    .array(
+      z.union([
+        z.string(),
+        z.object({ use: z.string(), details: z.string().optional() }),
+      ]).transform((item) =>
+        typeof item === 'string'
+          ? item
+          : item.details?.trim()
+          ? `${item.use.trim()}: ${item.details.trim()}`
+          : item.use.trim()
+      )
+    )
+    .optional()
+    .default([]),
+  partsUsed: z
+    .array(z.string().transform((s) => s.toLowerCase()))
+    .optional()
+    .default([]),
   toxicityLevel: z.enum(['NONE', 'LOW', 'MODERATE', 'HIGH']).default('NONE'),
   ayurvedicNames: z.array(z.string()).optional(),
   aliases: z.array(z.string()).optional(),
   plantType: z.string().optional(),
-  regionNative: z.array(z.string()).min(1),
+  regionNative: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v : v ? [v] : ['Unspecified']))
+    .optional()
+    .default(['Unspecified']),
+  nativeRegion: z.string().optional(),
   growingConditions: growingConditionsSchema.optional(),
   images: z.array(imageSchema).optional(),
   model3dUrl: z.string().url().optional(),
   categories: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
   attributes: z.record(z.unknown()).optional(),
-});
+  references: z.array(z.string()).optional(),
+  precautions: z.array(z.string()).optional(),
+  keyBenefits: z.array(z.string()).optional(),
+}).passthrough();
 
-export const updatePlantSchema = createPlantSchema.partial();
+export const updatePlantSchema = createPlantSchema.partial().passthrough();
 
 // Query params for GET /plants
 // q              — full-text search string (safe, escaped on service layer)

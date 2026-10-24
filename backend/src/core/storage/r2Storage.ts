@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import {
   S3Client,
   PutObjectCommand,
@@ -83,17 +85,27 @@ export async function putImage(options: PutImageOptions): Promise<string> {
     ? 'public, max-age=31536000, immutable'
     : 'public, max-age=3600';
 
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-      CacheControl: cacheControl,
-    })
-  );
+  try {
+    await client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+        CacheControl: cacheControl,
+      })
+    );
 
-  return publicUrl(key);
+    return publicUrl(key);
+  } catch (err: any) {
+    logger.warn(`R2/S3 upload failed for ${key}, falling back to local file storage: ${err.message}`);
+    const cleanKey = key.replace(/\\/g, '/');
+    const localDir = path.join(process.cwd(), 'uploads', path.dirname(cleanKey));
+    await fs.promises.mkdir(localDir, { recursive: true });
+    const localFilePath = path.join(process.cwd(), 'uploads', cleanKey);
+    await fs.promises.writeFile(localFilePath, buffer);
+    return `/uploads/${cleanKey}`;
+  }
 }
 
 /**

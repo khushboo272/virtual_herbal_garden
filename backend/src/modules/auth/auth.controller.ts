@@ -109,6 +109,12 @@ export class AuthController {
     sendSuccess(res, { message: 'Logged out from all devices' });
   }
 
+  async changePassword(req: Request, res: Response) {
+    const { currentPassword, newPassword } = req.body;
+    await authService.changePassword(req.user!.sub, currentPassword, newPassword);
+    sendSuccess(res, { message: 'Password changed successfully' });
+  }
+
   async googleCallback(req: Request, res: Response) {
     try {
       // Passport Google strategy returns a JwtPayload: { sub, email, role }

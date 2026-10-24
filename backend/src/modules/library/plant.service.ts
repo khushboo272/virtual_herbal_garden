@@ -4,11 +4,12 @@ import Review, { IReview } from './Review.model';
 import ActivityLog from '../notifications/ActivityLog.model';
 import './Category.model';
 import '../users/User.model';
-import { ActivityType, PaginationMeta } from '../../types';
+import { ActivityType, PaginationMeta, UserRole } from '../../types';
 import { generateSlug } from '../../core/utils/slug';
 import { AppError } from '../../core/utils/apiResponse';
 import { redis } from '../../core/config/redis';
 import { HEALTH_CATEGORIES, getCategoryBySlug } from './health-categories';
+import { assertCanModifyContent } from '../../core/policies/contentOwnership';
 
 interface LibraryFilters {
   page: number;
@@ -281,15 +282,16 @@ export class PlantService {
     return results as unknown as Partial<IPlant>[];
   }
 
-  async getBySlug(slugOrId: string, userId?: string): Promise<IPlant> {
+  async getBySlug(
+    slugOrId: string,
+    userId?: string,
+    userRole?: string,
+    isPreview = false,
+  ): Promise<IPlant> {
     const isId = mongoose.Types.ObjectId.isValid(slugOrId);
     const query = isId ? { _id: slugOrId, isDeleted: false } : { slug: slugOrId, isDeleted: false };
 
-    const plant = await Plant.findOneAndUpdate(
-      query,
-      { $inc: { viewCount: 1 } },
-      { new: true },
-    )
+    const plant = await Plant.findOne(query)
       .populate('categories', 'name slug')
       .populate('createdBy', 'displayName avatarUrl');
 
@@ -297,7 +299,21 @@ export class PlantService {
       throw new AppError('Plant not found', 404, 'NOT_FOUND');
     }
 
-    if (userId) {
+    if (!plant.isPublished) {
+      const isOwner =
+        userId &&
+        (plant.owner?.toString() === userId || plant.createdBy?.toString() === userId);
+      const isAdmin = userRole === UserRole.ADMIN || userRole === UserRole.SUPER_ADMIN;
+      if (!isPreview || (!isOwner && !isAdmin)) {
+        throw new AppError('Plant not found', 404, 'NOT_FOUND');
+      }
+    } else {
+      // Increment view count for published views
+      plant.viewCount = (plant.viewCount || 0) + 1;
+      await plant.save();
+    }
+
+    if (userId && plant.isPublished) {
       await ActivityLog.create({
         user: userId,
         activityType: ActivityType.VIEW_PLANT,
@@ -331,8 +347,21 @@ export class PlantService {
   }
 
   async create(data: Partial<IPlant>, userId: string): Promise<IPlant> {
-    const slug = generateSlug(data.commonName || '');
-    const plant = await Plant.create({ ...data, slug, createdBy: userId });
+    const slug = generateSlug(data.commonName || `plant-${Date.now()}`);
+    const scientificName =
+      data.scientificName?.trim() || `${data.commonName || 'Plant'} sp. (draft-${Date.now()})`;
+    const plant = await Plant.create({
+      ...data,
+      scientificName,
+      family: data.family?.trim() || 'Unclassified',
+      description: data.description?.trim() || 'Draft botanical description.',
+      regionNative: Array.isArray(data.regionNative) && data.regionNative.length > 0
+        ? data.regionNative
+        : ['Unspecified'],
+      slug,
+      createdBy: userId,
+      owner: userId,
+    });
     await redis.del('plants:featured');
     return plant;
   }
@@ -347,9 +376,7 @@ export class PlantService {
     if (!plant || plant.isDeleted) {
       throw new AppError('Plant not found', 404, 'NOT_FOUND');
     }
-    if (userRole === 'BOTANIST' && plant.createdBy.toString() !== userId) {
-      throw new AppError('You can only edit your own plants', 403, 'FORBIDDEN');
-    }
+    assertCanModifyContent(plant, userId, userRole, 'update');
     if (data.commonName && data.commonName !== plant.commonName) {
       data.slug = generateSlug(data.commonName);
     }

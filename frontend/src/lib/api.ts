@@ -7,11 +7,13 @@ const API_BASE = '/api/v1';
 export class ApiError extends Error {
   status: number;
   code: string;
-  constructor(message: string, status: number, code: string = 'UNKNOWN') {
+  details?: any;
+  constructor(message: string, status: number, code: string = 'UNKNOWN', details?: any) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -115,6 +117,7 @@ async function request<T>(
       errorBody?.error?.message || `Request failed (${res.status})`,
       res.status,
       errorBody?.error?.code || 'UNKNOWN',
+      errorBody?.error?.details || errorBody?.details,
     );
   }
 
@@ -159,8 +162,11 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  delete: <T>(endpoint: string) =>
-    request<T>(endpoint, { method: 'DELETE' }),
+  delete: <T>(endpoint: string, body?: unknown) =>
+    request<T>(endpoint, {
+      method: 'DELETE',
+      body: body ? JSON.stringify(body) : undefined,
+    }),
 
   upload: <T>(endpoint: string, formData: FormData) =>
     request<T>(endpoint, {

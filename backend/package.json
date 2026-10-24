@@ -18,7 +18,8 @@
     "seed:tours": "tsx src/seedTours.ts",
     "backfill:tours": "tsx src/scripts/backfillTours.ts",
     "r2:check": "tsx src/scripts/r2Check.ts",
-    "assets:upload": "tsx src/scripts/uploadAssets.ts"
+    "assets:upload": "tsx src/scripts/uploadAssets.ts",
+    "backfill:status": "tsx src/scripts/backfillContentStatus.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.600.0",

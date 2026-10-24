@@ -10,7 +10,8 @@ export class RemedyController {
 
   async getBySlugOrId(req: Request, res: Response) {
     const identifier = req.params.slugOrId || req.params.slug || req.params.id;
-    const remedy = await remedyService.getBySlugOrId(identifier);
+    const isPreview = req.query.preview === '1' || req.query.preview === 'true';
+    const remedy = await remedyService.getBySlugOrId(identifier, req.user?.sub, req.user?.role, isPreview);
     sendSuccess(res, remedy);
   }
 
@@ -42,12 +43,17 @@ export class RemedyController {
 
   async uploadImage(req: Request, res: Response) {
     if (!req.file) throw new AppError('No image file provided', 400, 'NO_FILE');
-    const result = await remedyService.uploadImage(req.params.id, req.file.buffer);
+    const result = await remedyService.uploadImage(
+      req.params.id,
+      req.file.buffer,
+      req.user?.sub,
+      req.user?.role,
+    );
     sendSuccess(res, result);
   }
 
   async deleteImage(req: Request, res: Response) {
-    await remedyService.deleteImage(req.params.id);
+    await remedyService.deleteImage(req.params.id, req.user?.sub, req.user?.role);
     sendSuccess(res, { message: 'Remedy image removed' });
   }
 }

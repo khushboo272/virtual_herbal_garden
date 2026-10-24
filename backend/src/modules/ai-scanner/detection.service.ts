@@ -222,32 +222,233 @@ export class DetectionService {
     };
   }
 
+  async getFeedbackQueue(
+    reviewerId: string,
+    filters: {
+      state?: 'pending' | 'reviewed' | 'all';
+      confidence?: 'low' | 'all';
+      isPlant?: boolean;
+      page: number;
+      limit: number;
+    },
+  ): Promise<{ items: unknown[]; meta: PaginationMeta }> {
+    const { state = 'pending', confidence = 'all', isPlant, page, limit } = filters;
+    const skip = (page - 1) * limit;
+
+    const query: Record<string, unknown> = {
+      status: DetectionStatus.COMPLETE,
+    };
+
+    if (state === 'pending') {
+      query.$or = [
+        { 'feedbacks.0': { $exists: false } },
+        { feedbacks: { $size: 0 } },
+        { feedback: null, feedbacks: { $exists: false } },
+      ];
+    } else if (state === 'reviewed') {
+      query.$or = [
+        { 'feedbacks.0': { $exists: true } },
+        { feedback: { $ne: null } },
+      ];
+    }
+
+    if (confidence === 'low') {
+      query['predictions.0.confidence'] = { $lt: 0.7 };
+    }
+
+    if (isPlant !== undefined) {
+      query['geminiResult.isPlant'] = isPlant;
+    }
+
+    // Never include user identity: omit user from projection
+    const [docs, total] = await Promise.all([
+      Detection.find(query)
+        .select('-user')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Detection.countDocuments(query),
+    ]);
+
+    const items = docs.map((d) => {
+      const p0 = d.predictions?.[0];
+      const gr0 = d.geminiResult?.alternatives?.[0];
+      const topMatch = p0
+        ? {
+            commonName: p0.commonName,
+            scientificName: gr0?.scientificName || '',
+            confidence: p0.confidence,
+            plantId: p0.plant?.toString() || null,
+          }
+        : gr0
+        ? {
+            commonName: gr0.commonName,
+            scientificName: gr0.scientificName,
+            confidence: gr0.confidence,
+            plantId: null,
+          }
+        : null;
+
+      const alternatives = d.geminiResult?.alternatives?.length
+        ? d.geminiResult.alternatives
+        : (d.predictions?.slice(1).map((p) => ({
+            commonName: p.commonName,
+            scientificName: '',
+            confidence: p.confidence,
+          })) || []);
+
+      const myFeedback =
+        d.feedbacks?.find((f) => f.reviewer?.toString() === reviewerId) ||
+        (d.feedback?.reviewer?.toString() === reviewerId ? d.feedback : null);
+
+      return {
+        id: (d as unknown as { _id: mongoose.Types.ObjectId })._id.toString(),
+        thumbnail: d.imageThumbnailUrl || d.imageUrl,
+        topMatch,
+        alternatives,
+        confidence: p0?.confidence ?? gr0?.confidence ?? 0,
+        isPlant: d.geminiResult?.isPlant ?? true,
+        myFeedback: myFeedback
+          ? {
+              verdict: myFeedback.verdict || (myFeedback.isCorrect ? 'CORRECT' : 'INCORRECT'),
+              correctPlantId: myFeedback.correctPlant?.toString() || null,
+              comment: myFeedback.comment || myFeedback.notes || '',
+              reviewedAt: myFeedback.reviewedAt,
+            }
+          : null,
+        reviewedCount: d.feedbacks?.length || (d.feedback ? 1 : 0),
+        createdAt: d.createdAt,
+      };
+    });
+
+    return {
+      items,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
   async addFeedback(
     detectionId: string,
     reviewerId: string,
-    data: { isCorrect: boolean; correctPlant?: string; notes?: string },
+    data: {
+      verdict?: import('../../types').DetectionVerdict;
+      isCorrect?: boolean;
+      correctPlantId?: string;
+      correctPlant?: string;
+      comment?: string;
+      notes?: string;
+    },
   ): Promise<IDetection> {
-    const detection = await Detection.findByIdAndUpdate(
-      detectionId,
-      {
-        $set: {
-          feedback: {
-            reviewer: new mongoose.Types.ObjectId(reviewerId),
-            isCorrect: data.isCorrect,
-            correctPlant: data.correctPlant ? new mongoose.Types.ObjectId(data.correctPlant) : undefined,
-            notes: data.notes,
-            reviewedAt: new Date(),
-          },
-        },
-      },
-      { new: true },
-    );
-
+    const detection = await Detection.findById(detectionId);
     if (!detection) {
       throw new AppError('Detection not found', 404, 'NOT_FOUND');
     }
 
+    const verdict: import('../../types').DetectionVerdict =
+      data.verdict || (data.isCorrect ? 'CORRECT' : 'INCORRECT');
+    const isCorrect = verdict === 'CORRECT';
+    const correctPlantId = data.correctPlantId || data.correctPlant;
+    const comment = data.comment || data.notes || '';
+
+    const newFeedback: import('../../types').IDetectionFeedback = {
+      reviewer: new mongoose.Types.ObjectId(reviewerId),
+      verdict,
+      isCorrect,
+      correctPlant: correctPlantId ? new mongoose.Types.ObjectId(correctPlantId) : undefined,
+      comment,
+      notes: comment,
+      reviewedAt: new Date(),
+    };
+
+    if (!detection.feedbacks) {
+      detection.feedbacks = [];
+    }
+
+    const existingIndex = detection.feedbacks.findIndex(
+      (f) => f.reviewer?.toString() === reviewerId,
+    );
+
+    if (existingIndex >= 0) {
+      detection.feedbacks[existingIndex] = newFeedback;
+    } else {
+      detection.feedbacks.push(newFeedback);
+    }
+
+    detection.feedback = newFeedback;
+    await detection.save();
+
     return detection;
+  }
+
+  async getFeedbackStats(reviewerId: string): Promise<{
+    reviewedCount: number;
+    accuracyRate: number;
+    myReviews: number;
+    pendingCount: number;
+  }> {
+    const reviewerObjId = new mongoose.Types.ObjectId(reviewerId);
+
+    const [totalCompleted, reviewedCount, myReviewsCount, correctCountAgg] = await Promise.all([
+      Detection.countDocuments({ status: DetectionStatus.COMPLETE }),
+      Detection.countDocuments({
+        status: DetectionStatus.COMPLETE,
+        $or: [{ 'feedbacks.0': { $exists: true } }, { feedback: { $ne: null } }],
+      }),
+      Detection.countDocuments({
+        status: DetectionStatus.COMPLETE,
+        $or: [{ 'feedbacks.reviewer': reviewerObjId }, { 'feedback.reviewer': reviewerObjId }],
+      }),
+      Detection.aggregate([
+        {
+          $match: {
+            status: DetectionStatus.COMPLETE,
+            $or: [{ 'feedbacks.0': { $exists: true } }, { feedback: { $ne: null } }],
+          },
+        },
+        {
+          $project: {
+            isCorrect: {
+              $cond: [
+                { $gt: [{ $size: { $ifNull: ['$feedbacks', []] } }, 0] },
+                {
+                  $in: [
+                    'CORRECT',
+                    {
+                      $map: {
+                        input: '$feedbacks',
+                        as: 'f',
+                        in: '$$f.verdict',
+                      },
+                    },
+                  ],
+                },
+                { $eq: ['$feedback.isCorrect', true] },
+              ],
+            },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            correct: { $sum: { $cond: ['$isCorrect', 1, 0] } },
+            total: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+    const pendingCount = Math.max(0, totalCompleted - reviewedCount);
+    const aggTotal = correctCountAgg[0]?.total || 0;
+    const aggCorrect = correctCountAgg[0]?.correct || 0;
+    const accuracyRate = aggTotal > 0 ? Math.round((aggCorrect / aggTotal) * 100) : 0;
+
+    return {
+      reviewedCount,
+      accuracyRate,
+      myReviews: myReviewsCount,
+      pendingCount,
+    };
   }
 
   async getStats(): Promise<Record<string, unknown>> {

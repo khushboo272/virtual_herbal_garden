@@ -68,6 +68,22 @@ export class NotificationService {
   async getUnreadCount(userId: string): Promise<number> {
     return Notification.countDocuments({ user: userId, isRead: false });
   }
+
+  async notifyAdmins(
+    type: NotificationType,
+    title: string,
+    body: string,
+    actionUrl?: string,
+  ): Promise<void> {
+    const User = (await import('../users/User.model')).default;
+    const admins = await User.find({ role: { $in: ['ADMIN', 'SUPER_ADMIN'] } }).select('_id');
+    await Promise.all(
+      admins.map((admin) =>
+        this.createNotification(admin._id.toString(), type, title, body, actionUrl),
+      ),
+    );
+  }
 }
 
 export const notificationService = new NotificationService();
+

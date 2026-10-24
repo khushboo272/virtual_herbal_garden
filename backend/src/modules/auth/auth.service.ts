@@ -60,7 +60,7 @@ export class AuthService {
       throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
     }
 
-    if (!user.isActive) {
+    if (!user.isActive || (user.bannedUntil && new Date(user.bannedUntil) > new Date())) {
       throw new AppError('Account is banned', 403, 'ACCOUNT_BANNED');
     }
 
@@ -134,8 +134,8 @@ export class AuthService {
     await storedToken.save();
 
     const user = await User.findById(storedToken.user);
-    if (!user || !user.isActive) {
-      throw new AppError('User not found or inactive', 401, 'USER_INACTIVE');
+    if (!user || !user.isActive || (user.bannedUntil && new Date(user.bannedUntil) > new Date())) {
+      throw new AppError('Account is banned or inactive', 403, 'ACCOUNT_BANNED');
     }
 
     return this.generateTokenPair(user, req);
@@ -251,6 +251,31 @@ export class AuthService {
   /** Public wrapper for generateTokenPair — used by controller for register/OAuth flows */
   async generateTokenPairForOAuth(user: IUser, req: Request): Promise<TokenPair> {
     return this.generateTokenPair(user, req);
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await User.findById(userId);
+    if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
+
+    if (!user.passwordHash) {
+      throw new AppError(
+        'This account was created via Google OAuth. Passwords cannot be set or changed for Google accounts.',
+        400,
+        'OAUTH_ONLY',
+      );
+    }
+
+    const isMatch = await comparePassword(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      throw new AppError('Current password is incorrect', 400, 'INCORRECT_PASSWORD');
+    }
+
+    user.passwordHash = await hashPassword(newPassword);
+    await user.save();
   }
 }
 

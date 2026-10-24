@@ -16,6 +16,7 @@ router.patch('/me', validate(updateProfileSchema), userController.updateProfile)
 router.post('/me/avatar', uploadSingle, userController.uploadAvatar);
 router.get('/me/bookmarks', userController.getBookmarks);
 router.post('/me/bookmarks', validate(createBookmarkSchema), userController.createBookmark);
+router.delete('/me/bookmarks/entity/:type/:entityId', userController.deleteBookmarkByEntity);
 router.delete('/me/bookmarks/:id', userController.deleteBookmark);
 router.get('/me/notifications', userController.getNotifications);
 router.patch('/me/notifications/read-all', userController.markAllNotificationsRead);

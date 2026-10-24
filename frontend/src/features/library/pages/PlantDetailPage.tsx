@@ -13,6 +13,8 @@ import { getRelated } from '../api/libraryApi';
 import type { LibraryPlant, PlantReview } from '../types/library.types';
 import { getRemediesByPlant, RemedyCard, type Remedy } from '../../remedies';
 import { getToursByPlant, TourCard, type TourSummary } from '../../tours';
+import { toast } from 'sonner';
+import { getGarden, addPlantToGarden } from '../../dashboard/shared';
 
 // ── Star rating input ──────────────────────────────────────────────────────
 
@@ -118,6 +120,36 @@ export function PlantDetailPage() {
 
   const [plantRemedies, setPlantRemedies] = useState<Remedy[]>([]);
   const [plantTours, setPlantTours] = useState<TourSummary[]>([]);
+  const [inGarden, setInGarden] = useState(false);
+  const [addingToGarden, setAddingToGarden] = useState(false);
+
+  // Check if plant is in user's garden
+  useEffect(() => {
+    if (isAuthenticated && plant?._id) {
+      getGarden()
+        .then((g) => {
+          const found = g?.plants?.some(
+            (p: any) => (p.plant?._id || p.plant) === plant._id,
+          );
+          setInGarden(!!found);
+        })
+        .catch(() => {});
+    }
+  }, [isAuthenticated, plant?._id]);
+
+  const handleAddToGarden = async () => {
+    if (!plant?._id) return;
+    try {
+      setAddingToGarden(true);
+      await addPlantToGarden(plant._id);
+      setInGarden(true);
+      toast.success(`${plant.commonName} added to your garden!`);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to add plant to garden');
+    } finally {
+      setAddingToGarden(false);
+    }
+  };
 
   // Load related plants
   useEffect(() => {
@@ -282,10 +314,27 @@ export function PlantDetailPage() {
                   )}
                 </div>
 
-                {/* Favorite + Share */}
-                <div className="flex gap-2 flex-shrink-0">
+                {/* Favorite + Share + Add to Garden */}
+                <div className="flex items-center gap-2 flex-shrink-0">
                   {isAuthenticated ? (
                     <>
+                      {inGarden ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-medium border border-emerald-200">
+                          <Leaf className="w-3.5 h-3.5 text-emerald-600" />
+                          In My Garden
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          id="plant-add-garden-btn"
+                          onClick={handleAddToGarden}
+                          disabled={addingToGarden}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-700 hover:bg-green-800 text-white text-xs font-medium transition-colors shadow-xs"
+                        >
+                          <Leaf className="w-3.5 h-3.5" />
+                          {addingToGarden ? 'Adding...' : 'Add to My Garden'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         id="plant-favorite-btn"

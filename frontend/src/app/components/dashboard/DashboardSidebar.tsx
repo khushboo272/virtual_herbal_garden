@@ -118,7 +118,10 @@ function SidebarItem({
   depth?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const isActive = currentPath === item.path || currentPath.startsWith(item.path + '/');
+  const isActive =
+    item.path === '/dashboard'
+      ? currentPath === '/dashboard'
+      : currentPath === item.path || currentPath.startsWith(item.path + '/');
   const hasChildren = item.children && item.children.length > 0;
   const badgeCount = item.badgeKey ? badgeCounts[item.badgeKey] : undefined;
 

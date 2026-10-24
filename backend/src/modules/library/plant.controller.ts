@@ -38,7 +38,8 @@ export class PlantController {
   }
 
   async getBySlug(req: Request, res: Response) {
-    const plant = await plantService.getBySlug(req.params.slug, req.user?.sub);
+    const isPreview = req.query.preview === '1' || req.query.preview === 'true';
+    const plant = await plantService.getBySlug(req.params.slug, req.user?.sub, req.user?.role, isPreview);
     sendSuccess(res, plant);
   }
 
@@ -78,6 +79,13 @@ export class PlantController {
     const files = req.files as Express.Multer.File[] | undefined;
     if (!files?.length) throw new AppError('No images provided', 400, 'NO_FILES');
 
+    const Plant = (await import('./Plant.model')).default;
+    const plant = await Plant.findById(req.params.id);
+    if (!plant || plant.isDeleted) throw new AppError('Plant not found', 404, 'NOT_FOUND');
+
+    const { assertCanModifyContent } = await import('../../core/policies/contentOwnership');
+    assertCanModifyContent(plant, req.user!.sub, req.user!.role, 'upload');
+
     const images = await Promise.all(
       files.map(async (file) => {
         const mime = validateImageMagicBytes(file.buffer);
@@ -86,7 +94,6 @@ export class PlantController {
       }),
     );
 
-    const Plant = (await import('./Plant.model')).default;
     await Plant.findByIdAndUpdate(req.params.id, { $push: { images: { $each: images } } });
     sendCreated(res, images);
   }
@@ -115,7 +122,10 @@ export class PlantController {
 
     const Plant = (await import('./Plant.model')).default;
     const plant = await Plant.findById(id);
-    if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
+    if (!plant || plant.isDeleted) throw new AppError('Plant not found', 404, 'NOT_FOUND');
+
+    const { assertCanModifyContent } = await import('../../core/policies/contentOwnership');
+    assertCanModifyContent(plant, req.user!.sub, req.user!.role, 'upload');
 
     const { uploadToR2 } = await import('../../lib/r2Client');
 

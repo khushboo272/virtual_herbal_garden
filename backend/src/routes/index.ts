@@ -8,6 +8,9 @@ import userRoutes from '../modules/users/user.routes';
 import adminRoutes from '../modules/admin/admin.routes';
 import tourRoutes from '../modules/tours/tour.routes';
 import homeRoutes from '../modules/home/home.routes';
+import contributionRoutes from '../modules/contributions/contribution.routes';
+import supportRoutes from '../modules/support/support.routes';
+import roleApplicationRoutes from '../modules/admin/roleApplications.routes';
 
 const router = Router();
 
@@ -20,5 +23,8 @@ router.use('/users', userRoutes);
 router.use('/admin', adminRoutes);
 router.use('/tours', tourRoutes);
 router.use('/home', homeRoutes);
+router.use('/contributions', contributionRoutes);
+router.use('/support', supportRoutes);
+router.use('/role-applications', roleApplicationRoutes);
 
 export default router;

@@ -32,6 +32,9 @@ export enum PlantPart {
   SEEDS = 'seeds',
   FLOWERS = 'flowers',
   RESIN = 'resin',
+  FRUIT = 'fruit',
+  STEM = 'stem',
+  WHOLE_PLANT = 'whole_plant',
 }
 
 export enum GrowthStage {
@@ -59,6 +62,7 @@ export enum BookmarkEntityType {
   PLANT = 'PLANT',
   REMEDY = 'REMEDY',
   ARTICLE = 'ARTICLE',
+  TOUR = 'TOUR',
 }
 
 export enum NotificationType {
@@ -67,6 +71,23 @@ export enum NotificationType {
   ADMIN = 'ADMIN',
   SYSTEM = 'SYSTEM',
   SYSTEM_ALERT = 'SYSTEM_ALERT',
+}
+
+export enum ContentStatus {
+  DRAFT = 'DRAFT',
+  PENDING_REVIEW = 'PENDING_REVIEW',
+  CHANGES_REQUESTED = 'CHANGES_REQUESTED',
+  PUBLISHED = 'PUBLISHED',
+  REJECTED = 'REJECTED',
+}
+
+export type ReviewAction = 'SUBMITTED' | 'APPROVED' | 'CHANGES_REQUESTED' | 'REJECTED' | 'WITHDRAWN';
+
+export interface IReviewNote {
+  at: Date;
+  byUserId: Types.ObjectId;
+  action: ReviewAction;
+  comment?: string;
 }
 
 export enum AuditAction {
@@ -85,6 +106,8 @@ export enum ActivityType {
   GARDEN_UPDATE = 'GARDEN_UPDATE',
   BOOKMARK = 'BOOKMARK',
   COMPLETE_TOUR = 'COMPLETE_TOUR',
+  SUBMISSION = 'SUBMISSION',
+  CORRECTION_REQUEST = 'CORRECTION_REQUEST',
 }
 
 export enum ImageType {
@@ -167,11 +190,15 @@ export interface IPrediction {
   commonName: string;
 }
 
+export type DetectionVerdict = 'CORRECT' | 'INCORRECT' | 'NOT_A_PLANT' | 'UNSURE';
+
 export interface IDetectionFeedback {
   reviewer: Types.ObjectId;
-  isCorrect: boolean;
+  verdict?: DetectionVerdict;
+  isCorrect?: boolean;
   correctPlant?: Types.ObjectId;
   notes?: string;
+  comment?: string;
   reviewedAt: Date;
 }
 

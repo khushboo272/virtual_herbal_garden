@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
-import { ToxicityLevel, PlantPart, IGrowingConditions, IPlantImage, ImageType } from '../../types';
+import { ToxicityLevel, PlantPart, IGrowingConditions, IPlantImage, ImageType, ContentStatus, IReviewNote } from '../../types';
 
 export interface IPlant extends Document {
   commonName: string;
@@ -37,9 +37,16 @@ export interface IPlant extends Document {
   tags: string[];
   attributes: Map<string, unknown>;
   isPublished: boolean;
+  status: ContentStatus;
+  owner: Types.ObjectId;
   isFeatured: boolean;
   isDeleted: boolean;
   createdBy: Types.ObjectId;
+  reviewNotes: IReviewNote[];
+  submittedAt: Date | null;
+  references: string[];
+  precautions: string[];
+  keyBenefits: string[];
   avgRating: number;
   reviewCount: number;
   viewCount: number;
@@ -70,6 +77,20 @@ const PlantImageSchema = new Schema<IPlantImage>(
     cardUrl: String,
     fullUrl: String,
     lqip: String,
+  },
+  { _id: false },
+);
+
+const ReviewNoteSchema = new Schema<IReviewNote>(
+  {
+    at: { type: Date, default: Date.now },
+    byUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    action: {
+      type: String,
+      enum: ['SUBMITTED', 'APPROVED', 'CHANGES_REQUESTED', 'REJECTED', 'WITHDRAWN'],
+      required: true,
+    },
+    comment: { type: String, default: null },
   },
   { _id: false },
 );
@@ -129,15 +150,40 @@ const PlantSchema = new Schema<IPlant>(
     tags: [{ type: String, lowercase: true }],
     attributes: { type: Map, of: Schema.Types.Mixed },
     isPublished: { type: Boolean, default: false },
+    status: {
+      type: String,
+      enum: Object.values(ContentStatus),
+      default: ContentStatus.DRAFT,
+    },
+    owner: { type: Schema.Types.ObjectId, ref: 'User' },
     isFeatured: { type: Boolean, default: false },
     isDeleted: { type: Boolean, default: false },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    reviewNotes: { type: [ReviewNoteSchema], default: [] },
+    submittedAt: { type: Date, default: null },
+    references: [{ type: String }],
+    precautions: [{ type: String }],
+    keyBenefits: [{ type: String }],
     avgRating: { type: Number, default: 0 },
     reviewCount: { type: Number, default: 0 },
     viewCount: { type: Number, default: 0 },
   },
   { timestamps: true },
 );
+
+PlantSchema.pre('save', function (next) {
+  if (this.isModified('status')) {
+    this.isPublished = this.status === ContentStatus.PUBLISHED;
+  } else if (this.isModified('isPublished') && !this.isModified('status')) {
+    if (this.isPublished && this.status !== ContentStatus.PUBLISHED) {
+      this.status = ContentStatus.PUBLISHED;
+    }
+  }
+  if (!this.owner && this.createdBy) {
+    this.owner = this.createdBy;
+  }
+  next();
+});
 
 // Full-text search index with field weights for relevance
 // scientificName + commonName + aliases weighted highest, then medicinalUses/tags
@@ -172,6 +218,8 @@ PlantSchema.index({ isDeleted: 1 });
 PlantSchema.index({ tags: 1 });
 PlantSchema.index({ regionNative: 1 });
 PlantSchema.index({ plantType: 1 });
+PlantSchema.index({ status: 1 });
+PlantSchema.index({ owner: 1 });
 PlantSchema.index({ createdAt: -1 });
 
 export default mongoose.model<IPlant>('Plant', PlantSchema);

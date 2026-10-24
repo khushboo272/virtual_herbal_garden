@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import User from '../users/User.model';
 import Plant from '../library/Plant.model';
 import Remedy from '../remedies/Remedy.model';
@@ -8,9 +9,11 @@ import AuditLog from './AuditLog.model';
 import Notification from '../notifications/Notification.model';
 import { notificationService } from '../notifications/notification.service';
 import SystemConfig from './SystemConfig.model';
-import { UserRole, AuditAction, NotificationType, PaginationMeta } from '../../types';
+import { UserRole, AuditAction, NotificationType, PaginationMeta, ContentStatus } from '../../types';
 import { AppError } from '../../core/utils/apiResponse';
 import { redis } from '../../core/config/redis';
+
+import RoleApplication, { RoleApplicationStatus } from './RoleApplication.model';
 
 export class AdminService {
   /**
@@ -43,62 +46,138 @@ export class AdminService {
 
   /**
    * Aggregated dashboard summary per PRD §4.4.2 / §7.1
-   * Powers the 6 ADMIN stat cards + pending moderation counts.
+   * Powers the ADMIN stat cards + pending moderation counts.
    */
   async getDashboardSummary(): Promise<Record<string, unknown>> {
     const cached = await redis.get('admin:dashboard-summary');
-    if (cached) return JSON.parse(cached);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {
+        // ignore parse error and fetch fresh
+      }
+    }
 
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
 
     const [
       totalUsers,
       activeToday,
       publishedPlants,
+      publishedRemedies,
+      toursPublished,
       aiScansToday,
       pendingPlants,
       pendingRemedies,
-      pendingTours,
-      toursPublished,
-      // Delta metrics (7 days ago)
-      usersLastWeek,
-      plantsLastWeek,
+      pendingApplications,
+      usersLast7Days,
+      usersPrev7Days,
+      recentLogs,
+      pendingPlantDocs,
+      pendingRemedyDocs,
+      pendingAppDocs,
     ] = await Promise.all([
       User.countDocuments(),
       User.countDocuments({ lastActiveAt: { $gte: startOfToday } }),
       Plant.countDocuments({ isPublished: true, isDeleted: false }),
-      Detection.countDocuments({ createdAt: { $gte: startOfToday } }),
-      Plant.countDocuments({ isPublished: false, isDeleted: false }),
-      Remedy.countDocuments({ isPublished: false, isDeleted: false }),
-      Tour.countDocuments({ isPublished: false, isDeleted: false }),
+      Remedy.countDocuments({ isPublished: true, isDeleted: false }),
       Tour.countDocuments({ isPublished: true, isDeleted: false }),
+      Detection.countDocuments({ createdAt: { $gte: startOfToday } }),
+      Plant.countDocuments({ status: ContentStatus.PENDING_REVIEW, isDeleted: false }),
+      Remedy.countDocuments({ status: ContentStatus.PENDING_REVIEW, isDeleted: false }),
+      RoleApplication.countDocuments({ status: RoleApplicationStatus.PENDING }),
       User.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
-      Plant.countDocuments({ isPublished: true, isDeleted: false, createdAt: { $gte: sevenDaysAgo } }),
+      User.countDocuments({ createdAt: { $gte: fourteenDaysAgo, $lt: sevenDaysAgo } }),
+      AuditLog.find().sort({ createdAt: -1 }).limit(10).populate('user', 'displayName email avatar'),
+      Plant.find({ status: ContentStatus.PENDING_REVIEW, isDeleted: false })
+        .sort({ createdAt: 1 })
+        .limit(5)
+        .select('_id commonName createdAt'),
+      Remedy.find({ status: ContentStatus.PENDING_REVIEW, isDeleted: false })
+        .sort({ createdAt: 1 })
+        .limit(5)
+        .select('_id title createdAt'),
+      RoleApplication.find({ status: RoleApplicationStatus.PENDING })
+        .sort({ createdAt: 1 })
+        .limit(5)
+        .populate('userId', 'displayName email')
+        .select('_id userId requestedRole createdAt'),
     ]);
+
+    const userGrowthDelta =
+      usersPrev7Days === 0
+        ? usersLast7Days > 0
+          ? 100
+          : 0
+        : Math.round(((usersLast7Days - usersPrev7Days) / usersPrev7Days) * 100);
+
+    const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+
+    const needsAttention = [
+      ...pendingPlantDocs.map((p: any) => ({
+        id: p._id.toString(),
+        title: p.commonName || 'Untitled Plant',
+        type: 'plant',
+        submittedAt: p.createdAt,
+        isOverdue: Date.now() - new Date(p.createdAt).getTime() > threeDaysMs,
+        link: `/dashboard/moderation/plant/${p._id}`,
+      })),
+      ...pendingRemedyDocs.map((r: any) => ({
+        id: r._id.toString(),
+        title: r.title || 'Untitled Remedy',
+        type: 'remedy',
+        submittedAt: r.createdAt,
+        isOverdue: Date.now() - new Date(r.createdAt).getTime() > threeDaysMs,
+        link: `/dashboard/moderation/remedy/${r._id}`,
+      })),
+      ...pendingAppDocs.map((a: any) => ({
+        id: a._id.toString(),
+        title: `${(a.userId as any)?.displayName || 'Applicant'} - Botanist Application`,
+        type: 'application',
+        submittedAt: a.createdAt,
+        isOverdue: Date.now() - new Date(a.createdAt).getTime() > threeDaysMs,
+        link: '/dashboard/moderation',
+      })),
+    ].sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime());
+
+    const recentActivity = recentLogs.map((log: any) => ({
+      id: log._id.toString(),
+      action: log.action,
+      target: log.entityType,
+      targetId: log.entityId?.toString() || null,
+      actor: log.user?.displayName || log.user?.email || 'System',
+      timestamp: log.createdAt.toISOString(),
+      details: log.newValue || log.oldValue || {},
+    }));
 
     const summary = {
       stats: {
         totalUsers,
         activeToday,
         publishedPlants,
-        aiScansToday,
-        pendingReview: pendingPlants + pendingRemedies + pendingTours,
+        publishedRemedies,
         toursPublished,
+        aiScansToday,
+        pendingReview: pendingPlants + pendingRemedies,
+        pendingApplications,
       },
       deltas: {
-        newUsersThisWeek: usersLastWeek,
-        newPlantsThisWeek: plantsLastWeek,
+        newUsersThisWeek: usersLast7Days,
+        userGrowthDeltaPercent: userGrowthDelta,
       },
       pendingByType: {
         plants: pendingPlants,
         remedies: pendingRemedies,
-        tours: pendingTours,
+        applications: pendingApplications,
       },
+      recentActivity,
+      needsAttention,
     };
 
-    await redis.setex('admin:dashboard-summary', 120, JSON.stringify(summary));
+    await redis.setex('admin:dashboard-summary', 60, JSON.stringify(summary));
     return summary;
   }
 
@@ -308,29 +387,155 @@ export class AdminService {
     return { plants, meta: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
-  async approvePlant(plantId: string): Promise<void> {
-    const plant = await Plant.findByIdAndUpdate(plantId, { isPublished: true }, { new: true });
+  async approvePlant(plantId: string, adminId?: string, reason?: string): Promise<void> {
+    const plant = await Plant.findById(plantId);
     if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
 
+    plant.status = ContentStatus.PUBLISHED;
+    plant.isPublished = true;
+    if (adminId) {
+      plant.reviewNotes.push({
+        at: new Date(),
+        byUserId: new mongoose.Types.ObjectId(adminId),
+        action: 'APPROVED',
+        comment: reason || 'Approved and published',
+      });
+    }
+    await plant.save();
+
+    const ownerId = plant.owner?.toString() || plant.createdBy.toString();
     await notificationService.createNotification(
-      plant.createdBy.toString(),
+      ownerId,
       NotificationType.ADMIN,
       'Plant Approved',
-      `Your plant "${plant.commonName}" has been approved and published.`,
+      `Your plant "${plant.commonName}" has been approved and published.${reason ? ` Note: ${reason}` : ''}`,
       `/plants/${plant.slug}`,
     );
   }
 
-  async rejectPlant(plantId: string, feedback: string): Promise<void> {
+  async rejectPlant(plantId: string, feedback: string, adminId?: string): Promise<void> {
     const plant = await Plant.findById(plantId);
     if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
 
+    plant.status = ContentStatus.REJECTED;
+    plant.isPublished = false;
+    if (adminId) {
+      plant.reviewNotes.push({
+        at: new Date(),
+        byUserId: new mongoose.Types.ObjectId(adminId),
+        action: 'REJECTED',
+        comment: feedback,
+      });
+    }
+    await plant.save();
+
+    const ownerId = plant.owner?.toString() || plant.createdBy.toString();
     await notificationService.createNotification(
-      plant.createdBy.toString(),
+      ownerId,
       NotificationType.ADMIN,
       'Plant Submission Rejected',
       `Your plant "${plant.commonName}" was not approved. Feedback: ${feedback}`,
       `/plants/${plant.slug}`,
+    );
+  }
+
+  async requestChangesPlant(plantId: string, comment: string, adminId: string): Promise<void> {
+    const plant = await Plant.findById(plantId);
+    if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
+
+    plant.status = ContentStatus.CHANGES_REQUESTED;
+    plant.isPublished = false;
+    plant.reviewNotes.push({
+      at: new Date(),
+      byUserId: new mongoose.Types.ObjectId(adminId),
+      action: 'CHANGES_REQUESTED',
+      comment,
+    });
+    await plant.save();
+
+    const ownerId = plant.owner?.toString() || plant.createdBy.toString();
+    await notificationService.createNotification(
+      ownerId,
+      NotificationType.ADMIN,
+      'Changes Requested for Plant',
+      `Reviewers requested changes on "${plant.commonName}": ${comment}`,
+      `/dashboard/contributions/plant/${plant._id}`,
+    );
+  }
+
+  async approveRemedy(remedyId: string, adminId?: string, reason?: string): Promise<void> {
+    const remedy = await Remedy.findById(remedyId);
+    if (!remedy) throw new AppError('Remedy not found', 404, 'NOT_FOUND');
+
+    remedy.status = ContentStatus.PUBLISHED;
+    remedy.isPublished = true;
+    if (adminId) {
+      remedy.reviewNotes.push({
+        at: new Date(),
+        byUserId: new mongoose.Types.ObjectId(adminId),
+        action: 'APPROVED',
+        comment: reason || 'Approved and published',
+      });
+    }
+    await remedy.save();
+
+    const ownerId = remedy.owner?.toString() || remedy.createdBy.toString();
+    await notificationService.createNotification(
+      ownerId,
+      NotificationType.ADMIN,
+      'Remedy Approved',
+      `Your remedy "${remedy.title}" has been approved and published.${reason ? ` Note: ${reason}` : ''}`,
+      `/remedies/${remedy.slug}`,
+    );
+  }
+
+  async rejectRemedy(remedyId: string, feedback: string, adminId?: string): Promise<void> {
+    const remedy = await Remedy.findById(remedyId);
+    if (!remedy) throw new AppError('Remedy not found', 404, 'NOT_FOUND');
+
+    remedy.status = ContentStatus.REJECTED;
+    remedy.isPublished = false;
+    if (adminId) {
+      remedy.reviewNotes.push({
+        at: new Date(),
+        byUserId: new mongoose.Types.ObjectId(adminId),
+        action: 'REJECTED',
+        comment: feedback,
+      });
+    }
+    await remedy.save();
+
+    const ownerId = remedy.owner?.toString() || remedy.createdBy.toString();
+    await notificationService.createNotification(
+      ownerId,
+      NotificationType.ADMIN,
+      'Remedy Submission Rejected',
+      `Your remedy "${remedy.title}" was not approved. Feedback: ${feedback}`,
+      `/remedies/${remedy.slug}`,
+    );
+  }
+
+  async requestChangesRemedy(remedyId: string, comment: string, adminId: string): Promise<void> {
+    const remedy = await Remedy.findById(remedyId);
+    if (!remedy) throw new AppError('Remedy not found', 404, 'NOT_FOUND');
+
+    remedy.status = ContentStatus.CHANGES_REQUESTED;
+    remedy.isPublished = false;
+    remedy.reviewNotes.push({
+      at: new Date(),
+      byUserId: new mongoose.Types.ObjectId(adminId),
+      action: 'CHANGES_REQUESTED',
+      comment,
+    });
+    await remedy.save();
+
+    const ownerId = remedy.owner?.toString() || remedy.createdBy.toString();
+    await notificationService.createNotification(
+      ownerId,
+      NotificationType.ADMIN,
+      'Changes Requested for Remedy',
+      `Reviewers requested changes on "${remedy.title}": ${comment}`,
+      `/dashboard/contributions/remedy/${remedy._id}`,
     );
   }
 

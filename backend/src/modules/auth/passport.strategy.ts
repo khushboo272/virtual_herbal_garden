@@ -5,6 +5,8 @@ import { env } from '../../core/config/env';
 import User from '../users/User.model';
 import { UserRole, JwtPayload } from '../../types';
 
+import { AppError } from '../../core/utils/apiResponse';
+
 // ── JWT Strategy (RS256) ──
 const jwtOptions: StrategyOptions = {
   jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -16,9 +18,12 @@ passport.use(
   'jwt',
   new JwtStrategy(jwtOptions, async (payload: JwtPayload, done) => {
     try {
-      const user = await User.findById(payload.sub).select('_id email role isActive').lean();
-      if (!user || !user.isActive) {
+      const user = await User.findById(payload.sub).select('_id email role isActive bannedUntil').lean();
+      if (!user) {
         return done(null, false);
+      }
+      if (!user.isActive || (user.bannedUntil && new Date(user.bannedUntil) > new Date())) {
+        return done(new AppError('Account is suspended', 403, 'ACCOUNT_SUSPENDED'), false);
       }
       const jwtPayload: JwtPayload = {
         sub: user._id.toString(),

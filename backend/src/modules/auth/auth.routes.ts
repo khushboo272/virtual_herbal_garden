@@ -6,6 +6,7 @@ import { authLimiter } from '../../core/middleware/rateLimiter';
 import {
   registerSchema, loginSchema, verifyEmailSchema,
   forgotPasswordSchema, resetPasswordSchema, verify2faSchema,
+  changePasswordSchema,
 } from './auth.validators';
 import passport from 'passport';
 
@@ -23,5 +24,6 @@ router.get('/google/callback', passport.authenticate('google', { session: false,
 router.post('/2fa/setup', authenticate(), authController.setup2fa);
 router.post('/2fa/verify', authenticate(), validate(verify2faSchema), authController.verify2fa);
 router.post('/logout-all', authenticate(), authController.logoutAll);
+router.post('/change-password', authenticate(), validate(changePasswordSchema), authController.changePassword);
 
 export default router;

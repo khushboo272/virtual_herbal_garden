@@ -1,4 +1,5 @@
 import 'express-async-errors';
+import path from 'path';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -61,6 +62,9 @@ app.use(morgan(morganFormat, {
 
 // API routes
 app.use(`/api/${env.API_VERSION}`, routes);
+
+// Static uploads fallback
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Health check
 app.get('/health', (_req, res) => {

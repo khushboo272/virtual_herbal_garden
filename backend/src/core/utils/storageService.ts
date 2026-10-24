@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import {
   PutObjectCommand,
   DeleteObjectCommand,
@@ -36,17 +38,17 @@ export class StorageService {
     const processed = await processImage(buffer);
     const basePath = `plants/${plantId}/images/${filename}`;
 
-    await Promise.all([
+    const [thumbUrl, cardUrl, fullUrl] = await Promise.all([
       this.putObject(`${basePath}-thumb.webp`, processed.thumbnail, 'image/webp'),
       this.putObject(`${basePath}-card.webp`, processed.card, 'image/webp'),
       this.putObject(`${basePath}-full.webp`, processed.full, 'image/webp'),
     ]);
 
     return {
-      url: `${CDN_BASE}/${basePath}-full.webp`,
-      thumbnailUrl: `${CDN_BASE}/${basePath}-thumb.webp`,
-      cardUrl: `${CDN_BASE}/${basePath}-card.webp`,
-      fullUrl: `${CDN_BASE}/${basePath}-full.webp`,
+      url: fullUrl,
+      thumbnailUrl: thumbUrl,
+      cardUrl: cardUrl,
+      fullUrl: fullUrl,
       lqip: processed.lqip,
       width: processed.width,
       height: processed.height,
@@ -92,16 +94,27 @@ export class StorageService {
     return getSignedUrl(s3Client, command, { expiresIn });
   }
 
-  private async putObject(key: string, body: Buffer, contentType: string): Promise<void> {
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: S3_BUCKET,
-        Key: key,
-        Body: body,
-        ContentType: contentType,
-        CacheControl: 'public, max-age=31536000',
-      }),
-    );
+  private async putObject(key: string, body: Buffer, contentType: string): Promise<string> {
+    try {
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: S3_BUCKET,
+          Key: key,
+          Body: body,
+          ContentType: contentType,
+          CacheControl: 'public, max-age=31536000',
+        }),
+      );
+      return `${CDN_BASE}/${key}`;
+    } catch (err: any) {
+      logger.warn(`S3 upload failed for ${key}, falling back to local file storage: ${err.message}`);
+      const cleanKey = key.replace(/\\/g, '/');
+      const localDir = path.join(process.cwd(), 'uploads', path.dirname(cleanKey));
+      await fs.promises.mkdir(localDir, { recursive: true });
+      const localFilePath = path.join(process.cwd(), 'uploads', cleanKey);
+      await fs.promises.writeFile(localFilePath, body);
+      return `/uploads/${cleanKey}`;
+    }
   }
 }
 
