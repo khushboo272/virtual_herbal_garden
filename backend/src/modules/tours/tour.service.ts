@@ -707,9 +707,10 @@ export class TourService {
    * ADMIN+: Aggregate system tour analytics.
    */
   async getAdminAnalytics(): Promise<any> {
-    const [totalTours, publishedTours, progressStats] = await Promise.all([
+    const [totalTours, publishedTours, featuredTours, progressStats, ratedStats] = await Promise.all([
       Tour.countDocuments({ isDeleted: false }),
       Tour.countDocuments({ isPublished: true, isDeleted: false }),
+      Tour.countDocuments({ isFeatured: true, isDeleted: false }),
       TourProgress.aggregate([
         {
           $group: {
@@ -721,18 +722,35 @@ export class TourService {
           },
         },
       ]),
+      TourProgress.aggregate([
+        { $match: { rating: { $exists: true, $ne: null } } },
+        {
+          $group: {
+            _id: null,
+            avgRating: { $avg: '$rating' },
+            totalRatings: { $sum: 1 },
+          },
+        },
+      ]),
     ]);
 
     const totalStarts = progressStats[0]?.totalStarts || 0;
     const totalCompletions = progressStats[0]?.totalCompletions || 0;
     const completionRate = totalStarts > 0 ? Math.round((totalCompletions / totalStarts) * 100) : 0;
+    const drafts = Math.max(0, totalTours - publishedTours);
+    const overallAvgRating = ratedStats[0]?.avgRating ? Number(ratedStats[0].avgRating.toFixed(1)) : 0;
+    const totalRatingsCount = ratedStats[0]?.totalRatings || 0;
 
     return {
       totalTours,
       published: publishedTours,
+      drafts,
+      featured: featuredTours,
       totalStarts,
       totalCompletions,
       completionRate,
+      overallAvgRating,
+      totalRatingsCount,
     };
   }
 
@@ -743,7 +761,11 @@ export class TourService {
     const tour = await Tour.findById(tourId).lean();
     if (!tour || tour.isDeleted) throw new AppError('Tour not found', 404, 'NOT_FOUND');
 
-    const progressDocs = await TourProgress.find({ tourId: tour._id }).lean();
+    const progressDocs = await TourProgress.find({ tourId: tour._id })
+      .populate('userId', 'displayName email avatarUrl role')
+      .sort({ updatedAt: -1 })
+      .lean();
+
     const started = progressDocs.length;
     const completed = progressDocs.filter((p) => p.completedAt != null).length;
     const completionRate = started > 0 ? Math.round((completed / started) * 100) : 0;
@@ -752,6 +774,29 @@ export class TourService {
     const avgRating = ratedDocs.length > 0
       ? Number((ratedDocs.reduce((sum, p) => sum + (p.rating || 0), 0) / ratedDocs.length).toFixed(1))
       : 0;
+
+    // Rating distribution (5 to 1)
+    const ratingDistribution: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    for (const p of ratedDocs) {
+      const r = Math.min(5, Math.max(1, Math.round(p.rating || 0)));
+      ratingDistribution[r] = (ratingDistribution[r] || 0) + 1;
+    }
+
+    // Learner ratings & reviews list
+    const ratingsList = ratedDocs.map((p) => {
+      const user = (p.userId && typeof p.userId === 'object') ? (p.userId as any) : null;
+      return {
+        id: String(p._id),
+        rating: p.rating,
+        comment: p.ratingComment || null,
+        user: {
+          displayName: user?.displayName || 'Learner',
+          email: user?.email || '',
+          avatarUrl: user?.avatarUrl || null,
+        },
+        createdAt: (p.updatedAt || p.createdAt || new Date()).toISOString(),
+      };
+    });
 
     // Quiz score average across all completed quizzes
     let totalQuizScores = 0;
@@ -769,20 +814,94 @@ export class TourService {
     }
     const avgQuizScore = totalQuizzes > 0 ? Math.round((totalQuizScores / totalQuizzes) * 100) : 0;
 
-    // Per-checkpoint drop-off funnel
+    // Checkpoints list
     const checkpoints = (tour.checkpoints || []).slice().sort((a, b) => a.order - b.order);
+
+    // Per-checkpoint drop-off funnel & quiz pass rates
     const perCheckpoint = checkpoints.map((cp) => {
       const completedCp = progressDocs.filter((p) => p.completedKeys?.includes(cp.key)).length;
       const reached = progressDocs.filter((p) => p.completedKeys?.includes(cp.key) || p.lastCheckpointKey === cp.key).length;
       const dropOffPct = started > 0 ? Math.round(((started - reached) / started) * 100) : 0;
 
+      // Quiz analytics for this checkpoint
+      const hasQuiz = Boolean(cp.quiz && cp.quiz.questions && cp.quiz.questions.length > 0);
+      let quizAttempts = 0;
+      let quizPassed = 0;
+      let quizScoreSum = 0;
+
+      for (const p of progressDocs) {
+        if (p.quizResults) {
+          const qMap = p.quizResults instanceof Map ? Object.fromEntries(p.quizResults) : p.quizResults;
+          const qRes = qMap[cp.key] as any;
+          if (qRes && qRes.total > 0) {
+            quizAttempts++;
+            if (qRes.passed) quizPassed++;
+            quizScoreSum += (qRes.bestScore / qRes.total);
+          }
+        }
+      }
+
+      const quizPassRate = quizAttempts > 0 ? Math.round((quizPassed / quizAttempts) * 100) : null;
+      const quizAvgScore = quizAttempts > 0 ? Math.round((quizScoreSum / quizAttempts) * 100) : null;
+
       return {
         key: cp.key,
         title: cp.title,
         order: cp.order,
+        durationMinutes: cp.durationMinutes || 3,
         reached,
         completed: completedCp,
         dropOffPct: Math.max(0, dropOffPct),
+        hasQuiz,
+        quizQuestionsCount: cp.quiz?.questions?.length || 0,
+        quizAttempts,
+        quizPassRate,
+        quizAvgScore,
+        plantSlugs: cp.plantSlugs || [],
+        remedySlugs: cp.remedySlugs || [],
+        keyTakeaways: cp.keyTakeaways || [],
+        hasAudio: Boolean(cp.audioUrl),
+      };
+    });
+
+    // Recent learner sessions list
+    const recentSessions = progressDocs.slice(0, 50).map((p) => {
+      const user = (p.userId && typeof p.userId === 'object') ? (p.userId as any) : null;
+      const completedCpCount = p.completedKeys?.length || 0;
+      const totalCp = checkpoints.length;
+      const percent = totalCp > 0 ? Math.min(100, Math.round((completedCpCount / totalCp) * 100)) : (p.completedAt ? 100 : 0);
+
+      let userQuizScore = 0;
+      let userQuizCount = 0;
+      if (p.quizResults) {
+        const qMap = p.quizResults instanceof Map ? Object.fromEntries(p.quizResults) : p.quizResults;
+        for (const res of Object.values(qMap) as any[]) {
+          if (res && res.total > 0) {
+            userQuizScore += (res.bestScore / res.total);
+            userQuizCount++;
+          }
+        }
+      }
+      const sessionAvgQuiz = userQuizCount > 0 ? Math.round((userQuizScore / userQuizCount) * 100) : null;
+
+      return {
+        id: String(p._id),
+        user: {
+          id: user?._id ? String(user._id) : undefined,
+          displayName: user?.displayName || 'Learner',
+          email: user?.email || '',
+          avatarUrl: user?.avatarUrl || null,
+        },
+        percent,
+        completedCount: completedCpCount,
+        totalCheckpoints: totalCp,
+        isCompleted: Boolean(p.completedAt),
+        lastCheckpointKey: p.lastCheckpointKey || null,
+        rating: p.rating || null,
+        avgQuizScore: sessionAvgQuiz,
+        startedAt: (p.startedAt || p.createdAt || new Date()).toISOString(),
+        completedAt: p.completedAt ? p.completedAt.toISOString() : null,
+        updatedAt: (p.updatedAt || p.createdAt || new Date()).toISOString(),
       };
     });
 
@@ -795,6 +914,22 @@ export class TourService {
       completionRate,
       avgRating,
       avgQuizScore,
+      tour: {
+        id: String(tour._id),
+        title: tour.title,
+        slug: tour.slug,
+        summary: tour.summary || '',
+        level: tour.level || 'BEGINNER',
+        healthCategory: tour.healthCategory || 'General',
+        isPublished: tour.isPublished,
+        isFeatured: tour.isFeatured || false,
+        coverImageUrl: tour.coverImageUrl || null,
+        estimatedMinutes: tour.estimatedMinutes || tour.estimatedDuration || 10,
+        checkpointsCount: checkpoints.length,
+      },
+      ratingDistribution,
+      ratingsList,
+      recentSessions,
       perCheckpoint,
     };
   }

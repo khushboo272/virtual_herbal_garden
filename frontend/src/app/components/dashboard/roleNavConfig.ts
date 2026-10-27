@@ -42,6 +42,7 @@ const userNav: NavSection[] = [
       { label: 'AI Scanner', icon: Sparkles, path: '/dashboard/scanner' },
       { label: 'Explore Plants', icon: BookOpen, path: '/library' },
       { label: 'Guided Tours', icon: MapPin, path: '/dashboard/tours' },
+      { label: 'Become a Botanist', icon: Sparkles, path: '/dashboard/become-contributor' },
     ],
   },
   {
@@ -100,7 +101,16 @@ const adminNav: NavSection[] = [
         children: [
           { label: 'Plants', icon: Leaf, path: '/dashboard/moderation?type=plant', badgeKey: 'pendingPlants' },
           { label: 'Remedies', icon: FileText, path: '/dashboard/moderation?type=remedy', badgeKey: 'pendingRemedies' },
-          { label: 'Tours', icon: Map, path: '/dashboard/moderation?type=tour', badgeKey: 'pendingTours' },
+          { label: 'Applications', icon: Users, path: '/dashboard/moderation?type=application', badgeKey: 'pendingApplications' },
+        ],
+      },
+      {
+        label: 'Content',
+        icon: FileText,
+        path: '/dashboard/content/plants',
+        children: [
+          { label: 'Plants', icon: Leaf, path: '/dashboard/content/plants' },
+          { label: 'Remedies', icon: FileText, path: '/dashboard/content/remedies' },
         ],
       },
       {

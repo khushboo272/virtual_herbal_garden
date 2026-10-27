@@ -27,10 +27,10 @@ export const globalLimiter = rateLimit({
   },
 });
 
-// Auth rate limit: 5 req/min per IP
+// Auth rate limit: 5 req/min per IP in production, 50 in development
 export const authLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: env.AUTH_RATE_LIMIT_MAX,
+  max: env.NODE_ENV === 'development' ? 50 : env.AUTH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
   ...(isMock ? {} : {

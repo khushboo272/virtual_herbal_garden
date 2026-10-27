@@ -19,7 +19,6 @@ const AuditLogSchema = new Schema<IAuditLog>(
     user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     action: {
       type: String,
-      enum: Object.values(AuditAction),
       required: true,
     },
     entityType: { type: String, required: true },

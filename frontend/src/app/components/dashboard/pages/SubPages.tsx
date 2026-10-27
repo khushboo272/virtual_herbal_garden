@@ -94,33 +94,8 @@ export function UserGrowthPage() {
   );
 }
 
-// ── Featured Content — /dashboard/featured ────────────────
-export function FeaturedContentPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-green-900">Featured Content</h1>
-        <p className="text-green-600 mt-1">Manage featured plants, remedies, and tours on the homepage</p>
-      </div>
-      <div className="grid md:grid-cols-3 gap-4">
-        {['Featured Plants', 'Featured Remedies', 'Featured Tours'].map((section) => (
-          <Card key={section} className="border-2 border-green-200 bg-white">
-            <CardHeader>
-              <CardTitle className="text-green-900 text-lg">{section}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-500 text-sm mb-4">Drag and drop items to set the featured order.</p>
-              <Button variant="outline" className="w-full border-green-300 text-green-700 hover:bg-green-50">
-                <Star className="w-4 h-4 mr-2" />
-                Manage {section}
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
+// ── Featured Content — /dashboard/featured (Real Implementation) ───────
+export { FeaturedContentPage } from '../../../../features/admin/pages/FeaturedContentPage';
 
 
 

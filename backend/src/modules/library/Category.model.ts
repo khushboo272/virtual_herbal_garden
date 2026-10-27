@@ -22,7 +22,6 @@ const CategorySchema = new Schema<ICategory>(
   { timestamps: { createdAt: true, updatedAt: false } },
 );
 
-CategorySchema.index({ slug: 1 }, { unique: true });
 CategorySchema.index({ parent: 1 });
 
 export default mongoose.model<ICategory>('Category', CategorySchema);

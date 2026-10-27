@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../../contexts/AuthContext';
 import {
   Leaf,
   Plus,
@@ -57,6 +58,34 @@ export function PlantEditorPage() {
   const navigate = useNavigate();
 
   useDocumentTitle(isEditing ? 'Edit Plant Draft | Virtual Herbal Garden' : 'New Plant Draft | Virtual Herbal Garden');
+
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const isAdminMode =
+    searchParams.get('admin') === 'true' ||
+    searchParams.get('admin') === '1' ||
+    user?.role === 'ADMIN' ||
+    user?.role === 'SUPER_ADMIN';
+
+  const handleAdminSaveAndPublish = async () => {
+    try {
+      setSubmitting(true);
+      const savedId = await handleSaveDraft(true);
+      const targetId = savedId || currentId;
+      if (!targetId) {
+        toast.error('Could not save draft before publishing');
+        return;
+      }
+      const { api } = await import('../../../lib/api');
+      await api.post(`/admin/content/plants/${targetId}/publish`);
+      toast.success('Plant published directly to active library!');
+      navigate('/dashboard/content/plants');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to publish plant');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   // Form Fields State
   const [commonName, setCommonName] = useState('');
@@ -627,14 +656,25 @@ export function PlantEditorPage() {
             </Button>
           )}
 
-          <Button
-            onClick={handleSubmitForReview}
-            disabled={submitting}
-            className="bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-xl h-9 px-4 flex items-center gap-1.5 shadow-xs"
-          >
-            <Send className="w-3.5 h-3.5" />
-            {submitting ? 'Submitting...' : 'Submit for Review'}
-          </Button>
+          {isAdminMode ? (
+            <Button
+              onClick={handleAdminSaveAndPublish}
+              disabled={submitting}
+              className="bg-green-700 hover:bg-green-800 text-white text-xs rounded-xl h-9 px-4 flex items-center gap-1.5 shadow-xs"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {submitting ? 'Publishing...' : 'Save & Publish'}
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSubmitForReview}
+              disabled={submitting}
+              className="bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-xl h-9 px-4 flex items-center gap-1.5 shadow-xs"
+            >
+              <Send className="w-3.5 h-3.5" />
+              {submitting ? 'Submitting...' : 'Submit for Review'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1220,13 +1260,24 @@ export function PlantEditorPage() {
               >
                 {saving ? 'Saving...' : 'Save Draft (Ctrl+S)'}
               </Button>
-              <Button
-                onClick={handleSubmitForReview}
-                disabled={submitting}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-xl h-9 font-semibold"
-              >
-                {submitting ? 'Submitting...' : 'Submit for Review'}
-              </Button>
+              {isAdminMode ? (
+                <Button
+                  onClick={handleAdminSaveAndPublish}
+                  disabled={submitting}
+                  className="w-full bg-green-700 hover:bg-green-800 text-white text-xs rounded-xl h-9 font-semibold"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                  {submitting ? 'Publishing...' : 'Save & Publish'}
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSubmitForReview}
+                  disabled={submitting}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-xl h-9 font-semibold"
+                >
+                  {submitting ? 'Submitting...' : 'Submit for Review'}
+                </Button>
+              )}
             </Card>
 
             {/* Guidelines Card */}

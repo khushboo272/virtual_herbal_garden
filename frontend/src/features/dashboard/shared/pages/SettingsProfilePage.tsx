@@ -82,6 +82,24 @@ export function SettingsProfilePage() {
       .catch(() => {});
   }, [user]);
 
+  // Prevent browser autofill from populating email into the DELETE confirmation input
+  useEffect(() => {
+    if (deleteModalOpen) {
+      setDeleteConfirmationText('');
+      setDeletePassword('');
+      const t1 = setTimeout(() => {
+        setDeleteConfirmationText((prev) => (prev.includes('@') ? '' : prev));
+      }, 50);
+      const t2 = setTimeout(() => {
+        setDeleteConfirmationText((prev) => (prev.includes('@') ? '' : prev));
+      }, 250);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [deleteModalOpen]);
+
   // Handle Profile Update
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -537,28 +555,95 @@ export function SettingsProfilePage() {
               </p>
             </div>
 
+            {/* Hidden dummy fields to prevent browser password managers from injecting username/email into the challenge field */}
+            <input
+              type="text"
+              name="prevent_autofill_email"
+              tabIndex={-1}
+              aria-hidden="true"
+              autoComplete="off"
+              className="sr-only"
+              style={{ position: 'absolute', opacity: 0, height: 0, width: 0, pointerEvents: 'none' }}
+            />
+            <input
+              type="password"
+              name="prevent_autofill_password"
+              tabIndex={-1}
+              aria-hidden="true"
+              autoComplete="off"
+              className="sr-only"
+              style={{ position: 'absolute', opacity: 0, height: 0, width: 0, pointerEvents: 'none' }}
+            />
+
             <div className="space-y-3 pt-2">
               <div className="space-y-1">
-                <Label className="text-xs font-medium text-gray-700">
-                  Type <span className="font-mono font-bold text-red-600">DELETE</span> to confirm:
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="delete-challenge-input" className="text-xs font-semibold text-gray-700">
+                    Type <span className="font-mono font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">DELETE</span> to confirm:
+                  </Label>
+                  {deleteConfirmationText && deleteConfirmationText !== 'DELETE' && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirmationText('')}
+                      className="text-[11px] text-red-600 hover:text-red-800 font-medium underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 <Input
+                  id="delete-challenge-input"
+                  name="delete-security-keyword"
+                  type="text"
                   value={deleteConfirmationText}
-                  onChange={(e) => setDeleteConfirmationText(e.target.value)}
-                  placeholder="DELETE"
-                  className="border-red-200 text-sm font-mono"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val.includes('@')) {
+                      setDeleteConfirmationText('');
+                    } else {
+                      setDeleteConfirmationText(val.toUpperCase());
+                    }
+                  }}
+                  autoComplete="new-password"
+                  autoCorrect="off"
+                  autoCapitalize="characters"
+                  spellCheck="false"
+                  data-lpignore="true"
+                  data-1p-ignore="true"
+                  placeholder="Type DELETE here"
+                  className={`text-sm font-mono tracking-wider transition-all ${
+                    deleteConfirmationText === 'DELETE'
+                      ? 'border-emerald-500 bg-emerald-50/40 text-emerald-900 font-bold'
+                      : 'border-red-200 focus:border-red-400'
+                  }`}
                 />
+                {deleteConfirmationText === 'DELETE' ? (
+                  <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-1">
+                    ✓ Confirmation keyword verified
+                  </p>
+                ) : deleteConfirmationText ? (
+                  <p className="text-[11px] text-amber-600 mt-1">
+                    Must type the exact word <strong>DELETE</strong> in all caps
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Enter the word: DELETE
+                  </p>
+                )}
               </div>
 
               {!isGoogleOAuth && (
                 <div className="space-y-1">
-                  <Label className="text-xs font-medium text-gray-700">
+                  <Label htmlFor="delete-account-password" className="text-xs font-medium text-gray-700">
                     Enter your current password:
                   </Label>
                   <Input
+                    id="delete-account-password"
+                    name="delete-account-password"
                     type="password"
                     value={deletePassword}
                     onChange={(e) => setDeletePassword(e.target.value)}
+                    autoComplete="current-password"
                     placeholder="••••••••"
                     className="border-red-200 text-sm"
                   />

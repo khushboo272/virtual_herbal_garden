@@ -6,7 +6,7 @@ dotenv.config();
 const envSchema = z.object({
   // Server
   NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
-  PORT: z.coerce.number().default(5000),
+  PORT: z.coerce.number().default(5001),
   API_VERSION: z.string().default('v1'),
 
   // MongoDB
@@ -32,7 +32,7 @@ const envSchema = z.object({
   // Google OAuth2
   GOOGLE_CLIENT_ID: z.string().min(1, 'GOOGLE_CLIENT_ID is required'),
   GOOGLE_CLIENT_SECRET: z.string().min(1, 'GOOGLE_CLIENT_SECRET is required'),
-  GOOGLE_CALLBACK_URL: z.string().url().default('http://localhost:5000/api/v1/auth/google/callback'),
+  GOOGLE_CALLBACK_URL: z.string().url().default('http://localhost:5001/api/v1/auth/google/callback'),
 
   // AI Microservice
   AI_SERVICE_URL: z.string().url().default('http://localhost:8000'),

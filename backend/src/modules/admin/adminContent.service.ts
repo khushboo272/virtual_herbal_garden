@@ -18,11 +18,17 @@ export interface ContentQueryFilters {
   limit?: number | string;
 }
 
+function normalizeContentType(type: string): 'plants' | 'remedies' {
+  const lower = String(type).toLowerCase();
+  return lower === 'plant' || lower === 'plants' ? 'plants' : 'remedies';
+}
+
 export class AdminContentService {
   /**
    * List all content (plants or remedies) across all statuses with filtering and search
    */
-  async listContent(type: 'plants' | 'remedies', filters: ContentQueryFilters) {
+  async listContent(type: 'plants' | 'remedies' | string, filters: ContentQueryFilters) {
+    const targetType = normalizeContentType(type);
     const page = Math.max(1, parseInt(String(filters.page || 1), 10));
     const limit = Math.min(100, Math.max(1, parseInt(String(filters.limit || 20), 10)));
     const skip = (page - 1) * limit;
@@ -43,7 +49,7 @@ export class AdminContentService {
 
     if (filters.q && filters.q.trim()) {
       const regex = new RegExp(filters.q.trim(), 'i');
-      if (type === 'plants') {
+      if (targetType === 'plants') {
         query.$or = [
           { commonName: regex },
           { scientificName: regex },
@@ -102,17 +108,18 @@ export class AdminContentService {
   /**
    * Publish an item
    */
-  async publish(type: 'plants' | 'remedies', id: string, adminUser: any, req?: any) {
+  async publish(type: 'plants' | 'remedies' | string, id: string, adminUser: any, req?: any) {
     if (!Types.ObjectId.isValid(id)) throw new AppError('Invalid ID', 400);
 
-    const Model = type === 'plants' ? Plant : (Remedy as any);
+    const targetType = normalizeContentType(type);
+    const Model = targetType === 'plants' ? Plant : (Remedy as any);
     const item = await Model.findOne({ _id: id, isDeleted: { $ne: true } });
-    if (!item) throw new AppError(`${type === 'plants' ? 'Plant' : 'Remedy'} not found`, 404);
+    if (!item) throw new AppError(`${targetType === 'plants' ? 'Plant' : 'Remedy'} not found`, 404);
 
     const prevPublished = item.isPublished;
     item.isPublished = true;
     item.status = ContentStatus.PUBLISHED;
-    if (type === 'plants') {
+    if (targetType === 'plants') {
       (item as any).publishedAt = new Date();
     }
     await item.save();
@@ -120,7 +127,7 @@ export class AdminContentService {
     await writeAuditLog({
       actor: adminUser._id,
       action: 'CONTENT_PUBLISHED',
-      targetModel: type === 'plants' ? 'Plant' : 'Remedy',
+      targetModel: targetType === 'plants' ? 'Plant' : 'Remedy',
       targetId: item._id,
       details: {
         slug: item.slug,
@@ -137,12 +144,13 @@ export class AdminContentService {
   /**
    * Unpublish an item
    */
-  async unpublish(type: 'plants' | 'remedies', id: string, adminUser: any, req?: any) {
+  async unpublish(type: 'plants' | 'remedies' | string, id: string, adminUser: any, req?: any) {
     if (!Types.ObjectId.isValid(id)) throw new AppError('Invalid ID', 400);
 
-    const Model = type === 'plants' ? Plant : (Remedy as any);
+    const targetType = normalizeContentType(type);
+    const Model = targetType === 'plants' ? Plant : (Remedy as any);
     const item = await Model.findOne({ _id: id, isDeleted: { $ne: true } });
-    if (!item) throw new AppError(`${type === 'plants' ? 'Plant' : 'Remedy'} not found`, 404);
+    if (!item) throw new AppError(`${targetType === 'plants' ? 'Plant' : 'Remedy'} not found`, 404);
 
     const prevPublished = item.isPublished;
     item.isPublished = false;
@@ -152,7 +160,7 @@ export class AdminContentService {
     await writeAuditLog({
       actor: adminUser._id,
       action: 'CONTENT_UNPUBLISHED',
-      targetModel: type === 'plants' ? 'Plant' : 'Remedy',
+      targetModel: targetType === 'plants' ? 'Plant' : 'Remedy',
       targetId: item._id,
       details: {
         slug: item.slug,
@@ -198,11 +206,12 @@ export class AdminContentService {
   /**
    * Impact calculation for content before deletion
    */
-  async getImpact(type: 'plants' | 'remedies', id: string) {
+  async getImpact(type: 'plants' | 'remedies' | string, id: string) {
     if (!Types.ObjectId.isValid(id)) throw new AppError('Invalid ID', 400);
     const objId = new Types.ObjectId(id);
+    const targetType = normalizeContentType(type);
 
-    if (type === 'plants') {
+    if (targetType === 'plants') {
       const [remediesCount, toursCount, gardensCount, bookmarksCount] = await Promise.all([
         Remedy.countDocuments({
           $or: [{ plants: objId }, { 'ingredients.plantId': objId }],
@@ -223,9 +232,13 @@ export class AdminContentService {
 
       return {
         remedies: remediesCount,
+        remediesCount,
         tours: toursCount,
+        toursCount,
         userGardens: gardensCount,
+        gardensCount,
         bookmarks: bookmarksCount,
+        bookmarksCount,
         total: remediesCount + toursCount + gardensCount + bookmarksCount,
       };
     } else {
@@ -236,9 +249,13 @@ export class AdminContentService {
 
       return {
         remedies: 0,
+        remediesCount: 0,
         tours: 0,
+        toursCount: 0,
         userGardens: 0,
+        gardensCount: 0,
         bookmarks: bookmarksCount,
+        bookmarksCount,
         total: bookmarksCount,
       };
     }
@@ -248,7 +265,7 @@ export class AdminContentService {
    * Delete content (requires item to be unpublished first and confirm slug)
    */
   async deleteContent(
-    type: 'plants' | 'remedies',
+    type: 'plants' | 'remedies' | string,
     id: string,
     confirmSlug: string,
     adminUser: any,
@@ -256,9 +273,10 @@ export class AdminContentService {
   ) {
     if (!Types.ObjectId.isValid(id)) throw new AppError('Invalid ID', 400);
 
-    const Model = type === 'plants' ? Plant : (Remedy as any);
+    const targetType = normalizeContentType(type);
+    const Model = targetType === 'plants' ? Plant : (Remedy as any);
     const item = await Model.findOne({ _id: id, isDeleted: { $ne: true } });
-    if (!item) throw new AppError(`${type === 'plants' ? 'Plant' : 'Remedy'} not found`, 404);
+    if (!item) throw new AppError(`${targetType === 'plants' ? 'Plant' : 'Remedy'} not found`, 404);
 
     if (item.isPublished) {
       throw new AppError(

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { Layout } from "./app/Layout";
 import { RequireRole } from "./app/components/RequireRole";
+import { RouteErrorBoundary } from "./app/components/RouteErrorBoundary";
 
 // Page components
 import { HomePage } from "./features/home";
@@ -29,21 +30,28 @@ import { DashboardHome } from "./app/components/dashboard/DashboardHome";
 
 // Dashboard sub-pages — dedicated components per route
 import {
-  UserManagementPage,
-  ModerationQueuePage,
   AnalyticsOverviewPage,
   AIScannerStatsPage,
   UserGrowthPage,
   FeaturedContentPage,
   AIScannerPage,
   GuidedToursPage,
-  ManagePlantsPage,
   SystemOverviewPage,
   FeatureFlagsPage,
   RoleManagementPage,
   AuditLogPage,
   AIModelConfigPage,
 } from "./app/components/dashboard/pages";
+
+// Admin feature pages (Part A)
+import {
+  ModerationQueuePage,
+  ModerationReviewPage,
+  ManageContentPlantsPage,
+  ManageContentRemediesPage,
+  AdminUserManagementPage,
+  BecomeContributorPage,
+} from "./features/admin";
 
 // Shared dashboard pages (real implementations)
 import {
@@ -64,8 +72,9 @@ import {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Toaster richColors position="top-right" />
+    <RouteErrorBoundary isRoot>
+      <BrowserRouter>
+        <Toaster richColors position="top-right" closeButton duration={3500} />
       <Routes>
         {/* Pages with shared public navbar layout */}
         <Route element={<Layout />}>
@@ -99,49 +108,53 @@ export default function App() {
           <Route path="profile" element={<SettingsProfilePage />} />
           <Route path="help" element={<HelpSupportPage />} />
           <Route path="tours" element={<GuidedToursPage />} />
+          <Route path="become-contributor" element={<RequireRole minimumRole="USER" forbiddenRedirect="/dashboard"><BecomeContributorPage /></RequireRole>} />
 
           {/* Botanist sub-routes — protected with BOTANIST role */}
           <Route
             path="contributions"
-            element={<RequireRole minimumRole="BOTANIST"><MyContributionsPage /></RequireRole>}
+            element={<RequireRole minimumRole="BOTANIST" forbiddenRedirect="/dashboard"><MyContributionsPage /></RequireRole>}
           />
           <Route
             path="contributions/new-plant"
-            element={<RequireRole minimumRole="BOTANIST"><PlantEditorPage /></RequireRole>}
+            element={<RequireRole minimumRole="BOTANIST" forbiddenRedirect="/dashboard"><PlantEditorPage /></RequireRole>}
           />
           <Route
             path="contributions/new-remedy"
-            element={<RequireRole minimumRole="BOTANIST"><RemedyEditorPage /></RequireRole>}
+            element={<RequireRole minimumRole="BOTANIST" forbiddenRedirect="/dashboard"><RemedyEditorPage /></RequireRole>}
           />
           <Route
             path="contributions/plant/:id"
-            element={<RequireRole minimumRole="BOTANIST"><PlantEditorPage /></RequireRole>}
+            element={<RequireRole minimumRole="BOTANIST" forbiddenRedirect="/dashboard"><PlantEditorPage /></RequireRole>}
           />
           <Route
             path="contributions/remedy/:id"
-            element={<RequireRole minimumRole="BOTANIST"><RemedyEditorPage /></RequireRole>}
+            element={<RequireRole minimumRole="BOTANIST" forbiddenRedirect="/dashboard"><RemedyEditorPage /></RequireRole>}
           />
           <Route
             path="contributions/:type/:id/review"
-            element={<RequireRole minimumRole="BOTANIST"><SubmissionDetailsPage /></RequireRole>}
+            element={<RequireRole minimumRole="BOTANIST" forbiddenRedirect="/dashboard"><SubmissionDetailsPage /></RequireRole>}
           />
           <Route
             path="ai-feedback"
-            element={<RequireRole minimumRole="BOTANIST"><AIFeedbackQueuePage /></RequireRole>}
+            element={<RequireRole minimumRole="BOTANIST" forbiddenRedirect="/dashboard"><AIFeedbackQueuePage /></RequireRole>}
           />
 
-          {/* Admin sub-routes — dedicated page components */}
-          <Route path="plants" element={<ManagePlantsPage />} />
-          <Route path="moderation" element={<ModerationQueuePage />} />
-          <Route path="analytics" element={<AnalyticsOverviewPage />} />
-          <Route path="analytics/scanner" element={<AIScannerStatsPage />} />
-          <Route path="analytics/users" element={<UserGrowthPage />} />
-          <Route path="featured" element={<FeaturedContentPage />} />
-          <Route path="users" element={<UserManagementPage />} />
-          <Route path="tours/manage" element={<RequireRole minimumRole="ADMIN"><AdminToursListPage /></RequireRole>} />
-          <Route path="tours/manage/new" element={<RequireRole minimumRole="ADMIN"><AdminTourEditorPage /></RequireRole>} />
-          <Route path="tours/manage/:id" element={<RequireRole minimumRole="ADMIN"><AdminTourEditorPage /></RequireRole>} />
-          <Route path="tours/analytics" element={<RequireRole minimumRole="ADMIN"><AdminTourAnalyticsPage /></RequireRole>} />
+          {/* Admin sub-routes — protected with per-route RequireRole(ADMIN) (BUG-036 fix) */}
+          <Route path="moderation" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><ModerationQueuePage /></RequireRole>} />
+          <Route path="moderation/:type/:id" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><ModerationReviewPage /></RequireRole>} />
+          <Route path="content/plants" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><ManageContentPlantsPage /></RequireRole>} />
+          <Route path="content/remedies" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><ManageContentRemediesPage /></RequireRole>} />
+          <Route path="plants" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><ManageContentPlantsPage /></RequireRole>} />
+          <Route path="users" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><AdminUserManagementPage /></RequireRole>} />
+          <Route path="analytics" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><AnalyticsOverviewPage /></RequireRole>} />
+          <Route path="analytics/scanner" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><AIScannerStatsPage /></RequireRole>} />
+          <Route path="analytics/users" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><UserGrowthPage /></RequireRole>} />
+          <Route path="featured" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><FeaturedContentPage /></RequireRole>} />
+          <Route path="tours/manage" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><AdminToursListPage /></RequireRole>} />
+          <Route path="tours/manage/new" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><AdminTourEditorPage /></RequireRole>} />
+          <Route path="tours/manage/:id" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><AdminTourEditorPage /></RequireRole>} />
+          <Route path="tours/analytics" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><AdminTourAnalyticsPage /></RequireRole>} />
 
           {/* Super Admin sub-routes */}
           <Route path="system" element={<SystemOverviewPage />} />
@@ -162,5 +175,6 @@ export default function App() {
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
       </Routes>
     </BrowserRouter>
+  </RouteErrorBoundary>
   );
 }

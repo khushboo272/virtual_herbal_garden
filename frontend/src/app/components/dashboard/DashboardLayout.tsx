@@ -18,32 +18,10 @@ import { DashboardSidebar } from './DashboardSidebar';
 import { Navbar } from '../../../components/navbar/Navbar';
 import { useAuth } from '../../../contexts/AuthContext';
 import { HeaderSearchDropdown } from '../../../features/dashboard/shared';
+import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
+import { findDashboardRoute, getBreadcrumbsForPath } from '../../../features/dashboard/dashboard.routes';
+import { RouteErrorBoundary } from '../RouteErrorBoundary';
 import type { UserRole } from './roleNavConfig';
-
-/** Maps route segments to human-readable breadcrumb labels */
-const BREADCRUMB_LABELS: Record<string, string> = {
-  dashboard: 'Dashboard',
-  garden: 'My Garden',
-  bookmarks: 'Bookmarks',
-  scanner: 'AI Scanner',
-  profile: 'Settings & Profile',
-  help: 'Help & Support',
-  contributions: 'My Contributions',
-  'new-plant': 'New Plant Draft',
-  'new-remedy': 'New Remedy Draft',
-  'ai-feedback': 'AI Feedback Queue',
-  moderation: 'Moderation Queue',
-  analytics: 'Analytics',
-  featured: 'Featured Content',
-  users: 'User Management',
-  tours: 'Tours',
-  manage: 'Management',
-  system: 'System',
-  'feature-flags': 'Feature Flags',
-  'role-management': 'Role Management',
-  'audit-log': 'Audit Log',
-  'ai-model-config': 'AI Model Config',
-};
 
 export function DashboardLayout() {
   const { user } = useAuth();
@@ -53,6 +31,11 @@ export function DashboardLayout() {
 
   const role = (user?.role || 'GUEST') as UserRole;
 
+  // Single source of truth for document title
+  const activeRoute = findDashboardRoute(location.pathname);
+  useDocumentTitle(activeRoute?.title || 'Dashboard — Virtual Herbal Garden');
+
+  // Live badge counts
   useEffect(() => {
     if (role === 'BOTANIST') {
       import('../../../features/botanist/api/contributionsApi')
@@ -63,26 +46,26 @@ export function DashboardLayout() {
           }
         })
         .catch(() => {});
+    } else if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
+      import('../../../lib/api')
+        .then(({ api }) => api.get('/admin/moderation/summary'))
+        .then((res) => {
+          const summary = res.data?.data || res.data;
+          if (summary) {
+            setBadgeCounts({
+              pendingModeration: summary.total || 0,
+              pendingPlants: summary.plants || 0,
+              pendingRemedies: summary.remedies || 0,
+              pendingApplications: summary.applications || 0,
+            });
+          }
+        })
+        .catch(() => {});
     }
-  }, [role]);
+  }, [role, location.pathname]);
 
-  // Build breadcrumbs from pathname
-  const pathSegments = location.pathname.split('/').filter(Boolean);
-  const breadcrumbs = pathSegments.map((segment, idx) => {
-    let label = BREADCRUMB_LABELS[segment];
-    if (!label) {
-      if (/^[0-9a-fA-F]{24}$/.test(segment)) {
-        label = 'Draft Details';
-      } else {
-        label = (segment.charAt(0).toUpperCase() + segment.slice(1)).replace(/[-_]/g, ' ');
-      }
-    }
-    return {
-      label,
-      path: '/' + pathSegments.slice(0, idx + 1).join('/'),
-      isLast: idx === pathSegments.length - 1,
-    };
-  });
+  // Derived breadcrumbs from dashboard.routes.ts
+  const breadcrumbs = getBreadcrumbsForPath(location.pathname);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -113,10 +96,14 @@ export function DashboardLayout() {
                       {idx > 0 && <BreadcrumbSeparator><ChevronRight className="w-3 h-3" /></BreadcrumbSeparator>}
                       <BreadcrumbItem>
                         {crumb.isLast ? (
-                          <BreadcrumbPage className="text-green-800 font-medium">{crumb.label}</BreadcrumbPage>
+                          <BreadcrumbPage className="font-medium text-slate-800">
+                            {crumb.label}
+                          </BreadcrumbPage>
                         ) : (
                           <BreadcrumbLink asChild>
-                            <Link to={crumb.path} className="text-green-600 hover:text-green-800">{crumb.label}</Link>
+                            <Link to={crumb.path} className="text-slate-500 hover:text-green-700">
+                              {crumb.label}
+                            </Link>
                           </BreadcrumbLink>
                         )}
                       </BreadcrumbItem>
@@ -125,18 +112,16 @@ export function DashboardLayout() {
                 </BreadcrumbList>
               </Breadcrumb>
 
-              {/* Right side — debounced grouped search */}
-              <div className="flex items-center gap-3">
-                <div className="hidden sm:block">
-                  <HeaderSearchDropdown />
-                </div>
-              </div>
+              {/* Quick Search */}
+              <HeaderSearchDropdown />
             </div>
           </header>
 
           {/* Page Content */}
-          <main className="p-6">
-            <Outlet />
+          <main className="p-6 max-w-7xl mx-auto">
+            <RouteErrorBoundary>
+              <Outlet />
+            </RouteErrorBoundary>
           </main>
         </div>
       </div>

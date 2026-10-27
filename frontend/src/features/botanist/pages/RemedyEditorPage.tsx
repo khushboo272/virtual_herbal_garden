@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../../contexts/AuthContext';
 import {
   FileText,
   Plus,
@@ -57,6 +58,34 @@ export function RemedyEditorPage() {
   useDocumentTitle(
     isEditing ? 'Edit Remedy Draft | Virtual Herbal Garden' : 'New Remedy Draft | Virtual Herbal Garden'
   );
+
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const isAdminMode =
+    searchParams.get('admin') === 'true' ||
+    searchParams.get('admin') === '1' ||
+    user?.role === 'ADMIN' ||
+    user?.role === 'SUPER_ADMIN';
+
+  const handleAdminSaveAndPublish = async () => {
+    try {
+      setSubmitting(true);
+      const savedId = await handleSaveDraft(true);
+      const targetId = savedId || currentId;
+      if (!targetId) {
+        toast.error('Could not save draft before publishing');
+        return;
+      }
+      const { api } = await import('../../../lib/api');
+      await api.post(`/admin/content/remedies/${targetId}/publish`);
+      toast.success('Remedy published directly to active library!');
+      navigate('/dashboard/content/remedies');
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to publish remedy');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   // Form Fields
   const [title, setTitle] = useState('');
@@ -183,6 +212,21 @@ export function RemedyEditorPage() {
     return () => clearTimeout(timer);
   }, [isDirty, currentId, title, description, ingredients, preparationSteps, references]);
 
+  const scrollToField = (fieldId: string) => {
+    const el = document.getElementById(`field-${fieldId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const target = (el.querySelector('input, textarea, select') as HTMLElement) || el;
+      if (target) {
+        target.focus();
+        target.classList.add('ring-2', 'ring-purple-500', 'ring-offset-2');
+        setTimeout(() => {
+          target.classList.remove('ring-2', 'ring-purple-500', 'ring-offset-2');
+        }, 2000);
+      }
+    }
+  };
+
   // Checklist computation
   const cleanIngredients = ingredients.filter((i) => i.name.trim().length > 0);
   const cleanSteps = preparationSteps.filter((s) => s.instruction.trim().length > 0);
@@ -194,26 +238,28 @@ export function RemedyEditorPage() {
       label: 'Remedy Title',
       isComplete: title.trim().length >= 3,
       isRequiredForReview: true,
-      hint: 'Clear, traditional remedy title',
+      hint: 'Clear, traditional remedy title (min 3 characters)',
     },
     {
       id: 'description',
-      label: 'Preparation Overview / Description',
+      label: 'Preparation Overview & Description',
       isComplete: description.trim().length >= 20,
       isRequiredForReview: true,
-      hint: 'Describe purpose and traditional background',
+      hint: 'Describe purpose and traditional background (min 20 characters)',
     },
     {
       id: 'ingredients',
       label: 'At Least 1 Ingredient & Measure',
       isComplete: cleanIngredients.length >= 1,
       isRequiredForReview: true,
+      hint: 'Add at least 1 botanic or herbal ingredient',
     },
     {
       id: 'steps',
       label: 'Numbered Preparation Steps',
       isComplete: cleanSteps.length >= 1,
       isRequiredForReview: true,
+      hint: 'Add step-by-step preparation instructions',
     },
     {
       id: 'references',
@@ -290,25 +336,52 @@ export function RemedyEditorPage() {
   };
 
   const handleSubmitForReview = async () => {
-    if (!currentId) {
-      toast.error('Please save your draft first');
+    if (title.trim().length < 3) {
+      toast.error('Remedy Title must be at least 3 characters.');
+      scrollToField('title');
       return;
     }
 
-    if (detectedSafetyPhrases.length > 0) {
-      toast.error('Submission blocked: unverified claims detected. Please rephrase with traditional context.');
+    if (description.trim().length < 20) {
+      toast.error(
+        `Preparation Overview & Description must be at least 20 characters (currently ${description.trim().length}).`,
+      );
+      scrollToField('description');
+      return;
+    }
+
+    if (cleanIngredients.length === 0) {
+      toast.error('At least 1 ingredient with name and quantity is required.');
+      scrollToField('ingredients');
+      return;
+    }
+
+    if (cleanSteps.length === 0) {
+      toast.error('At least 1 preparation instruction step is required.');
+      scrollToField('steps');
       return;
     }
 
     if (cleanReferences.length === 0) {
       toast.error('At least one citation or traditional source reference is required');
+      scrollToField('references');
+      return;
+    }
+
+    if (detectedSafetyPhrases.length > 0) {
+      toast.error('Submission blocked: unverified claims detected. Please rephrase with traditional context.');
+      scrollToField('safety');
       return;
     }
 
     try {
       setSubmitting(true);
-      await handleSaveDraft(true);
-      await submitContribution('remedy', currentId);
+      const savedId = currentId || (await handleSaveDraft(true));
+      if (!savedId) {
+        toast.error('Please save your draft first');
+        return;
+      }
+      await submitContribution('remedy', savedId);
       toast.success('Remedy submitted for review!');
       const targetParam = currentSlug || currentId;
       navigate(`/dashboard/contributions/remedy/${targetParam}/review`);
@@ -480,14 +553,25 @@ export function RemedyEditorPage() {
             </Button>
           )}
 
-          <Button
-            onClick={handleSubmitForReview}
-            disabled={submitting}
-            className="bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-xl h-9 px-4 flex items-center gap-1.5 shadow-xs"
-          >
-            <Send className="w-3.5 h-3.5" />
-            {submitting ? 'Submitting...' : 'Submit for Review'}
-          </Button>
+          {isAdminMode ? (
+            <Button
+              onClick={handleAdminSaveAndPublish}
+              disabled={submitting}
+              className="bg-green-700 hover:bg-green-800 text-white text-xs rounded-xl h-9 px-4 flex items-center gap-1.5 shadow-xs"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {submitting ? 'Publishing...' : 'Save & Publish'}
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSubmitForReview}
+              disabled={submitting}
+              className="bg-purple-600 hover:bg-purple-500 text-white text-xs rounded-xl h-9 px-4 flex items-center gap-1.5 shadow-xs"
+            >
+              <Send className="w-3.5 h-3.5" />
+              {submitting ? 'Submitting...' : 'Submit for Review'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -506,11 +590,17 @@ export function RemedyEditorPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Remedy Title <span className="text-rose-500">*</span>
-                </label>
+              <div id="field-title" className="sm:col-span-2">
+                <div className="flex items-center justify-between mb-1">
+                  <label htmlFor="field-title-input" className="block text-xs font-semibold text-slate-700">
+                    Remedy Title <span className="text-rose-500">*</span>
+                  </label>
+                  <span className={`text-[11px] ${title.trim().length >= 3 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                    {title.trim().length} / 3 min chars {title.trim().length >= 3 && '✓'}
+                  </span>
+                </div>
                 <Input
+                  id="field-title-input"
                   value={title}
                   onChange={(e) => {
                     setTitle(e.target.value);
@@ -605,19 +695,41 @@ export function RemedyEditorPage() {
                 />
               </div>
 
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Detailed Description & Context <span className="text-rose-500">*</span>
-                </label>
+              <div id="field-description" className="sm:col-span-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="field-description-input" className="block text-xs font-semibold text-slate-700">
+                    Preparation Overview & Detailed Description <span className="text-rose-500">*</span>
+                  </label>
+                  <span
+                    className={`text-[11px] font-medium transition-colors ${
+                      description.trim().length >= 20
+                        ? 'text-emerald-600'
+                        : description.trim().length > 0
+                        ? 'text-amber-600'
+                        : 'text-slate-400'
+                    }`}
+                  >
+                    {description.trim().length} / 20 min characters
+                    {description.trim().length > 0 && description.trim().length < 20 && (
+                      <span className="ml-1 font-semibold">({20 - description.trim().length} more needed)</span>
+                    )}
+                    {description.trim().length >= 20 && <span className="ml-1 font-semibold">✓</span>}
+                  </span>
+                </div>
                 <Textarea
+                  id="field-description-input"
                   value={description}
                   onChange={(e) => {
                     setDescription(e.target.value);
                     setIsDirty(true);
                   }}
-                  rows={3}
-                  placeholder="Describe the therapeutic context, traditional lineage, and customary administration..."
-                  className="w-full text-xs rounded-xl"
+                  rows={4}
+                  placeholder="Describe the therapeutic purpose, traditional background, and customary preparation (minimum 20 characters)..."
+                  className={`w-full text-xs rounded-xl transition-all ${
+                    description.trim().length > 0 && description.trim().length < 20
+                      ? 'border-amber-400 focus:border-amber-500 bg-amber-50/10'
+                      : ''
+                  }`}
                   required
                 />
               </div>
@@ -625,7 +737,7 @@ export function RemedyEditorPage() {
           </Card>
 
           {/* Section 2: Ingredients List with Plant Picker */}
-          <Card className="border border-slate-200/80 rounded-2xl shadow-xs bg-white p-6 space-y-4">
+          <Card id="field-ingredients" className="border border-slate-200/80 rounded-2xl shadow-xs bg-white p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -722,7 +834,7 @@ export function RemedyEditorPage() {
           </Card>
 
           {/* Section 3: Numbered Preparation Steps with Reorder */}
-          <Card className="border border-slate-200/80 rounded-2xl shadow-xs bg-white p-6 space-y-4">
+          <Card id="field-steps" className="border border-slate-200/80 rounded-2xl shadow-xs bg-white p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
@@ -848,7 +960,7 @@ export function RemedyEditorPage() {
           </Card>
 
           {/* Section 5: Sources & References (Min 1 required) */}
-          <Card className="border border-slate-200/80 rounded-2xl shadow-xs bg-white p-6 space-y-4">
+          <Card id="field-references" className="border border-slate-200/80 rounded-2xl shadow-xs bg-white p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -934,7 +1046,7 @@ export function RemedyEditorPage() {
         {/* Sidebar: Checklist & Controls */}
         <div className="space-y-6">
           <div className="sticky top-24 space-y-6">
-            <CompletenessChecklist items={checklistItems} />
+            <CompletenessChecklist items={checklistItems} onItemClick={scrollToField} />
 
             <Card className="border border-slate-200/80 rounded-2xl shadow-xs bg-white p-4 space-y-2.5">
               <Button
@@ -945,13 +1057,24 @@ export function RemedyEditorPage() {
               >
                 {saving ? 'Saving...' : 'Save Draft (Ctrl+S)'}
               </Button>
-              <Button
-                onClick={handleSubmitForReview}
-                disabled={submitting}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-xl h-9 font-semibold"
-              >
-                {submitting ? 'Submitting...' : 'Submit for Review'}
-              </Button>
+              {isAdminMode ? (
+                <Button
+                  onClick={handleAdminSaveAndPublish}
+                  disabled={submitting}
+                  className="w-full bg-green-700 hover:bg-green-800 text-white text-xs rounded-xl h-9 font-semibold"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                  {submitting ? 'Publishing...' : 'Save & Publish'}
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSubmitForReview}
+                  disabled={submitting}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs rounded-xl h-9 font-semibold"
+                >
+                  {submitting ? 'Submitting...' : 'Submit for Review'}
+                </Button>
+              )}
             </Card>
 
             <Card className="border border-purple-100 bg-purple-50/40 rounded-2xl p-4 text-xs text-purple-950 space-y-2">

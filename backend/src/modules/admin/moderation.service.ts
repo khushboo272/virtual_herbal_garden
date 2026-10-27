@@ -14,6 +14,19 @@ function escapeRegex(text: string): string {
   return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 }
 
+function normalizeType(type: string): 'plant' | 'remedy' {
+  const lower = String(type).toLowerCase();
+  return lower === 'plants' || lower === 'plant' ? 'plant' : 'remedy';
+}
+
+export function getPendingReviewPredicate(extraConditions: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    status: ContentStatus.PENDING_REVIEW,
+    isDeleted: false,
+    ...extraConditions,
+  };
+}
+
 export class ModerationService {
   /**
    * Summary of pending items across plants, remedies, and role applications.
@@ -21,8 +34,8 @@ export class ModerationService {
    */
   async getSummary(): Promise<{ plants: number; remedies: number; applications: number; total: number }> {
     const [plants, remedies, applications] = await Promise.all([
-      Plant.countDocuments({ status: ContentStatus.PENDING_REVIEW, isDeleted: false }),
-      Remedy.countDocuments({ status: ContentStatus.PENDING_REVIEW, isDeleted: false }),
+      Plant.countDocuments(getPendingReviewPredicate()),
+      Remedy.countDocuments(getPendingReviewPredicate()),
       RoleApplication.countDocuments({ status: RoleApplicationStatus.PENDING }),
     ]);
 
@@ -38,22 +51,23 @@ export class ModerationService {
    * Retrieves pending review items for a given content type with search and pagination.
    */
   async listQueue(
-    type: 'plant' | 'remedy',
+    type: 'plant' | 'remedy' | string,
     filters: { status?: ContentStatus; q?: string; page?: number; limit?: number } = {},
   ): Promise<{ items: Record<string, unknown>[]; meta: PaginationMeta; pagination: PaginationMeta }> {
+    const targetType = normalizeType(type);
     const status = filters.status || ContentStatus.PENDING_REVIEW;
     const page = Math.max(1, Number(filters.page) || 1);
     const limit = Math.max(1, Math.min(50, Number(filters.limit) || 20));
     const skip = (page - 1) * limit;
 
-    const query: Record<string, unknown> = {
-      status,
-      isDeleted: false,
-    };
+    const query: Record<string, unknown> =
+      status === ContentStatus.PENDING_REVIEW
+        ? getPendingReviewPredicate()
+        : { status, isDeleted: false };
 
     if (filters.q && filters.q.trim()) {
-      const regex = new RegExp(filters.q.trim(), 'i');
-      if (type === 'plant') {
+      const regex = new RegExp(escapeRegex(filters.q.trim()), 'i');
+      if (targetType === 'plant') {
         query.$or = [{ commonName: regex }, { scientificName: regex }];
       } else {
         query.$or = [{ title: regex }];
@@ -65,7 +79,7 @@ export class ModerationService {
     let items: any[];
     let total: number;
 
-    if (type === 'plant') {
+    if (targetType === 'plant') {
       [items, total] = await Promise.all([
         Plant.find(query)
           .populate('owner', 'displayName email avatarUrl')
@@ -97,15 +111,15 @@ export class ModerationService {
       const isOverdue = now - submittedTime > THREE_DAYS_MS;
       const daysAgo = Math.floor((now - submittedTime) / (24 * 60 * 60 * 1000));
 
-      const ownerDoc = doc.owner || doc.createdBy || {};
+      const ownerDoc = doc.owner || doc.createdBy;
       const owner = {
-        id: ownerDoc._id ? ownerDoc._id.toString() : 'unknown',
-        displayName: ownerDoc.displayName || 'Contributor',
-        email: ownerDoc.email || '',
-        avatarUrl: ownerDoc.avatarUrl || null,
+        id: ownerDoc?._id ? ownerDoc._id.toString() : 'unknown',
+        displayName: ownerDoc?.displayName || 'Unknown user',
+        email: ownerDoc?.email || '',
+        avatarUrl: ownerDoc?.avatarUrl || null,
       };
 
-      if (type === 'plant') {
+      if (targetType === 'plant') {
         return {
           id: doc._id.toString(),
           type: 'plant',
@@ -172,7 +186,8 @@ export class ModerationService {
    * Retrieves full moderation detail for an item with duplicate detection,
    * content safety scanning, and review history.
    */
-  async getItemDetail(type: 'plant' | 'remedy', id: string): Promise<Record<string, unknown>> {
+  async getItemDetail(type: 'plant' | 'remedy' | string, id: string): Promise<Record<string, unknown>> {
+    const targetType = normalizeType(type);
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const query = {
       $or: isObjectId ? [{ _id: id }, { slug: id }] : [{ slug: id }],
@@ -182,7 +197,7 @@ export class ModerationService {
     let doc: any;
     let duplicateCandidates: Record<string, unknown>[] = [];
 
-    if (type === 'plant') {
+    if (targetType === 'plant') {
       doc = await Plant.findOne(query)
         .populate('owner', 'displayName email avatarUrl')
         .populate('createdBy', 'displayName email avatarUrl')
@@ -284,12 +299,13 @@ export class ModerationService {
    * Approves a submission, publishing it and optionally featuring it.
    */
   async approve(
-    type: 'plant' | 'remedy',
+    type: 'plant' | 'remedy' | string,
     id: string,
     adminUserOrId: any,
     options: { feature?: boolean; comment?: string } = {},
     req?: Request,
   ): Promise<{ message: string; status: ContentStatus }> {
+    const targetType = normalizeType(type);
     const adminId = typeof adminUserOrId === 'object' ? (adminUserOrId?.sub || adminUserOrId?._id?.toString()) : adminUserOrId;
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const query = {
@@ -298,13 +314,13 @@ export class ModerationService {
     };
 
     let item: any;
-    if (type === 'plant') {
+    if (targetType === 'plant') {
       item = await Plant.findOne(query);
     } else {
       item = await Remedy.findOne(query);
     }
 
-    if (!item) throw new AppError(`${type === 'plant' ? 'Plant' : 'Remedy'} not found`, 404, 'NOT_FOUND');
+    if (!item) throw new AppError(`${targetType === 'plant' ? 'Plant' : 'Remedy'} not found`, 404, 'NOT_FOUND');
 
     const previousStatus = item.status;
     item.status = ContentStatus.PUBLISHED;
@@ -356,7 +372,7 @@ export class ModerationService {
    * Rejects a submission with a mandatory reason.
    */
   async reject(
-    type: 'plant' | 'remedy',
+    type: 'plant' | 'remedy' | string,
     id: string,
     adminUserOrId: any,
     reason: string,
@@ -366,6 +382,7 @@ export class ModerationService {
       throw new AppError('A rejection reason is required', 400, 'REASON_REQUIRED');
     }
 
+    const targetType = normalizeType(type);
     const adminId = typeof adminUserOrId === 'object' ? (adminUserOrId?.sub || adminUserOrId?._id?.toString()) : adminUserOrId;
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const query = {
@@ -374,13 +391,13 @@ export class ModerationService {
     };
 
     let item: any;
-    if (type === 'plant') {
+    if (targetType === 'plant') {
       item = await Plant.findOne(query);
     } else {
       item = await Remedy.findOne(query);
     }
 
-    if (!item) throw new AppError(`${type === 'plant' ? 'Plant' : 'Remedy'} not found`, 404, 'NOT_FOUND');
+    if (!item) throw new AppError(`${targetType === 'plant' ? 'Plant' : 'Remedy'} not found`, 404, 'NOT_FOUND');
 
     const previousStatus = item.status;
     item.status = ContentStatus.REJECTED;
@@ -428,7 +445,7 @@ export class ModerationService {
    * Requests changes on a submission with mandatory feedback comment.
    */
   async requestChanges(
-    type: 'plant' | 'remedy',
+    type: 'plant' | 'remedy' | string,
     id: string,
     adminUserOrId: any,
     comment: string,
@@ -438,6 +455,7 @@ export class ModerationService {
       throw new AppError('Feedback comment is required when requesting changes', 400, 'COMMENT_REQUIRED');
     }
 
+    const targetType = normalizeType(type);
     const adminId = typeof adminUserOrId === 'object' ? (adminUserOrId?.sub || adminUserOrId?._id?.toString()) : adminUserOrId;
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
     const query = {
@@ -446,13 +464,13 @@ export class ModerationService {
     };
 
     let item: any;
-    if (type === 'plant') {
+    if (targetType === 'plant') {
       item = await Plant.findOne(query);
     } else {
       item = await Remedy.findOne(query);
     }
 
-    if (!item) throw new AppError(`${type === 'plant' ? 'Plant' : 'Remedy'} not found`, 404, 'NOT_FOUND');
+    if (!item) throw new AppError(`${targetType === 'plant' ? 'Plant' : 'Remedy'} not found`, 404, 'NOT_FOUND');
 
     const previousStatus = item.status;
     item.status = ContentStatus.CHANGES_REQUESTED;

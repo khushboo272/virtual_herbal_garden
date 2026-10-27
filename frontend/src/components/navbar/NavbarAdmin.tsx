@@ -7,11 +7,11 @@ import { NotificationPanel } from '../../app/components/dashboard/NotificationPa
 import { NavbarAvatarMenu } from './NavbarAvatarMenu';
 import { NavbarMobileDrawer } from './NavbarMobileDrawer';
 
+import { PUBLIC_LINKS } from './NavbarPublic';
+
 const ADMIN_LINKS: NavLink[] = [
-  { label: 'Home', route: '/', icon: Home },
-  { label: 'Library', route: '/library', icon: BookOpen },
-  { label: '3D Garden', route: '/garden-3d', icon: Map },
-  { label: 'Dashboard', route: '/dashboard', icon: LayoutDashboard }
+  ...PUBLIC_LINKS,
+  { label: 'Dashboard', route: '/dashboard', icon: LayoutDashboard },
 ];
 
 export const NavbarAdmin = () => {

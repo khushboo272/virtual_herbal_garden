@@ -143,9 +143,13 @@ export interface TourAdminListItem {
 export interface TourAdminAnalytics {
   totalTours: number;
   published: number;
+  drafts?: number;
+  featured?: number;
   totalStarts: number;
   totalCompletions: number;
   completionRate: number;
+  overallAvgRating?: number;
+  totalRatingsCount?: number;
 }
 
 export interface TourDetailAnalytics {
@@ -157,12 +161,66 @@ export interface TourDetailAnalytics {
   completionRate: number;
   avgRating: number;
   avgQuizScore: number;
+  tour?: {
+    id: string;
+    title: string;
+    slug: string;
+    summary?: string;
+    level?: string;
+    healthCategory?: string;
+    isPublished: boolean;
+    isFeatured: boolean;
+    coverImageUrl?: string | null;
+    estimatedMinutes?: number;
+    checkpointsCount: number;
+  };
+  ratingDistribution?: Record<number, number>;
+  ratingsList?: Array<{
+    id: string;
+    rating: number;
+    comment: string | null;
+    user: {
+      displayName: string;
+      email: string;
+      avatarUrl: string | null;
+    };
+    createdAt: string;
+  }>;
+  recentSessions?: Array<{
+    id: string;
+    user: {
+      id?: string;
+      displayName: string;
+      email: string;
+      avatarUrl: string | null;
+    };
+    percent: number;
+    completedCount: number;
+    totalCheckpoints: number;
+    isCompleted: boolean;
+    lastCheckpointKey: string | null;
+    rating: number | null;
+    avgQuizScore: number | null;
+    startedAt: string;
+    completedAt: string | null;
+    updatedAt: string;
+  }>;
   perCheckpoint: Array<{
     key: string;
     title: string;
     order: number;
+    durationMinutes?: number;
     reached: number;
     completed: number;
     dropOffPct: number;
+    hasQuiz?: boolean;
+    quizQuestionsCount?: number;
+    quizAttempts?: number;
+    quizPassRate?: number | null;
+    quizAvgScore?: number | null;
+    plantSlugs?: string[];
+    remedySlugs?: string[];
+    keyTakeaways?: string[];
+    hasAudio?: boolean;
   }>;
 }

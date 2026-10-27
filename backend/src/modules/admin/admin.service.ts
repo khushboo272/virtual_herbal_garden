@@ -14,6 +14,7 @@ import { AppError } from '../../core/utils/apiResponse';
 import { redis } from '../../core/config/redis';
 
 import RoleApplication, { RoleApplicationStatus } from './RoleApplication.model';
+import { getPendingReviewPredicate } from './moderation.service';
 
 export class AdminService {
   /**
@@ -86,17 +87,17 @@ export class AdminService {
       Remedy.countDocuments({ isPublished: true, isDeleted: false }),
       Tour.countDocuments({ isPublished: true, isDeleted: false }),
       Detection.countDocuments({ createdAt: { $gte: startOfToday } }),
-      Plant.countDocuments({ status: ContentStatus.PENDING_REVIEW, isDeleted: false }),
-      Remedy.countDocuments({ status: ContentStatus.PENDING_REVIEW, isDeleted: false }),
+      Plant.countDocuments(getPendingReviewPredicate()),
+      Remedy.countDocuments(getPendingReviewPredicate()),
       RoleApplication.countDocuments({ status: RoleApplicationStatus.PENDING }),
       User.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
       User.countDocuments({ createdAt: { $gte: fourteenDaysAgo, $lt: sevenDaysAgo } }),
       AuditLog.find().sort({ createdAt: -1 }).limit(10).populate('user', 'displayName email avatar'),
-      Plant.find({ status: ContentStatus.PENDING_REVIEW, isDeleted: false })
+      Plant.find(getPendingReviewPredicate())
         .sort({ createdAt: 1 })
         .limit(5)
         .select('_id commonName createdAt'),
-      Remedy.find({ status: ContentStatus.PENDING_REVIEW, isDeleted: false })
+      Remedy.find(getPendingReviewPredicate())
         .sort({ createdAt: 1 })
         .limit(5)
         .select('_id title createdAt'),

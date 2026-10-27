@@ -7,7 +7,7 @@
 import { useAuth } from '../../../contexts/AuthContext';
 import { UserDashboard } from '../slides/UserDashboard';
 import { BotanistDashboardHome } from '../../../features/botanist';
-import { AdminDashboardOverview } from './pages/AdminDashboardOverview';
+import { AdminDashboardHome } from '../../../features/admin';
 import { GuestDashboard } from './GuestDashboard';
 
 interface DashboardHomeProps {
@@ -26,7 +26,7 @@ export function DashboardHome({ onOpenSignIn }: DashboardHomeProps) {
   switch (role) {
     case 'SUPER_ADMIN':
     case 'ADMIN':
-      return <AdminDashboardOverview />;
+      return <AdminDashboardHome />;
     case 'BOTANIST':
       return <BotanistDashboardHome />;
     case 'USER':

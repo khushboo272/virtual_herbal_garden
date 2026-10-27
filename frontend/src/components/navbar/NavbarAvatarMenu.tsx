@@ -44,9 +44,9 @@ export const NavbarAvatarMenu = () => {
           <User className="mr-2 h-4 w-4 text-gray-500" />
           <span>Dashboard</span>
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate('/settings')} className="cursor-pointer">
+        <DropdownMenuItem onClick={() => navigate('/dashboard/profile')} className="cursor-pointer">
           <Settings className="mr-2 h-4 w-4 text-gray-500" />
-          <span>Settings</span>
+          <span>Profile</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-700 cursor-pointer focus:bg-red-50">

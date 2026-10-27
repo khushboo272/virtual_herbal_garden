@@ -33,7 +33,7 @@ export class AdminController {
   // --- Users Management ---
   async listUsers(req: Request, res: Response) {
     const result = await adminUsersService.listUsers(req.query as any);
-    sendSuccess(res, result.items, 200, result.pagination);
+    sendSuccess(res, result, 200, result.pagination);
   }
 
   async getUserDetail(req: Request, res: Response) {
@@ -76,7 +76,8 @@ export class AdminController {
   }
 
   async listModerationQueue(req: Request, res: Response) {
-    const result = await moderationService.listQueue(req.query as any);
+    const { type = 'plant', ...filters } = req.query as any;
+    const result = await moderationService.listQueue(type, filters);
     sendSuccess(res, result.items, 200, result.pagination);
   }
 

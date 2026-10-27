@@ -28,7 +28,7 @@ export async function connectDB(): Promise<void> {
       await mongoose.connect(uri, {
         dbName: env.MONGODB_DB_NAME,
         maxPoolSize: 10,
-        serverSelectionTimeoutMS: 8000,
+        serverSelectionTimeoutMS: 15000,
         socketTimeoutMS: 45000,
         family: 4, // Force IPv4 — prevents ECONNREFUSED from IPv6 SRV issues
       });
@@ -73,14 +73,12 @@ export async function connectDB(): Promise<void> {
     }
   }
 
-  // Seed if using in-memory server (data is ephemeral)
-  if (usingMemoryServer && mongoServer) {
-    try {
-      const { seedDatabase } = await import('../../seed');
-      await seedDatabase();
-    } catch (seedErr) {
-      logger.warn('⚠️ Seeding skipped or partial:', seedErr);
-    }
+  // Ensure default seed data (users & essential content) exists if database is empty
+  try {
+    const { seedDatabase } = await import('../../seed');
+    await seedDatabase();
+  } catch (seedErr) {
+    logger.warn('⚠️ Seeding skipped or partial:', seedErr);
   }
 
   mongoose.connection.on('error', (err) => {

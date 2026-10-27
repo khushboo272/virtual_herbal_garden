@@ -154,6 +154,9 @@ export class RoleApplicationsService {
     if (!application) throw new AppError('Role application not found', 404);
 
     if (application.status !== RoleApplicationStatus.PENDING) {
+      if (application.status === RoleApplicationStatus.APPROVED) {
+        return application;
+      }
       throw new AppError(`Application is already ${application.status.toLowerCase()}`, 400);
     }
 

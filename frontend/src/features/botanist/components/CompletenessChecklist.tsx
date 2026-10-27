@@ -13,9 +13,10 @@ export interface ChecklistItem {
 interface CompletenessChecklistProps {
   items: ChecklistItem[];
   className?: string;
+  onItemClick?: (id: string) => void;
 }
 
-export function CompletenessChecklist({ items, className }: CompletenessChecklistProps) {
+export function CompletenessChecklist({ items, className, onItemClick }: CompletenessChecklistProps) {
   const completedCount = items.filter((i) => i.isComplete).length;
   const totalCount = items.length;
   const allRequiredMet = items.filter((i) => i.isRequiredForReview).every((i) => i.isComplete);
@@ -53,9 +54,18 @@ export function CompletenessChecklist({ items, className }: CompletenessChecklis
         {items.map((item) => (
           <div
             key={item.id}
+            onClick={() => onItemClick?.(item.id)}
+            role={onItemClick ? 'button' : undefined}
+            tabIndex={onItemClick ? 0 : undefined}
+            onKeyDown={(e) => {
+              if (onItemClick && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                onItemClick(item.id);
+              }
+            }}
             className={`flex items-start gap-2.5 text-xs py-1 transition-colors ${
-              item.isComplete ? 'text-gray-700' : 'text-gray-500'
-            }`}
+              onItemClick ? 'cursor-pointer hover:bg-purple-50/80 px-2 py-1.5 rounded-lg -mx-2' : ''
+            } ${item.isComplete ? 'text-gray-700' : 'text-gray-500'}`}
           >
             {item.isComplete ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />

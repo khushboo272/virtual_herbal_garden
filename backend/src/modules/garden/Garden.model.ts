@@ -47,7 +47,6 @@ const GardenSchema = new Schema<IGarden>(
 );
 
 // Indexes per PRD
-GardenSchema.index({ user: 1 }, { unique: true });
 GardenSchema.index({ 'plants.plant': 1 });
 
 export default mongoose.model<IGarden>('Garden', GardenSchema);

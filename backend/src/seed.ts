@@ -3,10 +3,79 @@ import Plant from './modules/library/Plant.model';
 import Tour from './modules/tours/Tour.model';
 import Remedy from './modules/remedies/Remedy.model';
 import SystemConfig from './modules/admin/SystemConfig.model';
-import { DifficultyLevel } from './types';
+import User from './modules/users/User.model';
+import { DifficultyLevel, UserRole } from './types';
+import { hashPassword } from './core/utils/hash';
 
 export async function seedDatabase() {
-  if ((await Plant.countDocuments()) > 0) return; // Only seed if empty
+  // Ensure essential test accounts exist (for in-memory fallback or fresh databases)
+  const userCount = await User.countDocuments();
+  if (userCount === 0) {
+    console.log('👤 Seeding default users...');
+    const passwordHash = await hashPassword('Test@1234');
+    const now = new Date();
+
+    await User.create([
+      {
+        email: 'superadmin@virtualherbal.garden',
+        passwordHash,
+        role: UserRole.SUPER_ADMIN,
+        displayName: 'System Administrator',
+        bio: 'Platform super administrator with full system access.',
+        isEmailVerified: true,
+        isActive: true,
+        lastLoginAt: now,
+        lastActiveAt: now,
+      },
+      {
+        email: 'admin@virtualherbal.garden',
+        passwordHash,
+        role: UserRole.ADMIN,
+        displayName: 'Dr. Arun Sharma',
+        bio: 'AYUSH-certified Ayurvedic practitioner with 15+ years of experience in herbal medicine.',
+        isEmailVerified: true,
+        isActive: true,
+        lastLoginAt: now,
+        lastActiveAt: now,
+      },
+      {
+        email: 'botanist@virtualherbal.garden',
+        passwordHash,
+        role: UserRole.BOTANIST,
+        displayName: 'Dr. Priya Iyer',
+        bio: 'Ethnobotanist specializing in Western Ghats medicinal flora. PhD from IISER Pune.',
+        isEmailVerified: true,
+        isActive: true,
+        lastLoginAt: now,
+        lastActiveAt: now,
+      },
+      {
+        email: 'user@virtualherbal.garden',
+        passwordHash,
+        role: UserRole.USER,
+        displayName: 'Aniket Kumar',
+        bio: 'Herbal medicine enthusiast and organic gardener.',
+        isEmailVerified: true,
+        isActive: true,
+        lastLoginAt: now,
+        lastActiveAt: now,
+      },
+      {
+        email: 'guest@virtualherbal.garden',
+        passwordHash,
+        role: UserRole.USER,
+        displayName: 'Sneha Patel',
+        bio: 'Learning about traditional Indian remedies.',
+        isEmailVerified: false,
+        isActive: true,
+        lastLoginAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+        lastActiveAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      },
+    ]);
+    console.log('✅ Default users seeded (Password: Test@1234 for all accounts)');
+  }
+
+  if ((await Plant.countDocuments()) > 0) return; // Only seed content if empty
 
   console.log('🌱 Seeding database...');
 

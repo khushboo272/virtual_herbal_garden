@@ -201,50 +201,108 @@
 ---
 
 ## BUG-029 Admin top navbar lacks AI Scanner, Remedies and Virtual Tour
-**Status:** OPEN
+**Status:** FIXED (Admin Dashboard Part A)
 **Description:** The navigation bar for ADMIN and SUPER_ADMIN roles lacks direct links to AI Scanner, Remedies, and Virtual Tour, inconsistent with the public and regular user navigation.
+**Fix:** Updated `NavbarAdmin.tsx` to render the shared public explorer links (Home, Library, AI Scanner, 3D Garden, Remedies, Virtual Tour) alongside Dashboard and user avatar controls, providing seamless parity across all authenticated roles.
 
 ---
 
 ## BUG-030 Browser tab titles are stale on admin pages and User Growth breadcrumb reads "Analytics > User Management"
-**Status:** OPEN
+**Status:** FIXED (Admin Dashboard Part A)
 **Description:** Browser tab document titles are stale or incorrect across admin routes (e.g. showing "AI Feedback Queue..." or "Create New Tour..."), and the User Growth page breadcrumb incorrectly maps to "Analytics > User Management".
+**Fix:** Built a central dashboard routing authority (`frontend/src/features/dashboard/dashboard.routes.ts`) providing unambiguous paths, labels, parents, and document titles. Implemented `useDocumentTitle` synchronization in `DashboardLayout.tsx` and updated User Growth breadcrumbs to correctly map to "Analytics > User Growth".
 
 ---
 
 ## BUG-031 "Active Today" / "Daily Active Users" always show 0 although users are logged in
-**Status:** OPEN
+**Status:** FIXED (Admin Dashboard Part A)
 **Description:** The admin dashboard overview and analytics cards show 0 for Active Today / Daily Active Users because user activity timestamps (`lastActiveAt`) are not actively maintained or tracked on authenticated requests.
+**Fix:** Added throttled `lastActiveAt` activity tracking in `auth.ts` middleware (max once per 5 minutes per user using Redis/in-memory cache) and implemented real `activeToday` calculations across `adminUsers.service.ts` and `admin.service.ts` dashboard summary.
 
 ---
 
 ## BUG-032 Moderation Queue has a Tours tab with no source of pending tours and no real review UI
-**Status:** OPEN
+**Status:** FIXED (Admin Dashboard Part A)
 **Description:** Moderation queue includes a "Tours" tab despite tours having no submission or pending-review lifecycle, and the queue lacks comprehensive preview, content safety, duplicate checking, and review decision UI.
+**Fix:** Removed Tours from the moderation queue and sidebar badges. Built config-driven tabs (Plants, Remedies, Applications) in `ModerationQueuePage.tsx` and a full-featured `ModerationReviewPage.tsx` with duplicate candidate lookups, safety finding analysis, 3D model status, source checklists, review timelines, and approve/reject/request-changes actions with owner notifications and audit logging.
 
 ---
 
 ## BUG-033 User Management shows every user as USER, "Change Role" is disabled for everyone, and lacks management controls
-**Status:** OPEN
+**Status:** FIXED (Admin Dashboard Part A)
 **Description:** User Management table displays all users with the USER role regardless of their actual database role, role modification is completely disabled, and there is no user search/filter, pagination, drawer details, ban/unban, or force-logout action.
+**Fix:** Built `AdminUserManagementPage.tsx` and `adminUsers.service.ts` returning real user roles, provider tags, search, filtering by role/status/provider, and pagination. Implemented user detail drawer with activity counts and logs, role hierarchy policy enforcement (`ChangeRoleModal.tsx`), ban/unban with optional `bannedUntil` dates, and `forceLogout` with refresh token revocation.
 
 ---
 
 ## BUG-034 No content management for all plants/remedies (publish/unpublish/feature/delete)
-**Status:** OPEN
+**Status:** FIXED (Admin Dashboard Part A)
 **Description:** Administrators have no unified content management view to audit, filter, publish, unpublish, feature, or safely delete all plants and remedies across the platform.
+**Fix:** Built `ManageContentPlantsPage.tsx`, `ManageContentRemediesPage.tsx`, `ContentManagementView.tsx`, and `adminContent.service.ts` with real-time status badges, search, filtering, pagination, bulk unpublish/delete (max 50), toggle feature, preview links, admin edit mode, and dependency impact analysis with typed slug confirmation for safe deletions.
 
 ---
 
 ## BUG-035 No way to apply for the BOTANIST role and no review of applications
-**Status:** OPEN
+**Status:** FIXED (Admin Dashboard Part A)
 **Description:** Platform users have no workflow or interface to apply for the BOTANIST role, and administrators have no queue to evaluate, approve, or reject contributor applications with feedback.
+**Fix:** Created `RoleApplication` Mongoose schema and `roleApplications.service.ts`. Built `/dashboard/become-contributor` for USER roles with validation (min 50 chars motivation, qualifications, max 3 links, 1-pending limit) and added application review tabs to the moderation queue with applicant stats, approve (auto-upgrades role to BOTANIST and revokes tokens), and reject (mandatory feedback) workflows.
 
 ---
 
 ## BUG-036 Admin child routes lack per-route role guards
-**Status:** OPEN
+**Status:** FIXED (Admin Dashboard Part A)
 **Description:** Admin sub-routes in the dashboard rely solely on parent navigation and lack dedicated per-route role guards (`RequireRole`), which can allow unauthorized role elevation if routes are accessed directly.
+**Fix:** Wrapped every admin sub-route in `App.tsx` with `<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard">`, redirecting any unauthorized access attempts back to `/dashboard` accompanied by a clear error toast.
+
+---
+
+## BUG-044 Moderation Queue shows a pending count but does not list the pending items
+**Status:** FIXED (Admin Part A Regression Fixes)
+**Description:** Moderation Queue showed a pending count in the summary and sidebar badge, but the list of pending items was empty while submitted items appeared in Content Management.
+**Root Cause:**
+1. In `admin.controller.ts`, `moderationService.listQueue(req.query as any)` passed the entire `req.query` object as parameter 1 (`type`). `normalizeType` treated the query object as `'remedy'`, querying remedies (count 0) instead of plants.
+2. In `moderation.service.ts`, mapping logic checked `if (type === 'plant')` instead of normalized `targetType === 'plant'`.
+3. Separate disparate predicates existed across `getSummary()`, `listQueue()`, and `admin.service.ts`.
+4. If an owner record was deleted or null, items were skipped or lacked fallback defaults.
+**Fix:**
+1. Created single shared predicate `getPendingReviewPredicate()` in `moderation.service.ts` used by summary, queue list, dashboard summary, and backfill.
+2. Corrected parameter destructuring in `admin.controller.ts`: `const { type = 'plant', ...filters } = req.query as any;`.
+3. Added fallback owner display values (`Unknown user`, `id: 'unknown'`, `email: ''`) ensuring missing/deleted owners never drop rows.
+4. Created idempotent backfill script `backfillPendingContent.ts` (`npm run backfill:pending`).
+5. Added "Pending review" status chip in Content Management linking to `/dashboard/moderation?type=plant|remedy`.
+6. Verified with invariant test suite `admin-moderation-invariants.test.ts`.
+
+---
+
+## BUG-045 /dashboard/users renders a blank white page
+**Status:** FIXED (Admin Part A Regression Fixes)
+**Description:** Navigating to `/dashboard/users` rendered a blank white page due to an unhandled runtime exception during component rendering.
+**Root Cause:**
+1. In `admin.controller.ts`, `listUsers` returns `sendSuccess(res, result, 200, result.pagination)` where `result` is an object `{ users, items, activeToday, ... }`.
+2. In `frontend/src/features/admin/api/adminApi.ts`, `getAdminUsers` set `items: data || []` where `data` was the raw payload object, not an array.
+3. In `AdminUserManagementPage.tsx`, `users` state was assigned `res.items` (the Object `{ users: [...], items: [...] }`), causing `users.map(...)` to throw `TypeError: users.map is not a function`.
+4. Without an error boundary, React unmounted the entire DOM tree, causing a blank screen.
+**Fix:**
+1. Created shared Zod schemas (`adminUsersResponseSchema` with safe defaults and `.transform()`) in `adminSchemas.ts` for frontend and backend contract validation.
+2. Created shared null-safe formatters in `adminFormatters.ts` (`safeFormatDate`, `safeRole`, `maskEmail`, `safeDisplayName`, `safeAvatarInitial`, `safeCount`).
+3. Updated `adminApi.ts` to safely extract and validate user arrays.
+4. Added graceful error state with Retry button in `AdminUserManagementPage.tsx`.
+5. Added unit tests with edge-case fixtures (null `lastActiveAt`, missing counts, banned user, Google-only user, empty name, 0 users, API failure).
+
+---
+
+## BUG-046 Any page-level exception blanks the entire app
+**Status:** FIXED (Admin Part A Regression Fixes)
+**Description:** When any exception occurred inside a dashboard route or page component, the entire application tree crashed and blanked the browser because there were no error boundaries.
+**Root Cause:** Absence of React error boundaries inside `DashboardLayout` and at the root application level in `App.tsx`.
+**Fix:**
+1. Created `RouteErrorBoundary` component with "Try again" (re-mounts route / resets state), "Go to dashboard" button, route pathname error logging to console, and collapsible error stack view in development mode.
+2. Wrapped the `<Outlet />` inside `DashboardLayout.tsx` with `<RouteErrorBoundary>` so if any page crashes, the top navigation and sidebar stay completely visible and functional.
+3. Wrapped the root tree in `App.tsx` with `<RouteErrorBoundary isRoot>` as a safe fallback.
+4. Added automated unit tests (`RouteErrorBoundary.test.tsx`) asserting navigation/sidebar integrity and fallback rendering.
+5. Added route smoke test (`dashboardSmoke.test.tsx`) iterating all 16 dashboard routes with edge-case fixtures, asserting 0 error boundaries are triggered.
+
+
 
 
 

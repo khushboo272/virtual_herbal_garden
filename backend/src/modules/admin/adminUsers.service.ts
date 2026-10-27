@@ -127,6 +127,8 @@ export class AdminUsersService {
     meta: PaginationMeta;
     items: Record<string, unknown>[];
     pagination: PaginationMeta;
+    activeToday?: number;
+    activeThisWeek?: number;
   }> {
     const page = Math.max(1, Number(params.page) || 1);
     const limit = Math.max(1, Math.min(100, Number(params.limit) || 20));
@@ -182,9 +184,23 @@ export class AdminUsersService {
       };
     });
 
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - 7);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const [activeToday, activeThisWeek] = await Promise.all([
+      User.countDocuments({ lastActiveAt: { $gte: startOfToday } }),
+      User.countDocuments({ lastActiveAt: { $gte: startOfWeek } }),
+    ]);
+
     return {
       users: formattedUsers,
       items: formattedUsers,
+      activeToday,
+      activeThisWeek,
       meta: {
         page,
         limit,
