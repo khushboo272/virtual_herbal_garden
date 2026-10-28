@@ -125,11 +125,20 @@ export interface ContentItem {
   title?: string;
   scientificName?: string;
   family?: string;
+  plantType?: string | null;
   slug: string;
   status: string;
   isPublished: boolean;
   isFeatured: boolean;
   images?: Array<{ url: string; isPrimary?: boolean }>;
+  image?: string;
+  coverImage?: string;
+  coverImageUrl?: string;
+  difficulty?: string;
+  difficultyLevel?: string;
+  preparationTime?: number;
+  prepTimeMinutes?: number;
+  tags?: string[];
   owner?: {
     _id: string;
     displayName?: string;
@@ -144,6 +153,7 @@ export interface ContentItem {
   };
   updatedAt: string;
   createdAt: string;
+  [key: string]: any;
 }
 
 export interface ContentImpact {

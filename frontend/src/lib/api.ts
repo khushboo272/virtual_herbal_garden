@@ -134,7 +134,13 @@ export const api = {
   ) => {
     const searchParams = new URLSearchParams();
     if (params) {
-      Object.entries(params).forEach(([key, value]) => {
+      // Support both direct params { featured: true } and axios-style { params: { featured: true } }
+      const actualParams =
+        (params as any).params && typeof (params as any).params === 'object' && !Array.isArray((params as any).params)
+          ? (params as any).params
+          : params;
+
+      Object.entries(actualParams).forEach(([key, value]) => {
         if (value !== undefined && value !== '') {
           searchParams.append(key, String(value));
         }

@@ -5,8 +5,10 @@ export const updateUserRoleSchema = z.object({
 });
 
 export const banUserSchema = z.object({
-  isActive: z.boolean(),
+  isActive: z.boolean().optional(),
+  ban: z.boolean().optional(),
   banReason: z.string().max(500).optional(),
+  bannedUntil: z.string().nullable().optional(),
 });
 
 export const broadcastNotificationSchema = z.object({

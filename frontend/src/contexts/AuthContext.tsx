@@ -55,10 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.debug('[Auth] refreshUser failed:', err?.status, err?.message);
       setUser(null);
       import('../lib/socket').then(({ disconnectSocket }) => disconnectSocket());
-      // Only clear tokens on explicit 401 (token truly invalid)
-      // Don't clear on network errors (503, 500, etc.) — server may be temporarily down
-      if (err?.status === 401) {
+      // Clear tokens on 401 or 403 (suspended/banned)
+      if (err?.status === 401 || err?.status === 403 || err?.code === 'ACCOUNT_SUSPENDED') {
         clearTokens();
+        if (err?.code === 'ACCOUNT_SUSPENDED' || err?.message?.toLowerCase().includes('suspended') || err?.message?.toLowerCase().includes('banned')) {
+          import('sonner').then(({ toast }) => {
+            toast.error(err?.message || 'Your account has been suspended by an administrator.');
+          });
+        }
       }
     }
   }, []);

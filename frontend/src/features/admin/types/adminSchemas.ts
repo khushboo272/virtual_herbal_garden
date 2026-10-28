@@ -108,36 +108,47 @@ export const moderationQueueResponseSchema = z.object({
   pagination: paginationDataSchema.default({ total: 0, page: 1, limit: 20, totalPages: 1 }),
 });
 
-export const contentItemSchema = z.object({
-  _id: z.string(),
-  commonName: z.string().optional(),
-  title: z.string().optional(),
-  scientificName: z.string().optional(),
-  family: z.string().optional(),
-  slug: z.string().default(''),
-  status: z.string().default('PUBLISHED'),
-  isPublished: z.boolean().default(true),
-  isFeatured: z.boolean().default(false),
-  images: z.array(z.object({ url: z.string(), isPrimary: z.boolean().optional() })).optional().default([]),
-  owner: z
-    .object({
-      _id: z.string().optional(),
-      displayName: z.string().optional(),
-      name: z.string().optional(),
-      email: z.string().optional(),
-    })
-    .optional(),
-  createdBy: z
-    .object({
-      _id: z.string().optional(),
-      displayName: z.string().optional(),
-      name: z.string().optional(),
-      email: z.string().optional(),
-    })
-    .optional(),
-  updatedAt: z.string().default(''),
-  createdAt: z.string().default(''),
-});
+export const contentItemSchema = z
+  .object({
+    _id: z.string(),
+    commonName: z.string().optional(),
+    title: z.string().optional(),
+    scientificName: z.string().optional(),
+    family: z.string().optional(),
+    plantType: z.string().nullish(),
+    slug: z.string().default(''),
+    status: z.string().default('PUBLISHED'),
+    isPublished: z.boolean().default(true),
+    isFeatured: z.boolean().default(false),
+    image: z.string().nullish(),
+    coverImage: z.string().nullish(),
+    coverImageUrl: z.string().nullish(),
+    difficulty: z.string().nullish(),
+    difficultyLevel: z.string().nullish(),
+    preparationTime: z.number().nullish(),
+    prepTimeMinutes: z.number().nullish(),
+    tags: z.array(z.string()).nullish(),
+    images: z.array(z.object({ url: z.string(), isPrimary: z.boolean().optional() })).optional().default([]),
+    owner: z
+      .object({
+        _id: z.string().optional(),
+        displayName: z.string().optional(),
+        name: z.string().optional(),
+        email: z.string().optional(),
+      })
+      .optional(),
+    createdBy: z
+      .object({
+        _id: z.string().optional(),
+        displayName: z.string().optional(),
+        name: z.string().optional(),
+        email: z.string().optional(),
+      })
+      .optional(),
+    updatedAt: z.string().default(''),
+    createdAt: z.string().default(''),
+  })
+  .passthrough();
 
 export const contentListResponseSchema = z.object({
   items: z.array(contentItemSchema).default([]),

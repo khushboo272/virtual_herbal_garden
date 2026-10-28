@@ -52,10 +52,11 @@ export class AdminController {
   }
 
   async banUser(req: Request, res: Response) {
-    const { isActive, banReason, bannedUntil } = req.body;
+    const { isActive, ban, banReason, bannedUntil } = req.body;
+    const shouldBan = ban !== undefined ? Boolean(ban) : (isActive !== undefined ? !isActive : true);
     const user = await adminUsersService.banUser(
       req.params.id,
-      isActive,
+      shouldBan,
       banReason,
       bannedUntil ? new Date(bannedUntil) : undefined,
       req.user,

@@ -206,6 +206,24 @@ export function AdminUserManagementPage() {
     }
   };
 
+  // Direct Reinstate for already suspended users
+  const handleReinstate = async (u: AdminUserListItem) => {
+    try {
+      setIsProcessing(true);
+      await banUser(u.id || u._id, {
+        isActive: true,
+        banReason: undefined,
+        bannedUntil: null,
+      });
+      toast.success(`Account reinstated for ${u.displayName}`);
+      loadUsers(pagination.page);
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to reinstate user');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   // Force Logout
   const handleForceLogout = async (u: AdminUserListItem) => {
     if (!window.confirm(`Force log out all active sessions for ${u.displayName}?`)) return;
@@ -424,7 +442,7 @@ export function AdminUserManagementPage() {
                                 size="sm"
                                 className="h-8 px-2 text-green-700 hover:text-green-800 hover:bg-green-50"
                                 title="Reinstate User"
-                                onClick={() => handleConfirmBan(false)}
+                                onClick={() => handleReinstate(u)}
                               >
                                 <Unlock className="w-3.5 h-3.5" />
                               </Button>

@@ -53,7 +53,7 @@ export async function getModerationQueue(params: {
   page?: number;
   limit?: number;
 }): Promise<{ items: ModerationQueueItem[]; pagination: PaginationData }> {
-  const res = await api.get('/admin/moderation', { params });
+  const res = await api.get('/admin/moderation', params);
   const raw = res.data;
   const dataObj = raw?.data !== undefined ? raw.data : raw;
   const rawItems = Array.isArray(dataObj)
@@ -129,7 +129,7 @@ export async function getContentList(
     limit?: number;
   } = {},
 ): Promise<{ items: ContentItem[]; pagination: PaginationData }> {
-  const res = await api.get(`/admin/content/${type}`, { params });
+  const res = await api.get(`/admin/content/${type}`, params);
   const raw = res.data;
   const dataObj = raw?.data !== undefined ? raw.data : raw;
   const rawItems = Array.isArray(dataObj)
@@ -210,7 +210,7 @@ export async function getAdminUsers(params: {
   page?: number;
   limit?: number;
 } = {}): Promise<{ items: AdminUserListItem[]; pagination: PaginationData; activeToday?: number; activeThisWeek?: number }> {
-  const res = await api.get('/admin/users', { params });
+  const res = await api.get('/admin/users', params);
   const raw = res.data;
   const dataObj = raw?.data !== undefined ? raw.data : raw;
 
@@ -283,7 +283,7 @@ export async function getRoleApplications(params: {
   page?: number;
   limit?: number;
 } = {}): Promise<{ items: RoleApplicationItem[]; pagination: PaginationData }> {
-  const res = await api.get('/admin/role-applications', { params });
+  const res = await api.get('/admin/role-applications', params);
   const raw = res.data;
   const dataObj = raw?.data !== undefined ? raw.data : raw;
   const rawItems = Array.isArray(dataObj)

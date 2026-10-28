@@ -7,6 +7,7 @@ import Bookmark from '../users/Bookmark.model';
 import { BookmarkEntityType, ContentStatus } from '../../types';
 import { AppError } from '../../core/errors/AppError';
 import { writeAuditLog } from '../../core/utils/auditLogger';
+import { invalidateHomeCache } from '../home/home.service';
 
 export interface ContentQueryFilters {
   status?: string;
@@ -36,7 +37,13 @@ export class AdminContentService {
     const query: any = { isDeleted: { $ne: true } };
 
     if (filters.status && filters.status !== 'ALL') {
-      query.status = filters.status;
+      if (filters.status === 'PUBLISHED') {
+        query.$or = [{ status: 'PUBLISHED' }, { isPublished: true }];
+      } else if (filters.status === 'DRAFT') {
+        query.$or = [{ status: 'DRAFT' }, { isPublished: false }];
+      } else {
+        query.status = filters.status;
+      }
     }
 
     if (filters.owner && Types.ObjectId.isValid(filters.owner)) {
@@ -44,7 +51,8 @@ export class AdminContentService {
     }
 
     if (filters.featured !== undefined && filters.featured !== '') {
-      query.isFeatured = filters.featured === true || filters.featured === 'true';
+      const isFeat = filters.featured === true || filters.featured === 'true';
+      query.isFeatured = isFeat ? true : { $ne: true };
     }
 
     if (filters.q && filters.q.trim()) {
@@ -138,6 +146,8 @@ export class AdminContentService {
       req,
     });
 
+    invalidateHomeCache();
+
     return item;
   }
 
@@ -171,27 +181,32 @@ export class AdminContentService {
       req,
     });
 
+    invalidateHomeCache();
+
     return item;
   }
 
   /**
    * Toggle featured status
    */
-  async toggleFeature(type: 'plants' | 'remedies', id: string, adminUser: any, req?: any) {
+  async toggleFeature(type: 'plants' | 'remedies' | string, id: string, adminUser: any, req?: any) {
     if (!Types.ObjectId.isValid(id)) throw new AppError('Invalid ID', 400);
 
-    const Model = type === 'plants' ? Plant : (Remedy as any);
+    const targetType = normalizeContentType(type);
+    const Model = targetType === 'plants' ? Plant : (Remedy as any);
     const item = await Model.findOne({ _id: id, isDeleted: { $ne: true } });
-    if (!item) throw new AppError(`${type === 'plants' ? 'Plant' : 'Remedy'} not found`, 404);
+    if (!item) throw new AppError(`${targetType === 'plants' ? 'Plant' : 'Remedy'} not found`, 404);
 
     const prevFeatured = !!item.isFeatured;
     item.isFeatured = !prevFeatured;
     await item.save();
 
+    invalidateHomeCache();
+
     await writeAuditLog({
       actor: adminUser._id,
       action: item.isFeatured ? 'CONTENT_FEATURED' : 'CONTENT_UNFEATURED',
-      targetModel: type === 'plants' ? 'Plant' : 'Remedy',
+      targetModel: targetType === 'plants' ? 'Plant' : 'Remedy',
       targetId: item._id,
       details: {
         slug: item.slug,

@@ -205,6 +205,29 @@ describe('Admin Dashboard Part A Tests', () => {
         .set('Authorization', `Bearer ${userToken}`);
       expect(res.status).toBe(403);
     });
+
+    it('suspends user via PATCH /admin/users/:id/ban when sending isActive: false', async () => {
+      const res = await request(app)
+        .patch(`/api/v1/admin/users/${regularUser._id}/ban`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          isActive: false,
+          banReason: 'Violation of garden guidelines',
+        });
+      expect(res.status).toBe(200);
+
+      const target = await User.findById(regularUser._id);
+      expect(target?.isActive).toBe(false);
+      expect(target?.banReason).toBe('Violation of garden guidelines');
+
+      // Verify list endpoint returns isBanned true and isActive false
+      const listRes = await request(app)
+        .get('/api/v1/admin/users')
+        .set('Authorization', `Bearer ${adminToken}`);
+      const listed = listRes.body.data.users.find((u: any) => u.id === regularUser._id.toString());
+      expect(listed?.isActive).toBe(false);
+      expect(listed?.isBanned).toBe(true);
+    });
   });
 
   // ── 3. lastActiveAt Throttling & Active Users ──
@@ -404,6 +427,38 @@ describe('Admin Dashboard Part A Tests', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({ ids: dummyIds });
       expect(res.status).toBe(400);
+    });
+
+    it('toggles featured status for plants and remedies via admin content endpoint', async () => {
+      const plant = await Plant.create({
+        commonName: 'Ashwagandha Specimen',
+        scientificName: 'Withania somnifera test',
+        slug: `ashwa-test-${Date.now()}`,
+        family: 'Solanaceae',
+        description: 'Test herb.',
+        plantType: 'HERB',
+        status: ContentStatus.PUBLISHED,
+        isPublished: true,
+        isFeatured: false,
+        createdBy: botanistUser._id,
+      });
+
+      // Toggle plant feature: false -> true
+      const featRes = await request(app)
+        .post(`/api/v1/admin/content/plants/${plant._id}/toggle-feature`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(featRes.status).toBe(200);
+      expect(featRes.body.data.isFeatured).toBe(true);
+
+      const dbPlant = await Plant.findById(plant._id);
+      expect(dbPlant?.isFeatured).toBe(true);
+
+      // Toggle back: true -> false
+      const unfeatRes = await request(app)
+        .post(`/api/v1/admin/content/plants/${plant._id}/toggle-feature`)
+        .set('Authorization', `Bearer ${adminToken}`);
+      expect(unfeatRes.status).toBe(200);
+      expect(unfeatRes.body.data.isFeatured).toBe(false);
     });
   });
 

@@ -356,6 +356,20 @@ export class AdminUsersService {
       '/dashboard',
     );
 
+    // Real-time socket notification for instant client-side logout/toast
+    try {
+      const { getIO } = await import('../../core/socket');
+      const io = getIO();
+      if (ban) {
+        io.to(`user:${targetUser._id.toString()}`).emit('account:suspended', {
+          reason: targetUser.banReason,
+          bannedUntil: targetUser.bannedUntil,
+        });
+      } else {
+        io.to(`user:${targetUser._id.toString()}`).emit('account:reinstated', {});
+      }
+    } catch {}
+
     return targetUser;
   }
 

@@ -32,6 +32,17 @@ const getNotificationIcon = (type: NotificationType): ReactNode => {
   }
 };
 
+function safeFormatTimeAgo(dateInput?: string | Date | null): string {
+  if (!dateInput) return 'just now';
+  try {
+    const d = new Date(dateInput);
+    if (isNaN(d.getTime())) return 'just now';
+    return formatDistanceToNow(d, { addSuffix: true });
+  } catch {
+    return 'just now';
+  }
+}
+
 export function NotificationPanel() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, loading } = useNotifications();
 
@@ -91,7 +102,7 @@ export function NotificationPanel() {
                     </p>
                     <p className="text-sm text-gray-500 mb-2">{notification.body}</p>
                     <p className="text-xs text-gray-400">
-                      {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                      {safeFormatTimeAgo(notification.createdAt)}
                     </p>
                   </div>
                   {!notification.isRead && (

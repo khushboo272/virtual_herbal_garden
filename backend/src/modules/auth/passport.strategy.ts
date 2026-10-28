@@ -57,6 +57,11 @@ passport.use(
         let user = await User.findOne({ email });
 
         if (user) {
+          if (!user.isActive || (user.bannedUntil && new Date(user.bannedUntil) > new Date())) {
+            const reason = user.banReason ? `: ${user.banReason}` : '';
+            return done(new AppError(`Account is suspended${reason}`, 403, 'ACCOUNT_SUSPENDED'), undefined);
+          }
+
           // Update existing user's OAuth account if not already linked
           const hasGoogleAccount = user.oauthAccounts.some(
             (acc) => acc.provider === 'google' && acc.providerUserId === profile.id,

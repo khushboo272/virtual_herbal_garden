@@ -25,6 +25,56 @@ import type { ContentItem } from '../types/admin.types';
 import type { TourAdminListItem } from '../../tours/types/tour.types';
 import { toast } from 'sonner';
 
+function getPlantTitle(plant: ContentItem): string {
+  return plant.commonName || plant.title || 'Untitled Plant';
+}
+
+function getPlantSubtitle(plant: ContentItem): string {
+  return plant.scientificName || plant.family || plant.subtitle || '';
+}
+
+function getPlantImage(plant: ContentItem): string | null {
+  if (plant.coverImage) return plant.coverImage;
+  if (plant.coverImageUrl) return plant.coverImageUrl;
+  if (plant.images && plant.images.length > 0) {
+    const primary = plant.images.find((img) => img.isPrimary);
+    return primary?.url || plant.images[0].url;
+  }
+  if (plant.image && typeof plant.image === 'string') return plant.image;
+  return null;
+}
+
+function getRemedyTitle(remedy: ContentItem): string {
+  return remedy.title || remedy.commonName || 'Untitled Remedy';
+}
+
+function getRemedySubtitle(remedy: ContentItem): string {
+  if (remedy.subtitle) return remedy.subtitle;
+  const parts: string[] = [];
+  if (remedy.difficulty || remedy.difficultyLevel) {
+    parts.push(remedy.difficulty || remedy.difficultyLevel);
+  }
+  if (remedy.prepTimeMinutes || remedy.preparationTime) {
+    parts.push(`${remedy.prepTimeMinutes || remedy.preparationTime} mins`);
+  }
+  if (parts.length > 0) return parts.join(' • ');
+  if (remedy.tags && remedy.tags.length > 0) {
+    return remedy.tags.slice(0, 2).join(', ');
+  }
+  return '';
+}
+
+function getRemedyImage(remedy: ContentItem): string | null {
+  if (remedy.coverImage) return remedy.coverImage;
+  if (remedy.coverImageUrl) return remedy.coverImageUrl;
+  if (remedy.image && typeof remedy.image === 'string') return remedy.image;
+  if (remedy.images && remedy.images.length > 0) {
+    const primary = remedy.images.find((img) => img.isPrimary);
+    return primary?.url || remedy.images[0].url;
+  }
+  return null;
+}
+
 export function FeaturedContentPage() {
   const [activeTab, setActiveTab] = useState<'plants' | 'remedies' | 'tours'>('plants');
 
@@ -54,17 +104,19 @@ export function FeaturedContentPage() {
       setLoadingPlants(true);
       // Fetch featured plants
       const featRes = await getContentList('plants', { featured: true, limit: 50 });
-      setFeaturedPlants(featRes.items);
+      const actuallyFeatured = (featRes.items || []).filter((i) => i.isFeatured);
+      setFeaturedPlants(actuallyFeatured);
 
       // Fetch published candidates for search/picker
       const candRes = await getContentList('plants', {
         status: 'PUBLISHED',
+        featured: false,
         q: plantSearch.trim(),
-        limit: 20,
+        limit: 50,
       });
       // Filter out those already featured
-      const featIds = new Set(featRes.items.map((i) => i._id));
-      setCandidatePlants(candRes.items.filter((i) => !featIds.has(i._id)));
+      const featIds = new Set(actuallyFeatured.map((i) => i._id));
+      setCandidatePlants((candRes.items || []).filter((i) => !featIds.has(i._id) && !i.isFeatured));
     } catch (err: any) {
       toast.error(err?.message || 'Failed to load plants.');
     } finally {
@@ -78,16 +130,18 @@ export function FeaturedContentPage() {
       setLoadingRemedies(true);
       // Fetch featured remedies
       const featRes = await getContentList('remedies', { featured: true, limit: 50 });
-      setFeaturedRemedies(featRes.items);
+      const actuallyFeatured = (featRes.items || []).filter((i) => i.isFeatured);
+      setFeaturedRemedies(actuallyFeatured);
 
       // Fetch published candidates for search/picker
       const candRes = await getContentList('remedies', {
         status: 'PUBLISHED',
+        featured: false,
         q: remedySearch.trim(),
-        limit: 20,
+        limit: 50,
       });
-      const featIds = new Set(featRes.items.map((i) => i._id));
-      setCandidateRemedies(candRes.items.filter((i) => !featIds.has(i._id)));
+      const featIds = new Set(actuallyFeatured.map((i) => i._id));
+      setCandidateRemedies((candRes.items || []).filter((i) => !featIds.has(i._id) && !i.isFeatured));
     } catch (err: any) {
       toast.error(err?.message || 'Failed to load remedies.');
     } finally {
@@ -136,15 +190,35 @@ export function FeaturedContentPage() {
   // Toggle Plant Feature
   const handleTogglePlant = async (plant: ContentItem) => {
     setActionLoadingId(plant._id);
+    const plantTitle = getPlantTitle(plant);
+    const wasFeatured = !!plant.isFeatured;
+
+    // Optimistic UI update
+    if (wasFeatured) {
+      setFeaturedPlants((prev) => prev.filter((p) => p._id !== plant._id));
+      setCandidatePlants((prev) => [{ ...plant, isFeatured: false }, ...prev.filter((p) => p._id !== plant._id)]);
+    } else {
+      setCandidatePlants((prev) => prev.filter((p) => p._id !== plant._id));
+      setFeaturedPlants((prev) => [{ ...plant, isFeatured: true }, ...prev.filter((p) => p._id !== plant._id)]);
+    }
+
     try {
       await toggleFeatureContent('plants', plant._id);
       toast.success(
-        plant.isFeatured
-          ? `Removed "${plant.title}" from Featured Plants`
-          : `Featured "${plant.title}" on Homepage!`,
+        wasFeatured
+          ? `Removed "${plantTitle}" from Featured Plants`
+          : `Featured "${plantTitle}" on Homepage!`,
       );
       await loadPlants();
     } catch (err: any) {
+      // Revert optimistic update on failure
+      if (wasFeatured) {
+        setFeaturedPlants((prev) => [{ ...plant, isFeatured: true }, ...prev.filter((p) => p._id !== plant._id)]);
+        setCandidatePlants((prev) => prev.filter((p) => p._id !== plant._id));
+      } else {
+        setCandidatePlants((prev) => [{ ...plant, isFeatured: false }, ...prev.filter((p) => p._id !== plant._id)]);
+        setFeaturedPlants((prev) => prev.filter((p) => p._id !== plant._id));
+      }
       toast.error(err?.message || 'Failed to update featured plant.');
     } finally {
       setActionLoadingId(null);
@@ -154,15 +228,35 @@ export function FeaturedContentPage() {
   // Toggle Remedy Feature
   const handleToggleRemedy = async (remedy: ContentItem) => {
     setActionLoadingId(remedy._id);
+    const remedyTitle = getRemedyTitle(remedy);
+    const wasFeatured = !!remedy.isFeatured;
+
+    // Optimistic UI update
+    if (wasFeatured) {
+      setFeaturedRemedies((prev) => prev.filter((r) => r._id !== remedy._id));
+      setCandidateRemedies((prev) => [{ ...remedy, isFeatured: false }, ...prev.filter((r) => r._id !== remedy._id)]);
+    } else {
+      setCandidateRemedies((prev) => prev.filter((r) => r._id !== remedy._id));
+      setFeaturedRemedies((prev) => [{ ...remedy, isFeatured: true }, ...prev.filter((r) => r._id !== remedy._id)]);
+    }
+
     try {
       await toggleFeatureContent('remedies', remedy._id);
       toast.success(
-        remedy.isFeatured
-          ? `Removed "${remedy.title}" from Featured Remedies`
-          : `Featured "${remedy.title}" on Homepage!`,
+        wasFeatured
+          ? `Removed "${remedyTitle}" from Featured Remedies`
+          : `Featured "${remedyTitle}" on Homepage!`,
       );
       await loadRemedies();
     } catch (err: any) {
+      // Revert optimistic update on failure
+      if (wasFeatured) {
+        setFeaturedRemedies((prev) => [{ ...remedy, isFeatured: true }, ...prev.filter((r) => r._id !== remedy._id)]);
+        setCandidateRemedies((prev) => prev.filter((r) => r._id !== remedy._id));
+      } else {
+        setCandidateRemedies((prev) => [{ ...remedy, isFeatured: false }, ...prev.filter((r) => r._id !== remedy._id)]);
+        setFeaturedRemedies((prev) => prev.filter((r) => r._id !== remedy._id));
+      }
       toast.error(err?.message || 'Failed to update featured remedy.');
     } finally {
       setActionLoadingId(null);
@@ -287,15 +381,27 @@ export function FeaturedContentPage() {
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={(val: any) => setActiveTab(val)} className="space-y-6">
         <TabsList className="bg-slate-100 p-1">
-          <TabsTrigger value="plants" className="px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-emerald-800">
+          <TabsTrigger
+            value="plants"
+            onClick={() => setActiveTab('plants')}
+            className="px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-emerald-800"
+          >
             <Leaf className="w-4 h-4 mr-2" />
             Featured Plants ({featuredPlants.length})
           </TabsTrigger>
-          <TabsTrigger value="remedies" className="px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-purple-800">
+          <TabsTrigger
+            value="remedies"
+            onClick={() => setActiveTab('remedies')}
+            className="px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-purple-800"
+          >
             <FileText className="w-4 h-4 mr-2" />
             Featured Remedies ({featuredRemedies.length})
           </TabsTrigger>
-          <TabsTrigger value="tours" className="px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-blue-800">
+          <TabsTrigger
+            value="tours"
+            onClick={() => setActiveTab('tours')}
+            className="px-4 py-2 data-[state=active]:bg-white data-[state=active]:text-blue-800"
+          >
             <Compass className="w-4 h-4 mr-2" />
             Featured Tours ({featuredTours.length})
           </TabsTrigger>
@@ -327,57 +433,68 @@ export function FeaturedContentPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {featuredPlants.map((plant) => (
-                    <div
-                      key={plant._id}
-                      className="border border-emerald-200 rounded-xl p-3 bg-white shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-16 h-16 rounded-lg bg-emerald-50 border border-emerald-100 overflow-hidden shrink-0 flex items-center justify-center">
-                          {plant.coverImage ? (
-                            <img src={plant.coverImage} alt={plant.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <Leaf className="w-8 h-8 text-emerald-400" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <Badge className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0 border-amber-200">
-                              ★ Featured
-                            </Badge>
-                            {plant.isPublished && (
-                              <Badge className="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0">Published</Badge>
+                  {featuredPlants.map((plant) => {
+                    const imgUrl = getPlantImage(plant);
+                    const title = getPlantTitle(plant);
+                    const subtitle = getPlantSubtitle(plant);
+
+                    return (
+                      <div
+                        key={plant._id}
+                        className="border border-emerald-200 rounded-xl p-3 bg-white shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-16 h-16 rounded-lg bg-emerald-50 border border-emerald-100 overflow-hidden shrink-0 flex items-center justify-center">
+                            {imgUrl ? (
+                              <img src={imgUrl} alt={title} className="w-full h-full object-cover" />
+                            ) : (
+                              <Leaf className="w-8 h-8 text-emerald-400" />
                             )}
                           </div>
-                          <h4 className="font-semibold text-slate-900 text-sm mt-1 truncate">{plant.title}</h4>
-                          {plant.subtitle && (
-                            <p className="text-xs italic text-slate-500 truncate">{plant.subtitle}</p>
-                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Badge className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0 border-amber-200">
+                                ★ Featured
+                              </Badge>
+                              {plant.isPublished && (
+                                <Badge className="bg-emerald-100 text-emerald-800 text-[10px] px-1.5 py-0">Published</Badge>
+                              )}
+                              {plant.family && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-slate-200 text-slate-600">
+                                  {plant.family}
+                                </Badge>
+                              )}
+                            </div>
+                            <h4 className="font-semibold text-slate-900 text-sm mt-1 truncate">{title}</h4>
+                            {subtitle && (
+                              <p className="text-xs italic text-slate-500 truncate">{subtitle}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-100 text-xs">
+                          <Link
+                            to={`/plant/${plant.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-slate-600 hover:text-emerald-700 font-medium flex items-center gap-1"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> View
+                          </Link>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleTogglePlant(plant)}
+                            disabled={actionLoadingId === plant._id}
+                            className="text-rose-700 border-rose-200 hover:bg-rose-50 text-xs h-7 px-2.5"
+                          >
+                            <X className="w-3.5 h-3.5 mr-1" />
+                            Remove
+                          </Button>
                         </div>
                       </div>
-
-                      <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-100 text-xs">
-                        <Link
-                          to={`/plant/${plant.slug}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-slate-600 hover:text-emerald-700 font-medium flex items-center gap-1"
-                        >
-                          <Eye className="w-3.5 h-3.5" /> View
-                        </Link>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleTogglePlant(plant)}
-                          disabled={actionLoadingId === plant._id}
-                          className="text-rose-700 border-rose-200 hover:bg-rose-50 text-xs h-7 px-2.5"
-                        >
-                          <X className="w-3.5 h-3.5 mr-1" />
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -409,26 +526,41 @@ export function FeaturedContentPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {candidatePlants.map((plant) => (
-                    <div
-                      key={plant._id}
-                      className="border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 bg-slate-50/50 hover:bg-white hover:border-slate-300 transition-all"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-slate-900 text-xs truncate">{plant.title}</p>
-                        {plant.subtitle && <p className="text-[11px] text-slate-400 italic truncate">{plant.subtitle}</p>}
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handleTogglePlant(plant)}
-                        disabled={actionLoadingId === plant._id}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 px-2.5 shrink-0"
+                  {candidatePlants.map((plant) => {
+                    const imgUrl = getPlantImage(plant);
+                    const title = getPlantTitle(plant);
+                    const subtitle = getPlantSubtitle(plant);
+
+                    return (
+                      <div
+                        key={plant._id}
+                        className="border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 bg-slate-50/50 hover:bg-white hover:border-slate-300 transition-all"
                       >
-                        <Plus className="w-3.5 h-3.5 mr-1" />
-                        Feature
-                      </Button>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-100 overflow-hidden shrink-0 flex items-center justify-center">
+                            {imgUrl ? (
+                              <img src={imgUrl} alt={title} className="w-full h-full object-cover" />
+                            ) : (
+                              <Leaf className="w-5 h-5 text-emerald-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-slate-900 text-xs truncate">{title}</p>
+                            {subtitle && <p className="text-[11px] text-slate-400 italic truncate">{subtitle}</p>}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleTogglePlant(plant)}
+                          disabled={actionLoadingId === plant._id}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 px-2.5 shrink-0"
+                        >
+                          <Plus className="w-3.5 h-3.5 mr-1" />
+                          Feature
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -461,57 +593,68 @@ export function FeaturedContentPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {featuredRemedies.map((remedy) => (
-                    <div
-                      key={remedy._id}
-                      className="border border-purple-200 rounded-xl p-3 bg-white shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-16 h-16 rounded-lg bg-purple-50 border border-purple-100 overflow-hidden shrink-0 flex items-center justify-center">
-                          {remedy.coverImage ? (
-                            <img src={remedy.coverImage} alt={remedy.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <FileText className="w-8 h-8 text-purple-400" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <Badge className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0 border-amber-200">
-                              ★ Featured
-                            </Badge>
-                            {remedy.isPublished && (
-                              <Badge className="bg-purple-100 text-purple-800 text-[10px] px-1.5 py-0">Published</Badge>
+                  {featuredRemedies.map((remedy) => {
+                    const imgUrl = getRemedyImage(remedy);
+                    const title = getRemedyTitle(remedy);
+                    const subtitle = getRemedySubtitle(remedy);
+
+                    return (
+                      <div
+                        key={remedy._id}
+                        className="border border-purple-200 rounded-xl p-3 bg-white shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="w-16 h-16 rounded-lg bg-purple-50 border border-purple-100 overflow-hidden shrink-0 flex items-center justify-center">
+                            {imgUrl ? (
+                              <img src={imgUrl} alt={title} className="w-full h-full object-cover" />
+                            ) : (
+                              <FileText className="w-8 h-8 text-purple-400" />
                             )}
                           </div>
-                          <h4 className="font-semibold text-slate-900 text-sm mt-1 truncate">{remedy.title}</h4>
-                          {remedy.subtitle && (
-                            <p className="text-xs text-slate-500 truncate">{remedy.subtitle}</p>
-                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Badge className="bg-amber-100 text-amber-800 text-[10px] px-1.5 py-0 border-amber-200">
+                                ★ Featured
+                              </Badge>
+                              {remedy.isPublished && (
+                                <Badge className="bg-purple-100 text-purple-800 text-[10px] px-1.5 py-0">Published</Badge>
+                              )}
+                              {remedy.difficulty && (
+                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-slate-200 text-slate-600">
+                                  {remedy.difficulty}
+                                </Badge>
+                              )}
+                            </div>
+                            <h4 className="font-semibold text-slate-900 text-sm mt-1 truncate">{title}</h4>
+                            {subtitle && (
+                              <p className="text-xs text-slate-500 truncate">{subtitle}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-100 text-xs">
+                          <Link
+                            to={`/remedies/${remedy.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-slate-600 hover:text-purple-700 font-medium flex items-center gap-1"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> View
+                          </Link>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleRemedy(remedy)}
+                            disabled={actionLoadingId === remedy._id}
+                            className="text-rose-700 border-rose-200 hover:bg-rose-50 text-xs h-7 px-2.5"
+                          >
+                            <X className="w-3.5 h-3.5 mr-1" />
+                            Remove
+                          </Button>
                         </div>
                       </div>
-
-                      <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-100 text-xs">
-                        <Link
-                          to={`/remedies/${remedy.slug}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-slate-600 hover:text-purple-700 font-medium flex items-center gap-1"
-                        >
-                          <Eye className="w-3.5 h-3.5" /> View
-                        </Link>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleToggleRemedy(remedy)}
-                          disabled={actionLoadingId === remedy._id}
-                          className="text-rose-700 border-rose-200 hover:bg-rose-50 text-xs h-7 px-2.5"
-                        >
-                          <X className="w-3.5 h-3.5 mr-1" />
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -543,26 +686,41 @@ export function FeaturedContentPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {candidateRemedies.map((remedy) => (
-                    <div
-                      key={remedy._id}
-                      className="border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 bg-slate-50/50 hover:bg-white hover:border-slate-300 transition-all"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-slate-900 text-xs truncate">{remedy.title}</p>
-                        {remedy.subtitle && <p className="text-[11px] text-slate-400 truncate">{remedy.subtitle}</p>}
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => handleToggleRemedy(remedy)}
-                        disabled={actionLoadingId === remedy._id}
-                        className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-7 px-2.5 shrink-0"
+                  {candidateRemedies.map((remedy) => {
+                    const imgUrl = getRemedyImage(remedy);
+                    const title = getRemedyTitle(remedy);
+                    const subtitle = getRemedySubtitle(remedy);
+
+                    return (
+                      <div
+                        key={remedy._id}
+                        className="border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3 bg-slate-50/50 hover:bg-white hover:border-slate-300 transition-all"
                       >
-                        <Plus className="w-3.5 h-3.5 mr-1" />
-                        Feature
-                      </Button>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <div className="w-10 h-10 rounded-lg bg-purple-50 border border-purple-100 overflow-hidden shrink-0 flex items-center justify-center">
+                            {imgUrl ? (
+                              <img src={imgUrl} alt={title} className="w-full h-full object-cover" />
+                            ) : (
+                              <FileText className="w-5 h-5 text-purple-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-slate-900 text-xs truncate">{title}</p>
+                            {subtitle && <p className="text-[11px] text-slate-400 truncate">{subtitle}</p>}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => handleToggleRemedy(remedy)}
+                          disabled={actionLoadingId === remedy._id}
+                          className="bg-purple-600 hover:bg-purple-700 text-white text-xs h-7 px-2.5 shrink-0"
+                        >
+                          <Plus className="w-3.5 h-3.5 mr-1" />
+                          Feature
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

@@ -1146,18 +1146,28 @@ export const tourService = new TourService();
  * Standalone export so the home service stays decoupled.
  */
 export async function getFeaturedTours(limit = 3): Promise<any[]> {
-  const tours = await Tour.find({
+  const baseFilter = {
     isPublished: true,
     isDeleted: false,
     $or: [
       { 'checkpoints.0': { $exists: true } },
       { 'stops.0': { $exists: true } },
     ],
-  })
-    .sort({ isFeatured: -1, createdAt: -1 })
+  };
+
+  let tours = await Tour.find({ ...baseFilter, isFeatured: true })
+    .sort({ updatedAt: -1, createdAt: -1 })
     .select('title slug description summary difficulty level estimatedDuration estimatedMinutes coverImage coverImageUrl checkpoints stops')
     .limit(limit)
     .lean();
+
+  if (tours.length === 0) {
+    tours = await Tour.find(baseFilter)
+      .sort({ createdAt: -1 })
+      .select('title slug description summary difficulty level estimatedDuration estimatedMinutes coverImage coverImageUrl checkpoints stops')
+      .limit(limit)
+      .lean();
+  }
 
   return tours.map((t: any) => {
     const norm = normalizeTourDoc(t);

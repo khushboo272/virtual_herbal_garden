@@ -308,3 +308,35 @@
 
 
 
+
+---
+
+## BUG-047 Admin user suspension is immediately inverted/unbanned and user remains active
+**Status:** FIXED
+**Description:** When an admin attempted to suspend a user in User Management, the user was immediately unbanned / reinstated, sending an "Account Reinstated" notification, and the user remained "Active" in the admin table.
+**Root Cause:**
+1. In `frontend/src/features/admin/pages/AdminUserManagementPage.tsx`, suspending a user sends `{ isActive: false, banReason, bannedUntil }`.
+2. In `backend/src/modules/admin/admin.controller.ts`, `banUser` passed `req.body.isActive` directly as the `ban: boolean` argument to `adminUsersService.banUser(targetUserId, ban, reason, ...)`.
+3. Because `isActive` was `false`, `adminUsersService.setBanStatus` received `ban = false`.
+4. It executed the `else` branch (unban/reinstate): setting `targetUser.isActive = true`, clearing `banReason`, and sending an "Account Reinstated" notification to the user.
+5. In addition, `banUserSchema` in `admin.validators.ts` omitted `bannedUntil` and `ban`.
+**Fix:**
+1. In `admin.controller.ts`, computed `shouldBan = ban !== undefined ? Boolean(ban) : (isActive !== undefined ? !isActive : true)`.
+2. Updated `banUserSchema` in `admin.validators.ts` to accept `isActive`, `ban`, `banReason`, and `bannedUntil`.
+3. Added direct `handleReinstate(u)` for suspended user rows in `AdminUserManagementPage.tsx`.
+4. Added real-time `account:suspended` and `account:reinstated` socket emissions.
+5. Added integration tests in `backend/tests/admin-dashboard-part-a.test.ts` verifying that suspension via API properly sets `isActive: false`, `isBanned: true`, and preserves the suspension.
+
+---
+
+## BUG-048 NotificationPanel crashes with RangeError: Invalid time value
+**Status:** FIXED
+**Description:** On the user side, navigating or opening notifications threw an unhandled `RangeError: Invalid time value` at `formatDistanceToNow` inside `NotificationPanel.tsx`, triggering an "Application Error" fallback screen instead of showing the real issue.
+**Root Cause:**
+In `frontend/src/app/components/dashboard/NotificationPanel.tsx`, `formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })` was called directly without date validation. If `notification.createdAt` was missing, null, or an unparseable string, date-fns threw `RangeError: Invalid time value`.
+**Fix:**
+1. Created `safeFormatTimeAgo(dateInput)` in `NotificationPanel.tsx` checking for null/undefined, verifying `!isNaN(d.getTime())`, and wrapping `formatDistanceToNow` in `try/catch`.
+2. Added `ACCOUNT_SUSPENDED` handling in `AuthContext.tsx` and `api.ts` to clear tokens and show explicit suspension messages.
+3. Added suspension verification in `GoogleStrategy` so banned users cannot bypass suspension using Google OAuth.
+4. Added custom failure callback in `auth.routes.ts` passing the exact suspension message in the redirect URL.
+5. Added unit test in `NotificationPanel.test.tsx` verifying safe rendering with invalid and missing dates.

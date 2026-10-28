@@ -7,12 +7,14 @@
  */
 import mongoose from 'mongoose';
 import Plant from '../src/modules/library/Plant.model';
+import Remedy from '../src/modules/remedies/Remedy.model';
 import User from '../src/modules/users/User.model';
 import { hashPassword } from '../src/core/utils/hash';
 import {
   buildHomePayload,
   invalidateHomeCache,
 } from '../src/modules/home/home.service';
+import { getFeaturedRemedies } from '../src/modules/remedies/remedy.service';
 import { plantService } from '../src/modules/library/plant.service';
 
 import './setup';
@@ -96,6 +98,79 @@ describe('buildHomePayload()', () => {
     // Should have exactly the number of published plants (up to 6)
     expect(featuredPlants.length).toBeGreaterThanOrEqual(2);
     expect(featuredPlants.length).toBeLessThanOrEqual(6);
+  });
+
+  it('does not include unfeatured plants in featuredPlants when explicit featured plants exist', async () => {
+    invalidateHomeCache();
+    const feat1 = await createPlant({ isFeatured: true, slug: `feat-only-1-${Date.now()}` });
+    const feat2 = await createPlant({ isFeatured: true, slug: `feat-only-2-${Date.now()}` });
+    const unfeat = await createPlant({ isFeatured: false, slug: `unfeat-should-not-show-${Date.now()}` });
+
+    const { featuredPlants } = await buildHomePayload();
+    expect(featuredPlants.map((p) => p.slug)).toEqual(expect.arrayContaining([feat1.slug, feat2.slug]));
+    expect(featuredPlants.map((p) => p.slug)).not.toContain(unfeat.slug);
+    expect(featuredPlants.length).toBe(2);
+  });
+
+  it('does not include unfeatured remedies in featuredRemedies when explicit featured remedies exist', async () => {
+    invalidateHomeCache();
+    const featRem = await Remedy.create({
+      title: 'Only Featured Remedy',
+      slug: `only-feat-rem-${Date.now()}`,
+      description: 'Test featured remedy',
+      dosage: '1 cup',
+      preparationTime: 10,
+      isPublished: true,
+      isFeatured: true,
+      createdBy: userId,
+    });
+    const unfeatRem = await Remedy.create({
+      title: 'Unfeatured Remedy Should Not Show',
+      slug: `unfeat-rem-hide-${Date.now()}`,
+      description: 'Test unfeatured remedy',
+      dosage: '1 cup',
+      preparationTime: 10,
+      isPublished: true,
+      isFeatured: false,
+      createdBy: userId,
+    });
+
+    const { featuredRemedies } = await buildHomePayload();
+    expect(featuredRemedies.map((r) => r.slug)).toContain(featRem.slug);
+    expect(featuredRemedies.map((r) => r.slug)).not.toContain(unfeatRem.slug);
+    expect(featuredRemedies.length).toBe(1);
+  });
+
+  it('featuredRemedies prioritizes remedies flagged with isFeatured: true over newer unfeatured', async () => {
+    // Older featured remedy
+    const featRemedy = await Remedy.create({
+      title: 'Old Featured Remedy',
+      slug: `feat-rem-${Date.now()}`,
+      description: 'Test featured remedy',
+      dosage: '1 cup',
+      preparationTime: 10,
+      isPublished: true,
+      isFeatured: true,
+      createdBy: userId,
+      createdAt: new Date(Date.now() - 100000),
+    });
+
+    // 3 newer unfeatured remedies
+    for (let i = 0; i < 3; i++) {
+      await Remedy.create({
+        title: `Newer Unfeatured Remedy ${i}`,
+        slug: `new-unfeat-rem-${Date.now()}-${i}`,
+        description: 'Test unfeatured remedy',
+        dosage: '1 cup',
+        preparationTime: 10,
+        isPublished: true,
+        isFeatured: false,
+        createdBy: userId,
+      });
+    }
+
+    const featured = await getFeaturedRemedies(3);
+    expect(featured.some((r) => r.slug === featRemedy.slug)).toBe(true);
   });
 
   it('plantOfTheDay is deterministic for the same date', async () => {

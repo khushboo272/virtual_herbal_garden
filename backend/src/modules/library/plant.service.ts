@@ -463,29 +463,28 @@ export const plantService = new PlantService();
 // These are intentionally lightweight read-only queries to keep the home
 // service decoupled from PlantService internals.
 
-/** Returns up to `limit` featured published plants, filling with newest if fewer than limit */
+/** Returns up to `limit` featured published plants; falls back to newest published only if none are flagged */
 export async function getFeaturedPlants(limit = 6): Promise<Partial<IPlant>[]> {
   const fields = 'commonName scientificName slug images tags isFeatured avgRating createdAt';
   const featured = await Plant.find({ isFeatured: true, isPublished: true, isDeleted: false })
+    .sort({ updatedAt: -1, createdAt: -1 })
     .select(fields)
     .limit(limit)
     .lean();
 
-  if (featured.length >= limit) return featured as unknown as Partial<IPlant>[];
+  if (featured.length > 0) return featured as unknown as Partial<IPlant>[];
 
-  // Fill remaining slots with newest published (not already in the featured list)
-  const featuredIds = featured.map((p) => (p as { _id: unknown })._id);
-  const fill = await Plant.find({
-    _id: { $nin: featuredIds },
+  // Only if no plants are flagged as featured, fall back to published plants
+  const fallback = await Plant.find({
     isPublished: true,
     isDeleted: false,
   })
     .sort({ reviewCount: -1, createdAt: -1 })
     .select(fields)
-    .limit(limit - featured.length)
+    .limit(limit)
     .lean();
 
-  return [...featured, ...fill] as unknown as Partial<IPlant>[];
+  return fallback as unknown as Partial<IPlant>[];
 }
 
 /** Returns up to `limit` newest published plants */

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { tourService } from './tour.service';
 import { sendSuccess, sendCreated, AppError } from '../../core/utils/apiResponse';
 import { UserRole } from '../../types';
+import { invalidateHomeCache } from '../home/home.service';
 
 export class TourController {
   // Public
@@ -103,21 +104,25 @@ export class TourController {
 
   async update(req: Request, res: Response) {
     const tour = await tourService.update(req.params.id, req.body);
+    invalidateHomeCache();
     sendSuccess(res, tour);
   }
 
   async publish(req: Request, res: Response) {
     const tour = await tourService.publish(req.params.id);
+    invalidateHomeCache();
     sendSuccess(res, tour);
   }
 
   async unpublish(req: Request, res: Response) {
     const tour = await tourService.unpublish(req.params.id);
+    invalidateHomeCache();
     sendSuccess(res, tour);
   }
 
   async delete(req: Request, res: Response) {
     await tourService.softDelete(req.params.id);
+    invalidateHomeCache();
     sendSuccess(res, { message: 'Tour deleted successfully' });
   }
 

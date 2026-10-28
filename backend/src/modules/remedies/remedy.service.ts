@@ -419,16 +419,34 @@ export class RemedyService {
 export const remedyService = new RemedyService();
 
 /**
- * Returns up to `limit` published remedies for the home page.
+ * Returns up to `limit` published remedies for the home page,
+ * prioritizing remedies flagged with isFeatured: true, and falling back to newest published if none are flagged.
  */
 export async function getFeaturedRemedies(limit = 3): Promise<IRemedy[]> {
-  const remedies = await Remedy.find({ isPublished: true, isDeleted: false })
-    .sort({ createdAt: -1 })
-    .select('title slug description tags preparationTime prepTimeMinutes difficulty difficultyLevel plants image images')
+  const fields = 'title slug description tags preparationTime prepTimeMinutes difficulty difficultyLevel plants image images isFeatured createdAt';
+  
+  // 1. Fetch featured published remedies
+  const featured = await Remedy.find({ isFeatured: true, isPublished: true, isDeleted: false })
+    .sort({ updatedAt: -1, createdAt: -1 })
+    .select(fields)
     .populate('plants', 'commonName slug images')
     .limit(limit)
     .lean();
-  return remedies as unknown as IRemedy[];
+
+  if (featured.length > 0) return featured as unknown as IRemedy[];
+
+  // 2. Only if no remedies are flagged as featured, fall back to newest published remedies
+  const fallback = await Remedy.find({
+    isPublished: true,
+    isDeleted: false,
+  })
+    .sort({ createdAt: -1 })
+    .select(fields)
+    .populate('plants', 'commonName slug images')
+    .limit(limit)
+    .lean();
+
+  return fallback as unknown as IRemedy[];
 }
 
 /**
