@@ -2,6 +2,7 @@ import { Request } from 'express';
 import crypto from 'crypto';
 import User, { IUser } from '../users/User.model';
 import RefreshToken from './RefreshToken.model';
+import FeatureFlag from '../system/FeatureFlag.model';
 import { UserRole, AuditAction, ISessionInfo } from '../../types';
 import { hashPassword, comparePassword } from '../../core/utils/hash';
 import {
@@ -115,6 +116,34 @@ export class AuthService {
         severity: 'WARN',
       });
       throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+    }
+
+    // Maintenance Mode Check — enforce role bypass privileges
+    const maintFlag = await FeatureFlag.findOne({ key: 'maintenance_mode' }).lean();
+    if (maintFlag && maintFlag.isEnabled) {
+      const allowedRoles = maintFlag.metadata?.allowedRoles || ['SUPER_ADMIN', 'ADMIN'];
+      if (!allowedRoles.includes(user.role)) {
+        await createAuditLog({
+          req,
+          action: AuditAction.LOGIN_FAILED,
+          entityType: 'User',
+          entityId: user._id.toString(),
+          details: { email, reason: 'Maintenance mode active and role not permitted' },
+          severity: 'WARN',
+        });
+        if (user.role === UserRole.ADMIN) {
+          throw new AppError(
+            'Platform maintenance mode is active. Administrator access is currently restricted to Super Admins only.',
+            403,
+            'MAINTENANCE_MODE_RESTRICTED',
+          );
+        }
+        throw new AppError(
+          'Platform is currently undergoing scheduled maintenance. Please check back shortly.',
+          403,
+          'MAINTENANCE_MODE_ACTIVE',
+        );
+      }
     }
 
     // Check 2FA
@@ -231,6 +260,26 @@ export class AuthService {
     await user.resetLoginAttempts();
     user.lastLoginAt = new Date();
     await user.save();
+
+    // Maintenance Mode Check on 2FA completion
+    const maintFlag = await FeatureFlag.findOne({ key: 'maintenance_mode' }).lean();
+    if (maintFlag && maintFlag.isEnabled) {
+      const allowedRoles = maintFlag.metadata?.allowedRoles || ['SUPER_ADMIN', 'ADMIN'];
+      if (!allowedRoles.includes(user.role)) {
+        if (user.role === UserRole.ADMIN) {
+          throw new AppError(
+            'Platform maintenance mode is active. Administrator access is currently restricted to Super Admins only.',
+            403,
+            'MAINTENANCE_MODE_RESTRICTED',
+          );
+        }
+        throw new AppError(
+          'Platform is currently undergoing scheduled maintenance. Please check back shortly.',
+          403,
+          'MAINTENANCE_MODE_ACTIVE',
+        );
+      }
+    }
 
     const tokens = await this.generateTokenPair(user, req);
 
@@ -377,6 +426,26 @@ export class AuthService {
     const user = await User.findById(storedToken.user);
     if (!user || !user.isActive || (user.bannedUntil && new Date(user.bannedUntil) > new Date())) {
       throw new AppError('Account is banned or inactive', 403, 'ACCOUNT_BANNED');
+    }
+
+    // Maintenance Mode Check on refresh
+    const maintFlag = await FeatureFlag.findOne({ key: 'maintenance_mode' }).lean();
+    if (maintFlag && maintFlag.isEnabled) {
+      const allowedRoles = maintFlag.metadata?.allowedRoles || ['SUPER_ADMIN', 'ADMIN'];
+      if (!allowedRoles.includes(user.role)) {
+        if (user.role === UserRole.ADMIN) {
+          throw new AppError(
+            'Platform maintenance mode is active. Administrator access is currently restricted to Super Admins only.',
+            403,
+            'MAINTENANCE_MODE_RESTRICTED',
+          );
+        }
+        throw new AppError(
+          'Platform is currently undergoing scheduled maintenance. Please check back shortly.',
+          403,
+          'MAINTENANCE_MODE_ACTIVE',
+        );
+      }
     }
 
     return this.generateTokenPair(user, req);

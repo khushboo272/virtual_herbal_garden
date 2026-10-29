@@ -3,6 +3,7 @@ import { authController } from './auth.controller';
 import { validate } from '../../core/middleware/validate';
 import { authenticate } from '../../core/middleware/auth';
 import { requireRecentAuth } from '../../core/middleware/requireRecentAuth';
+import { requireFeatureFlag } from '../../core/middleware/requireFeatureFlag';
 import { authLimiter, reauthLimiter } from '../../core/middleware/rateLimiter';
 import {
   registerSchema,
@@ -20,7 +21,13 @@ import passport from 'passport';
 
 const router = Router();
 
-router.post('/register', authLimiter, validate(registerSchema), authController.register);
+router.post(
+  '/register',
+  requireFeatureFlag('new_user_registration'),
+  authLimiter,
+  validate(registerSchema),
+  authController.register,
+);
 router.post('/login', authLimiter, validate(loginSchema), authController.login);
 router.post('/2fa/login-verify', authLimiter, validate(loginVerify2faSchema), authController.loginVerify2fa);
 router.post('/logout', authenticate(), authController.logout);

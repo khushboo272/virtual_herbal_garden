@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { Leaf, BookOpen, Sparkles, Map, Pill, Award, LayoutDashboard, LogIn, LogOut, User, Palette, ShieldCheck } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
+import { useFeatureFlags } from "../contexts/FeatureFlagsContext";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./components/ui/dialog";
 import { Input } from "./components/ui/input";
@@ -18,6 +19,16 @@ export function Layout() {
   const [authLoading, setAuthLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
+
+  let registrationEnabled = true;
+  try {
+    const flagsCtx = useFeatureFlags();
+    if (flagsCtx?.isFeatureEnabled) {
+      registrationEnabled = flagsCtx.isFeatureEnabled('new_user_registration');
+    }
+  } catch {
+    // Graceful fallback outside provider
+  }
 
   // 2-Step Verification challenge state
   const [twoFactorChallenge, setTwoFactorChallenge] = useState<{
@@ -367,10 +378,17 @@ export function Layout() {
                   <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{authError}</p>
                 )}
 
+                {authMode === "register" && !registrationEnabled && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+                    <p className="font-semibold text-amber-900">New Registrations Paused</p>
+                    <p className="mt-0.5">Account creation is temporarily disabled by platform administrators. Existing members may sign in.</p>
+                  </div>
+                )}
+
                 <Button
                   type="submit"
                   className="w-full bg-green-600 hover:bg-green-700"
-                  disabled={authLoading}
+                  disabled={authLoading || (authMode === "register" && !registrationEnabled)}
                 >
                   {authLoading ? "Please wait..." : authMode === "login" ? "Sign In" : "Create Account"}
                 </Button>

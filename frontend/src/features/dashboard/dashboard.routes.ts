@@ -332,8 +332,8 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
   {
     path: '/dashboard/system/ai-model-config',
     pattern: /^\/dashboard\/system\/ai-model-config\/?$/,
-    label: 'AI Model Config',
-    title: 'AI Model Config — Virtual Herbal Garden',
+    label: 'AI Model & System Config',
+    title: 'AI Model & System Config — Virtual Herbal Garden',
     minRole: 'SUPER_ADMIN',
     parents: [
       { label: 'Dashboard', path: '/dashboard' },

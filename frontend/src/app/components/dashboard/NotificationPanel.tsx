@@ -59,10 +59,15 @@ export function NotificationPanel() {
         </Button>
       </SheetTrigger>
       <SheetContent className="w-[400px] sm:w-[540px] p-0 flex flex-col">
-        <SheetHeader className="p-4 border-b border-gray-100 bg-slate-50 flex flex-row items-center justify-between">
+        <SheetHeader className="p-4 pr-14 border-b border-gray-100 bg-slate-50 flex flex-row items-center justify-between">
           <SheetTitle className="text-lg font-semibold text-gray-800">Notifications</SheetTitle>
           {unreadCount > 0 && (
-            <Button variant="outline" size="sm" onClick={() => markAllAsRead()} className="h-8 text-xs">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => markAllAsRead()}
+              className="h-8 text-xs font-medium text-slate-700 hover:text-slate-900 border-slate-200 hover:bg-slate-100 shrink-0"
+            >
               Mark All Read
             </Button>
           )}

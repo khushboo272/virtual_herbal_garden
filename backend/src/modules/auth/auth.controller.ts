@@ -5,6 +5,7 @@ import { env } from '../../core/config/env';
 import { signAccessToken, generateRefreshToken, hashRefreshToken } from '../../core/utils/jwt';
 import { UserRole } from '../../types';
 import RefreshToken from './RefreshToken.model';
+import FeatureFlag from '../system/FeatureFlag.model';
 
 export class AuthController {
   async register(req: Request, res: Response) {
@@ -166,6 +167,20 @@ export class AuthController {
       if (!user || !user.sub || !user.email) {
         console.error('Google callback: req.user is missing or invalid:', JSON.stringify(req.user));
         return res.redirect(`${env.CLIENT_URL}/?error=oauth_failed`);
+      }
+
+      // Maintenance Mode Check
+      const maintFlag = await FeatureFlag.findOne({ key: 'maintenance_mode' }).lean();
+      if (maintFlag && maintFlag.isEnabled) {
+        const allowedRoles = maintFlag.metadata?.allowedRoles || ['SUPER_ADMIN', 'ADMIN'];
+        if (!allowedRoles.includes(user.role)) {
+          const errorMsg = encodeURIComponent(
+            user.role === 'ADMIN'
+              ? 'Platform maintenance mode is active. Administrator access is restricted to Super Admins only.'
+              : 'Platform is currently undergoing scheduled maintenance. Please check back shortly.'
+          );
+          return res.redirect(`${env.CLIENT_URL}/oauth/callback?error=${errorMsg}`);
+        }
       }
 
       const accessToken = signAccessToken({ sub: user.sub, email: user.email, role: (user.role || 'USER') as UserRole });

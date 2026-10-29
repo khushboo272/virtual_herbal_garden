@@ -9,6 +9,7 @@ import { logger } from './core/utils/logger';
 // Import workers to start them
 import './modules/notifications/email.worker';
 
+// Trigger tsx watch reload: maintenance mode allowedRoles and schedule activation
 
 async function bootstrap(): Promise<void> {
   // Connect to MongoDB

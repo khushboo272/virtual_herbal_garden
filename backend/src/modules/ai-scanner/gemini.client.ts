@@ -5,6 +5,7 @@ import { logger } from '../../core/utils/logger';
 import { PLANT_IDENTIFICATION_PROMPT } from './prompts';
 import { PlantIdentificationSchema } from './types';
 import type { PlantIdentification } from './types';
+import { systemService } from '../system/system.service';
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -31,8 +32,9 @@ export async function identifyPlant(
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
+    const activeModel = await systemService.getActiveAIModel();
     const response = await client.models.generateContent({
-      model: env.GEMINI_MODEL,
+      model: activeModel,
       contents: [
         {
           role: 'user',

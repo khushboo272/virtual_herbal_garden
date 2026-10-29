@@ -4,6 +4,7 @@ import { authenticate } from '../../core/middleware/auth';
 import { requireRole } from '../../core/middleware/rbac';
 import { validate } from '../../core/middleware/validate';
 import { uploadSingle } from '../../core/middleware/upload';
+import { requireFeatureFlag } from '../../core/middleware/requireFeatureFlag';
 import { UserRole } from '../../types';
 import { detectionFeedbackSchema, feedbackQueueQuerySchema } from './detection.validators';
 
@@ -44,12 +45,25 @@ router.post(
   '/detect',
   authenticate(),
   requireRole(UserRole.USER),
+  requireFeatureFlag('ai_scanner'),
   scanLimiter,
   uploadSingle,
   detectionController.detect,
 );
-router.get('/detect/:jobId', authenticate(), requireRole(UserRole.USER), detectionController.getDetection);
-router.get('/history', authenticate(), requireRole(UserRole.USER), detectionController.getHistory);
+router.get(
+  '/detect/:jobId',
+  authenticate(),
+  requireRole(UserRole.USER),
+  requireFeatureFlag('ai_scanner'),
+  detectionController.getDetection,
+);
+router.get(
+  '/history',
+  authenticate(),
+  requireRole(UserRole.USER),
+  requireFeatureFlag('ai_scanner'),
+  detectionController.getHistory,
+);
 router.post(
   '/detect/:id/feedback',
   authenticate(),

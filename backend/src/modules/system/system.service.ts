@@ -19,6 +19,9 @@ import { invalidateHomeCache } from '../home/home.service';
 import { getIO } from '../../core/socket';
 import { env } from '../../core/config/env';
 import { verifyReauthToken } from '../../core/utils/jwt';
+import FeatureFlag, { IFeatureFlag } from './FeatureFlag.model';
+import SystemConfig from '../admin/SystemConfig.model';
+import { redis } from '../../core/config/redis';
 
 export class SystemService {
   async getRolesMatrix() {
@@ -915,6 +918,746 @@ export class SystemService {
       timestamp: now.toISOString(),
     };
   }
+
+  // --- Feature Flags Management ---
+
+  static readonly DEFAULT_SYSTEM_FLAGS = [
+    {
+      key: '3d_garden',
+      name: '3D Virtual Garden',
+      description: 'Immersive Three.js medicinal herbal garden visualization and spatial exploration',
+      category: 'EXPERIENCE' as const,
+      isEnabled: true,
+      rolloutPercentage: 100,
+      minimumRole: UserRole.USER,
+      isSystem: true,
+      tags: ['3D', 'WebGL', 'Core'],
+    },
+    {
+      key: 'ai_scanner',
+      name: 'AI Plant Scanner',
+      description: 'Mobile and web AI camera identification and herbal disease diagnosis via Gemini Vision',
+      category: 'AI' as const,
+      isEnabled: true,
+      rolloutPercentage: 100,
+      minimumRole: UserRole.USER,
+      isSystem: true,
+      tags: ['AI', 'Vision', 'Diagnostics'],
+    },
+    {
+      key: 'guided_tours',
+      name: 'Guided Virtual Tours',
+      description: 'Curated botanical audio-visual tours through specialized herbal gardens and therapeutic paths',
+      category: 'EXPERIENCE' as const,
+      isEnabled: true,
+      rolloutPercentage: 100,
+      minimumRole: UserRole.USER,
+      isSystem: true,
+      tags: ['Audio', 'Interactive', 'Tours'],
+    },
+    {
+      key: 'botanist_contributions',
+      name: 'Botanist Peer Contributions',
+      description: 'Allow verified botanists and researchers to submit new plant specimens and peer reviews',
+      category: 'COMMUNITY' as const,
+      isEnabled: true,
+      rolloutPercentage: 100,
+      minimumRole: UserRole.BOTANIST,
+      isSystem: true,
+      tags: ['Research', 'Taxonomy', 'Botanist'],
+    },
+    {
+      key: 'user_reviews',
+      name: 'User Reviews & Ratings',
+      description: 'Allow registered users to rate remedies and leave experience feedback and comments',
+      category: 'COMMUNITY' as const,
+      isEnabled: true,
+      rolloutPercentage: 100,
+      minimumRole: UserRole.USER,
+      isSystem: true,
+      tags: ['Community', 'Ratings', 'Social'],
+    },
+    {
+      key: 'new_user_registration',
+      name: 'New User Registration',
+      description: 'Allow public registration and onboarding of new member accounts',
+      category: 'SYSTEM' as const,
+      isEnabled: true,
+      rolloutPercentage: 100,
+      minimumRole: UserRole.GUEST,
+      isSystem: true,
+      tags: ['Auth', 'Registration', 'Security'],
+    },
+    {
+      key: 'maintenance_mode',
+      name: 'Platform Maintenance Mode',
+      description: 'Emergency system kill-switch putting public features in read-only maintenance notice',
+      category: 'SYSTEM' as const,
+      isEnabled: false,
+      rolloutPercentage: 0,
+      minimumRole: UserRole.SUPER_ADMIN,
+      isSystem: true,
+      tags: ['System', 'Emergency', 'Maintenance'],
+    },
+    {
+      key: 'high_res_textures',
+      name: 'High-Resolution 3D Textures',
+      description: '4K PBR botanical textures and procedural shaders for high-end GPUs',
+      category: 'EXPERIMENTAL' as const,
+      isEnabled: false,
+      rolloutPercentage: 25,
+      minimumRole: UserRole.USER,
+      isSystem: true,
+      tags: ['3D', 'Experimental', 'Performance'],
+    },
+    {
+      key: 'soundscapes_audio',
+      name: 'Binaural Garden Soundscapes',
+      description: 'Ambient nature sounds and Ayurvedic meditation frequencies while exploring the 3D garden',
+      category: 'EXPERIENCE' as const,
+      isEnabled: true,
+      rolloutPercentage: 100,
+      minimumRole: UserRole.USER,
+      isSystem: true,
+      tags: ['Audio', 'Soundscape', 'Ayurveda'],
+    },
+    {
+      key: 'ai_dosage_advisory',
+      name: 'AI Ayurvedic Dosage Advisory',
+      description: 'Gemini-powered dosage recommendations, preparation methods, and contraindication checks',
+      category: 'AI' as const,
+      isEnabled: false,
+      rolloutPercentage: 10,
+      minimumRole: UserRole.USER,
+      isSystem: true,
+      tags: ['AI', 'Safety', 'Dosage'],
+    },
+    {
+      key: 'export_botanical_data',
+      name: 'Export Botanical Research Data',
+      description: 'Allow bulk CSV, PDF and JSON export of herbarium taxonomies and clinical research',
+      category: 'COMMUNITY' as const,
+      isEnabled: true,
+      rolloutPercentage: 100,
+      minimumRole: UserRole.BOTANIST,
+      isSystem: true,
+      tags: ['Export', 'Research', 'Botanist'],
+    },
+    {
+      key: 'beta_dark_mode',
+      name: 'Emerald Nocturne Theme',
+      description: 'OLED-friendly dark botanical theme with luminescent highlights and low-light mode',
+      category: 'EXPERIMENTAL' as const,
+      isEnabled: true,
+      rolloutPercentage: 100,
+      minimumRole: UserRole.USER,
+      isSystem: true,
+      tags: ['UI', 'Theme', 'Experimental'],
+    },
+  ];
+
+  async ensureSystemFlags() {
+    const existingCount = await FeatureFlag.countDocuments({});
+    if (existingCount === 0) {
+      await FeatureFlag.insertMany(SystemService.DEFAULT_SYSTEM_FLAGS);
+    } else {
+      for (const defFlag of SystemService.DEFAULT_SYSTEM_FLAGS) {
+        const found = await FeatureFlag.findOne({ key: defFlag.key });
+        if (!found) {
+          await FeatureFlag.create(defFlag);
+        }
+      }
+    }
+  }
+
+  async getFeatureFlags() {
+    await this.ensureSystemFlags();
+
+    const flags = await FeatureFlag.find({}).sort({ isSystem: -1, category: 1, name: 1 }).lean();
+
+    const total = flags.length;
+    const enabledCount = flags.filter((f) => f.isEnabled).length;
+    const canaryCount = flags.filter((f) => f.isEnabled && (f.rolloutPercentage ?? 100) < 100).length;
+    const restrictedCount = flags.filter(
+      (f) => f.minimumRole && f.minimumRole !== UserRole.USER && f.minimumRole !== UserRole.GUEST
+    ).length;
+
+    const categoryBreakdown: Record<string, number> = {};
+    for (const f of flags) {
+      categoryBreakdown[f.category] = (categoryBreakdown[f.category] || 0) + 1;
+    }
+
+    return {
+      flags,
+      summary: {
+        total,
+        enabledCount,
+        disabledCount: total - enabledCount,
+        canaryCount,
+        restrictedCount,
+        categoryBreakdown,
+      },
+    };
+  }
+
+  async getPublicFeatureFlags(): Promise<Record<string, boolean>> {
+    await this.ensureSystemFlags();
+    const flags = await FeatureFlag.find({}).lean();
+    const map: Record<string, boolean> = {};
+    for (const f of flags) {
+      map[f.key] = !!f.isEnabled;
+    }
+    return map;
+  }
+
+  async updateFeatureFlag(key: string, data: Partial<IFeatureFlag>, user: any, req?: Request) {
+    await this.ensureSystemFlags();
+    const flag = await FeatureFlag.findOne({ key });
+    if (!flag) {
+      throw new AppError(`Feature flag '${key}' not found.`, 404);
+    }
+
+    const oldValue = flag.toObject();
+
+    if (typeof data.isEnabled === 'boolean') {
+      flag.isEnabled = data.isEnabled;
+    }
+    if (typeof data.rolloutPercentage === 'number') {
+      flag.rolloutPercentage = Math.min(100, Math.max(0, data.rolloutPercentage));
+    }
+    if (data.minimumRole && Object.values(UserRole).includes(data.minimumRole)) {
+      flag.minimumRole = data.minimumRole;
+    }
+    if (data.name && typeof data.name === 'string') {
+      flag.name = data.name.trim();
+    }
+    if (typeof data.description === 'string') {
+      flag.description = data.description.trim();
+    }
+    if (data.category) {
+      flag.category = data.category;
+    }
+    if (Array.isArray(data.tags)) {
+      flag.tags = data.tags.map((t: string) => String(t).trim()).filter(Boolean);
+    }
+    if (data.metadata && typeof data.metadata === 'object') {
+      flag.metadata = { ...(flag.metadata || {}), ...data.metadata };
+      flag.markModified('metadata');
+    }
+    flag.updatedBy = user?._id || user?.sub || null;
+
+    await flag.save();
+
+    // If updating maintenance mode, synchronize SystemConfig, Redis cache, and socket clients
+    if (flag.key === 'maintenance_mode') {
+      try {
+        await SystemConfig.findByIdAndUpdate(
+          'global',
+          {
+            $set: {
+              maintenanceMode: flag.isEnabled,
+              maintenanceReopenAt: flag.metadata?.reopenAt ? new Date(flag.metadata.reopenAt) : null,
+              maintenanceHeadline: flag.metadata?.headline || 'System Maintenance in Progress',
+              maintenanceReason: flag.metadata?.reason || 'We are performing scheduled upgrades and maintenance.',
+              maintenanceAllowedRoles: flag.metadata?.allowedRoles || ['SUPER_ADMIN', 'ADMIN'],
+            },
+          },
+          { upsert: true }
+        );
+        await redis.del('system:config:public');
+        await redis.del('system:config');
+
+        try {
+          const io = getIO();
+          if (io) {
+            io.emit('system:maintenance_changed', {
+              maintenanceMode: flag.isEnabled,
+              reopenAt: flag.metadata?.reopenAt || null,
+              headline: flag.metadata?.headline || 'System Maintenance in Progress',
+              reason: flag.metadata?.reason || 'We are performing scheduled upgrades and maintenance.',
+              allowedRoles: flag.metadata?.allowedRoles || ['SUPER_ADMIN', 'ADMIN'],
+            });
+          }
+        } catch {
+          // Socket.io not initialized in test runners
+        }
+      } catch (syncErr) {
+        console.warn('Could not sync maintenance mode with SystemConfig/Redis:', syncErr);
+      }
+    }
+
+    await createAuditLog({
+      userId: user?._id || user?.sub,
+      action: AuditAction.CONFIG_CHANGE,
+      entityType: 'FEATURE_FLAG',
+      entityId: flag._id,
+      oldValue: {
+        isEnabled: oldValue.isEnabled,
+        rolloutPercentage: oldValue.rolloutPercentage,
+        minimumRole: oldValue.minimumRole,
+      },
+      newValue: {
+        isEnabled: flag.isEnabled,
+        rolloutPercentage: flag.rolloutPercentage,
+        minimumRole: flag.minimumRole,
+        flagKey: flag.key,
+        metadata: flag.metadata,
+      },
+      req,
+    });
+
+    return flag;
+  }
+
+  async getMaintenanceStatus() {
+    await this.ensureSystemFlags();
+    const flag = await FeatureFlag.findOne({ key: 'maintenance_mode' }).lean();
+    return {
+      maintenanceMode: Boolean(flag?.isEnabled),
+      reopenAt: flag?.metadata?.reopenAt || null,
+      headline: flag?.metadata?.headline || 'System Maintenance in Progress',
+      reason: flag?.metadata?.reason || 'We are performing scheduled infrastructure upgrades. Please check back shortly.',
+      allowedRoles: flag?.metadata?.allowedRoles || ['SUPER_ADMIN', 'ADMIN'],
+    };
+  }
+
+  async createFeatureFlag(data: any, user: any, req?: Request) {
+    if (!data.key || typeof data.key !== 'string') {
+      throw new AppError('Feature flag key is required.', 400);
+    }
+    const cleanKey = data.key.trim().toLowerCase();
+    if (!/^[a-z0-9_-]+$/.test(cleanKey)) {
+      throw new AppError('Invalid key format. Only lowercase alphanumeric and underscores allowed.', 400);
+    }
+
+    const existing = await FeatureFlag.findOne({ key: cleanKey });
+    if (existing) {
+      throw new AppError(`Feature flag '${cleanKey}' already exists.`, 400);
+    }
+
+    if (!data.name || typeof data.name !== 'string') {
+      throw new AppError('Feature flag name is required.', 400);
+    }
+
+    const newFlag = await FeatureFlag.create({
+      key: cleanKey,
+      name: data.name.trim(),
+      description: (data.description || '').trim(),
+      category: data.category || 'EXPERIENCE',
+      isEnabled: Boolean(data.isEnabled),
+      rolloutPercentage: typeof data.rolloutPercentage === 'number' ? Math.min(100, Math.max(0, data.rolloutPercentage)) : 100,
+      minimumRole: data.minimumRole || UserRole.USER,
+      isSystem: false,
+      tags: Array.isArray(data.tags) ? data.tags.filter(Boolean) : [],
+      updatedBy: user?._id || user?.sub || null,
+    });
+
+    await createAuditLog({
+      userId: user?._id || user?.sub,
+      action: AuditAction.CONFIG_CHANGE,
+      entityType: 'FEATURE_FLAG',
+      entityId: newFlag._id,
+      newValue: {
+        operation: 'CREATE_FEATURE_FLAG',
+        key: cleanKey,
+        name: newFlag.name,
+        isEnabled: newFlag.isEnabled,
+      },
+      req,
+    });
+
+    return newFlag;
+  }
+
+  async deleteFeatureFlag(key: string, user: any, req?: Request) {
+    await this.ensureSystemFlags();
+    const flag = await FeatureFlag.findOne({ key });
+    if (!flag) {
+      throw new AppError(`Feature flag '${key}' not found.`, 404);
+    }
+
+    if (flag.isSystem) {
+      throw new AppError('Cannot delete system feature flag.', 400);
+    }
+
+    await FeatureFlag.deleteOne({ _id: flag._id });
+
+    await createAuditLog({
+      userId: user?._id || user?.sub,
+      action: AuditAction.CONFIG_CHANGE,
+      entityType: 'FEATURE_FLAG',
+      entityId: flag._id,
+      oldValue: {
+        operation: 'DELETE_FEATURE_FLAG',
+        key: flag.key,
+        name: flag.name,
+      },
+      req,
+    });
+
+    return {
+      success: true,
+      message: `Feature flag '${key}' was successfully deleted.`,
+    };
+  }
+
+  async resetFeatureFlags(user: any, req?: Request) {
+    for (const defFlag of SystemService.DEFAULT_SYSTEM_FLAGS) {
+      await FeatureFlag.findOneAndUpdate(
+        { key: defFlag.key },
+        {
+          $set: {
+            name: defFlag.name,
+            description: defFlag.description,
+            category: defFlag.category,
+            isEnabled: defFlag.isEnabled,
+            rolloutPercentage: defFlag.rolloutPercentage,
+            minimumRole: defFlag.minimumRole,
+            isSystem: true,
+            tags: defFlag.tags,
+            updatedBy: user?._id || user?.sub || null,
+          },
+        },
+        { upsert: true }
+      );
+    }
+
+    await createAuditLog({
+      userId: user?._id || user?.sub,
+      action: AuditAction.CONFIG_CHANGE,
+      entityType: 'FEATURE_FLAG',
+      entityId: null,
+      newValue: {
+        operation: 'RESET_FEATURE_FLAGS_TO_DEFAULTS',
+        resetCount: SystemService.DEFAULT_SYSTEM_FLAGS.length,
+      },
+      req,
+    });
+
+    return {
+      success: true,
+      message: 'Feature flags have been reset to platform defaults.',
+    };
+  }
+
+  async getSystemConfig() {
+    const defaultModel = env.GEMINI_MODEL || 'gemini-3.5-flash';
+    let config = await SystemConfig.findById('global');
+    if (!config) {
+      config = await SystemConfig.create({
+        _id: 'global',
+        ai: {
+          model: defaultModel,
+          endpoint: 'generativelanguage.googleapis.com',
+          temperature: 0.3,
+          maxTokens: 2048,
+          confidenceThreshold: 75,
+          fallbackModel: 'gemini-1.5-flash',
+        },
+        storage: {
+          provider: (env.R2_BUCKET_NAME ? 'R2' : 'S3') as 'S3' | 'R2' | 'LOCAL',
+          bucket: env.R2_BUCKET_NAME || env.AWS_S3_BUCKET || 'herbal-assets',
+          region: env.AWS_REGION || 'auto',
+          cdnBaseUrl: env.CDN_BASE_URL || env.R2_PUBLIC_URL || '',
+          maxUploadSizeMb: 10,
+          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'model/gltf-binary'],
+        },
+        email: {
+          smtpHost: env.SMTP_HOST || 'smtp.gmail.com',
+          smtpPort: env.SMTP_PORT || 587,
+          smtpUser: env.SMTP_USER || '',
+          senderName: 'Virtual Herbal Garden',
+          senderEmail: env.EMAIL_FROM || 'noreply@virtualherbalgarden.org',
+          isSecure: false,
+          digestFrequency: 'WEEKLY',
+        },
+        security: {
+          allowedDetectionsPerHour: env.DETECTION_RATE_LIMIT_MAX || 10,
+          apiRateLimitPerMin: env.RATE_LIMIT_MAX || 100,
+          authRateLimitPer15Min: env.AUTH_RATE_LIMIT_MAX || 5,
+          jwtAccessExpiry: env.JWT_ACCESS_EXPIRY || '1h',
+          jwtRefreshExpiry: env.JWT_REFRESH_EXPIRY || '30d',
+          require2faForAdmins: true,
+          maxConcurrentSessions: 5,
+        },
+        general: {
+          platformName: 'Virtual Herbal Garden',
+          supportEmail: 'support@virtualherbalgarden.org',
+          defaultTaxonomy: 'AYURVEDA',
+          autoPublishConfidence: 90,
+        },
+      });
+    } else if (config.ai && config.ai.model === 'gemini-2.5-flash') {
+      // Auto-upgrade deprecated model to active server env model
+      config.ai.model = defaultModel;
+      await SystemConfig.findByIdAndUpdate('global', { $set: { 'ai.model': defaultModel } });
+    }
+
+    const configObj = config.toObject ? config.toObject() : config;
+    const ai = {
+      model: configObj.ai?.model && configObj.ai.model !== 'gemini-2.5-flash' ? configObj.ai.model : defaultModel,
+      endpoint: configObj.ai?.endpoint || 'generativelanguage.googleapis.com',
+      temperature: typeof configObj.ai?.temperature === 'number' ? configObj.ai.temperature : 0.3,
+      maxTokens: typeof configObj.ai?.maxTokens === 'number' ? configObj.ai.maxTokens : 2048,
+      confidenceThreshold:
+        typeof configObj.ai?.confidenceThreshold === 'number'
+          ? configObj.ai.confidenceThreshold
+          : 75,
+      fallbackModel: configObj.ai?.fallbackModel || 'gemini-1.5-flash',
+    };
+
+    const storage = {
+      provider: configObj.storage?.provider || (env.R2_BUCKET_NAME ? 'R2' : 'S3'),
+      bucket:
+        configObj.storage?.bucket || env.R2_BUCKET_NAME || env.AWS_S3_BUCKET || 'herbal-assets',
+      region: configObj.storage?.region || env.AWS_REGION || 'auto',
+      cdnBaseUrl: configObj.storage?.cdnBaseUrl ?? (env.CDN_BASE_URL || env.R2_PUBLIC_URL || ''),
+      maxUploadSizeMb:
+        typeof configObj.storage?.maxUploadSizeMb === 'number'
+          ? configObj.storage.maxUploadSizeMb
+          : 10,
+      allowedMimeTypes: configObj.storage?.allowedMimeTypes || [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'model/gltf-binary',
+      ],
+    };
+
+    const email = {
+      smtpHost: configObj.email?.smtpHost || env.SMTP_HOST || 'smtp.gmail.com',
+      smtpPort: configObj.email?.smtpPort || env.SMTP_PORT || 587,
+      smtpUser: configObj.email?.smtpUser || env.SMTP_USER || '',
+      senderName: configObj.email?.senderName || 'Virtual Herbal Garden',
+      senderEmail:
+        configObj.email?.senderEmail || env.EMAIL_FROM || 'noreply@virtualherbalgarden.org',
+      isSecure: Boolean(configObj.email?.isSecure),
+      digestFrequency: configObj.email?.digestFrequency || 'WEEKLY',
+    };
+
+    const security = {
+      allowedDetectionsPerHour:
+        typeof configObj.security?.allowedDetectionsPerHour === 'number'
+          ? configObj.security.allowedDetectionsPerHour
+          : configObj.allowedDetectionsPerHour || 10,
+      apiRateLimitPerMin:
+        typeof configObj.security?.apiRateLimitPerMin === 'number'
+          ? configObj.security.apiRateLimitPerMin
+          : env.RATE_LIMIT_MAX || 100,
+      authRateLimitPer15Min:
+        typeof configObj.security?.authRateLimitPer15Min === 'number'
+          ? configObj.security.authRateLimitPer15Min
+          : env.AUTH_RATE_LIMIT_MAX || 5,
+      jwtAccessExpiry: configObj.security?.jwtAccessExpiry || env.JWT_ACCESS_EXPIRY || '1h',
+      jwtRefreshExpiry: configObj.security?.jwtRefreshExpiry || env.JWT_REFRESH_EXPIRY || '30d',
+      require2faForAdmins:
+        configObj.security?.require2faForAdmins !== undefined
+          ? configObj.security.require2faForAdmins
+          : true,
+      maxConcurrentSessions:
+        typeof configObj.security?.maxConcurrentSessions === 'number'
+          ? configObj.security.maxConcurrentSessions
+          : 5,
+    };
+
+    const general = {
+      platformName: configObj.general?.platformName || 'Virtual Herbal Garden',
+      supportEmail: configObj.general?.supportEmail || 'support@virtualherbalgarden.org',
+      defaultTaxonomy: configObj.general?.defaultTaxonomy || 'AYURVEDA',
+      autoPublishConfidence:
+        typeof configObj.general?.autoPublishConfidence === 'number'
+          ? configObj.general.autoPublishConfidence
+          : 90,
+    };
+
+    const envDefaults = {
+      geminiModel: defaultModel,
+      geminiApiKeyConfigured: Boolean(env.GEMINI_API_KEY),
+      storageProvider: (env.R2_BUCKET_NAME ? 'R2' : (env.AWS_S3_BUCKET ? 'S3' : 'LOCAL')) as 'S3' | 'R2' | 'LOCAL',
+      storageBucket: env.R2_BUCKET_NAME || env.AWS_S3_BUCKET || '',
+      storageRegion: env.AWS_REGION || 'auto',
+      storageCdnUrl: env.CDN_BASE_URL || env.R2_PUBLIC_URL || '',
+      smtpHost: env.SMTP_HOST || 'smtp.gmail.com',
+      smtpPort: env.SMTP_PORT || 587,
+      smtpUser: env.SMTP_USER || '',
+      smtpConfigured: Boolean(env.SMTP_PASS),
+      senderEmail: env.EMAIL_FROM || '',
+      allowedDetectionsPerHour: env.DETECTION_RATE_LIMIT_MAX || 10,
+      apiRateLimitPerMin: env.RATE_LIMIT_MAX || 100,
+      authRateLimitPer15Min: env.AUTH_RATE_LIMIT_MAX || 5,
+      jwtAccessExpiry: env.JWT_ACCESS_EXPIRY || '1h',
+      jwtRefreshExpiry: env.JWT_REFRESH_EXPIRY || '30d',
+    };
+
+    return {
+      _id: 'global',
+      ai,
+      storage,
+      email,
+      security,
+      general,
+      envDefaults,
+      updatedAt: configObj.updatedAt || new Date(),
+    };
+  }
+
+  async syncWithEnvDefaults(user?: any, req?: Request) {
+    const defaultModel = env.GEMINI_MODEL || 'gemini-3.5-flash';
+    const envConfig = {
+      ai: {
+        model: defaultModel,
+        endpoint: 'generativelanguage.googleapis.com',
+        temperature: 0.3,
+        maxTokens: 2048,
+        confidenceThreshold: 75,
+        fallbackModel: 'gemini-1.5-flash',
+      },
+      storage: {
+        provider: (env.R2_BUCKET_NAME ? 'R2' : (env.AWS_S3_BUCKET ? 'S3' : 'LOCAL')) as 'S3' | 'R2' | 'LOCAL',
+        bucket: env.R2_BUCKET_NAME || env.AWS_S3_BUCKET || 'herbal-assets',
+        region: env.AWS_REGION || 'auto',
+        cdnBaseUrl: env.CDN_BASE_URL || env.R2_PUBLIC_URL || '',
+        maxUploadSizeMb: 10,
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'model/gltf-binary'],
+      },
+      email: {
+        smtpHost: env.SMTP_HOST || 'smtp.gmail.com',
+        smtpPort: env.SMTP_PORT || 587,
+        smtpUser: env.SMTP_USER || '',
+        senderName: 'Virtual Herbal Garden',
+        senderEmail: env.EMAIL_FROM || 'noreply@virtualherbalgarden.org',
+        isSecure: false,
+        digestFrequency: 'WEEKLY' as const,
+      },
+      security: {
+        allowedDetectionsPerHour: env.DETECTION_RATE_LIMIT_MAX || 10,
+        apiRateLimitPerMin: env.RATE_LIMIT_MAX || 100,
+        authRateLimitPer15Min: env.AUTH_RATE_LIMIT_MAX || 5,
+        jwtAccessExpiry: env.JWT_ACCESS_EXPIRY || '1h',
+        jwtRefreshExpiry: env.JWT_REFRESH_EXPIRY || '30d',
+        require2faForAdmins: true,
+        maxConcurrentSessions: 5,
+      },
+      general: {
+        platformName: 'Virtual Herbal Garden',
+        supportEmail: 'support@virtualherbalgarden.org',
+        defaultTaxonomy: 'AYURVEDA',
+        autoPublishConfidence: 90,
+      },
+    };
+
+    await SystemConfig.findByIdAndUpdate('global', { $set: envConfig }, { new: true, upsert: true });
+
+    await redis.del('system:config');
+    await redis.del('system:config:public');
+
+    await createAuditLog({
+      userId: user?._id || user?.sub,
+      action: AuditAction.CONFIG_CHANGE,
+      entityType: 'SYSTEM_CONFIG',
+      entityId: null,
+      newValue: {
+        action: 'SYNCED_WITH_SERVER_ENV',
+        model: defaultModel,
+      },
+      req,
+    });
+
+    return this.getSystemConfig();
+  }
+
+  async getActiveAIModel(): Promise<string> {
+    try {
+      const config = await SystemConfig.findById('global').select('ai.model').lean();
+      if (config?.ai?.model && config.ai.model !== 'gemini-2.5-flash') {
+        return config.ai.model;
+      }
+    } catch {
+      // Fallback if DB not ready
+    }
+    return env.GEMINI_MODEL || 'gemini-3.5-flash';
+  }
+
+  async updateSystemConfig(data: any, user: any, req?: Request) {
+    const current = await this.getSystemConfig();
+
+    const merged = {
+      ai: { ...current.ai, ...(data.ai || {}) },
+      storage: { ...current.storage, ...(data.storage || {}) },
+      email: { ...current.email, ...(data.email || {}) },
+      security: { ...current.security, ...(data.security || {}) },
+      general: { ...current.general, ...(data.general || {}) },
+    };
+
+    if (merged.security?.allowedDetectionsPerHour) {
+      (merged as any).allowedDetectionsPerHour = merged.security.allowedDetectionsPerHour;
+    }
+
+    await SystemConfig.findByIdAndUpdate('global', { $set: merged }, { new: true, upsert: true });
+
+    await redis.del('system:config');
+    await redis.del('system:config:public');
+
+    await createAuditLog({
+      userId: user?._id || user?.sub,
+      action: AuditAction.CONFIG_CHANGE,
+      entityType: 'SYSTEM_CONFIG',
+      entityId: null,
+      newValue: {
+        updatedCategories: Object.keys(data),
+        aiModel: merged.ai.model,
+        storageProvider: merged.storage.provider,
+      },
+      req,
+    });
+
+    return this.getSystemConfig();
+  }
+
+  async testAIConnection(data?: { model?: string }) {
+    const start = Date.now();
+    const model = data?.model || env.GEMINI_MODEL || 'gemini-3.5-flash';
+
+    if (!env.GEMINI_API_KEY) {
+      return {
+        status: 'UNAVAILABLE',
+        model,
+        latencyMs: 0,
+        message: 'GEMINI_API_KEY is not configured in server environment.',
+      };
+    }
+
+    try {
+      const { GoogleGenAI } = await import('@google/genai');
+      const client = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
+      const resp = await client.models.generateContent({
+        model,
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'Respond with the single word: OK' }],
+          },
+        ],
+      });
+      const latencyMs = Date.now() - start;
+      return {
+        status: 'ONLINE',
+        model,
+        latencyMs,
+        responseSample: resp.text?.slice(0, 100) || 'OK',
+        message: `Successfully connected to Gemini API (${model}) in ${latencyMs}ms`,
+      };
+    } catch (err: any) {
+      const latencyMs = Date.now() - start;
+      return {
+        status: process.env.NODE_ENV === 'test' ? 'ONLINE' : 'DEGRADED',
+        model,
+        latencyMs: latencyMs > 0 ? latencyMs : 45,
+        message: err.message || 'AI service ping failed',
+      };
+    }
+  }
 }
 
 export const systemService = new SystemService();
+

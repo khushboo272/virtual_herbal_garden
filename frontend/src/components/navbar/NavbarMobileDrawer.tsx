@@ -6,7 +6,14 @@ import { NavLink } from './types';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '../../app/components/ui/utils';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFeatureFlags } from '../../contexts/FeatureFlagsContext';
 import { NotificationPanel } from '../../app/components/dashboard/NotificationPanel';
+
+const ROUTE_FLAG_MAP: Record<string, string> = {
+  '/ai-detect': 'ai_scanner',
+  '/garden-3d': '3d_garden',
+  '/virtual-tour': 'guided_tours',
+};
 
 export interface NavbarMobileDrawerProps {
   links: NavLink[];
@@ -20,6 +27,15 @@ export const NavbarMobileDrawer = ({ links, variant, onLoginClick, onRegisterCli
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  let isFeatureEnabled = (_k: string) => true;
+  try {
+    const flagsCtx = useFeatureFlags();
+    if (flagsCtx?.isFeatureEnabled) {
+      isFeatureEnabled = flagsCtx.isFeatureEnabled;
+    }
+  } catch {
+    // Safe fallback if outside provider
+  }
 
   const handleNavigate = (route: string) => {
     navigate(route);
@@ -74,20 +90,30 @@ export const NavbarMobileDrawer = ({ links, variant, onLoginClick, onRegisterCli
         <div className="flex-1 overflow-y-auto py-4">
           <nav className="flex flex-col px-2 space-y-1">
             {links.map((link) => {
+              const flagKey = ROUTE_FLAG_MAP[link.route];
+              const isEnabled = flagKey ? isFeatureEnabled(flagKey) : true;
               const isActive = location.pathname === link.route;
               return (
                 <button
                   key={link.route}
                   onClick={() => handleNavigate(link.route)}
                   className={cn(
-                    "flex items-center w-full px-4 py-3 text-sm font-medium rounded-md transition-colors",
+                    "flex items-center justify-between w-full px-4 py-3 text-sm font-medium rounded-md transition-colors",
                     isActive 
                       ? "bg-green-100 text-green-800" 
-                      : "text-gray-600 hover:bg-green-50 hover:text-green-700"
+                      : "text-gray-600 hover:bg-green-50 hover:text-green-700",
+                    !isEnabled && "opacity-75"
                   )}
                 >
-                  <link.icon className={cn("w-5 h-5 mr-3", isActive ? "text-green-700" : "text-gray-400")} />
-                  {link.label}
+                  <div className="flex items-center">
+                    <link.icon className={cn("w-5 h-5 mr-3", isActive ? "text-green-700" : "text-gray-400")} />
+                    {link.label}
+                  </div>
+                  {!isEnabled && (
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase bg-amber-100 text-amber-800 rounded border border-amber-200">
+                      Disabled
+                    </span>
+                  )}
                 </button>
               );
             })}

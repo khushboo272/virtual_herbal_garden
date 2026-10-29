@@ -160,7 +160,7 @@ const superAdminNav: NavSection[] = [
       { label: 'Feature Flags', icon: Shield, path: '/dashboard/system/feature-flags' },
       { label: 'Role Management', icon: Users, path: '/dashboard/system/role-management' },
       { label: 'Audit Log', icon: ScrollText, path: '/dashboard/system/audit-log' },
-      { label: 'AI Model Config', icon: Cpu, path: '/dashboard/system/ai-model-config' },
+      { label: 'AI Model & System Config', icon: Cpu, path: '/dashboard/system/ai-model-config' },
     ],
   },
   // Footer section

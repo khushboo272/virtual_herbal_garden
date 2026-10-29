@@ -78,6 +78,80 @@ export class SystemController {
     const result = await systemService.purgeExpiredSessions(userId, req);
     sendSuccess(res, result);
   }
+
+  async getPublicFeatureFlags(_req: Request, res: Response) {
+    const result = await systemService.getPublicFeatureFlags();
+    sendSuccess(res, result);
+  }
+
+  async getFeatureFlags(_req: Request, res: Response) {
+    const result = await systemService.getFeatureFlags();
+    sendSuccess(res, result);
+  }
+
+  async updateFeatureFlag(req: Request, res: Response) {
+    const result = await systemService.updateFeatureFlag(
+      req.params.key,
+      req.body,
+      req.user as any,
+      req
+    );
+    sendSuccess(res, result);
+  }
+
+  async createFeatureFlag(req: Request, res: Response) {
+    const result = await systemService.createFeatureFlag(
+      req.body,
+      req.user as any,
+      req
+    );
+    sendSuccess(res, result, 201);
+  }
+
+  async deleteFeatureFlag(req: Request, res: Response) {
+    const result = await systemService.deleteFeatureFlag(
+      req.params.key,
+      req.user as any,
+      req
+    );
+    sendSuccess(res, result);
+  }
+
+  async resetFeatureFlags(req: Request, res: Response) {
+    const result = await systemService.resetFeatureFlags(req.user as any, req);
+    sendSuccess(res, result);
+  }
+
+  async getMaintenanceStatus(_req: Request, res: Response) {
+    const result = await systemService.getMaintenanceStatus();
+    sendSuccess(res, result);
+  }
+
+  async getSystemConfig(_req: Request, res: Response) {
+    const result = await systemService.getSystemConfig();
+    sendSuccess(res, result);
+  }
+
+  async updateSystemConfig(req: Request, res: Response) {
+    const result = await systemService.updateSystemConfig(
+      req.body,
+      req.user as any,
+      req
+    );
+    sendSuccess(res, result);
+  }
+
+  async testAIConnection(req: Request, res: Response) {
+    const result = await systemService.testAIConnection(req.body);
+    sendSuccess(res, result);
+  }
+
+  async syncEnvConfig(req: Request, res: Response) {
+    const result = await systemService.syncWithEnvDefaults(req.user as any, req);
+    sendSuccess(res, result);
+  }
 }
 
 export const systemController = new SystemController();
+
+

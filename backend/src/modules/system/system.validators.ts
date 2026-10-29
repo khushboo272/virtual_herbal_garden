@@ -17,3 +17,57 @@ export const systemAuditLogsQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
 });
+
+export const updateSystemConfigurationSchema = z.object({
+  ai: z
+    .object({
+      model: z.string().optional(),
+      endpoint: z.string().optional(),
+      temperature: z.number().min(0).max(1).optional(),
+      maxTokens: z.number().min(256).max(8192).optional(),
+      confidenceThreshold: z.number().min(1).max(100).optional(),
+      fallbackModel: z.string().optional(),
+    })
+    .optional(),
+  storage: z
+    .object({
+      provider: z.enum(['S3', 'R2', 'LOCAL']).optional(),
+      bucket: z.string().optional(),
+      region: z.string().optional(),
+      cdnBaseUrl: z.string().optional(),
+      maxUploadSizeMb: z.number().min(1).max(100).optional(),
+      allowedMimeTypes: z.array(z.string()).optional(),
+    })
+    .optional(),
+  email: z
+    .object({
+      smtpHost: z.string().optional(),
+      smtpPort: z.number().optional(),
+      smtpUser: z.string().optional(),
+      senderName: z.string().optional(),
+      senderEmail: z.string().email().optional(),
+      isSecure: z.boolean().optional(),
+      digestFrequency: z.enum(['DAILY', 'WEEKLY', 'NEVER']).optional(),
+    })
+    .optional(),
+  security: z
+    .object({
+      allowedDetectionsPerHour: z.number().min(1).max(500).optional(),
+      apiRateLimitPerMin: z.number().min(10).max(2000).optional(),
+      authRateLimitPer15Min: z.number().min(1).max(50).optional(),
+      jwtAccessExpiry: z.string().optional(),
+      jwtRefreshExpiry: z.string().optional(),
+      require2faForAdmins: z.boolean().optional(),
+      maxConcurrentSessions: z.number().min(1).max(20).optional(),
+    })
+    .optional(),
+  general: z
+    .object({
+      platformName: z.string().min(1).optional(),
+      supportEmail: z.string().email().optional(),
+      defaultTaxonomy: z.string().optional(),
+      autoPublishConfidence: z.number().min(50).max(100).optional(),
+    })
+    .optional(),
+});
+

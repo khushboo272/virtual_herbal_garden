@@ -15,43 +15,8 @@ import { useAdminUsers } from '../../../../hooks/useAdmin';
 export { SystemOverviewPage } from '../../../../features/system/pages/SystemOverviewPage';
 
 // ── Feature Flags — /dashboard/system/feature-flags ──────
-export function FeatureFlagsPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-green-900">Feature Flags</h1>
-        <p className="text-green-600 mt-1">Toggle platform features on or off</p>
-      </div>
-      <Card className="border-2 border-red-200 bg-white">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-gray-900">
-            <Shield className="w-5 h-5 text-red-600" />
-            Active Feature Flags
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {[
-            { label: '3D Garden', description: 'Enable the immersive 3D garden experience', enabled: true },
-            { label: 'AI Plant Scanner', description: 'Enable AI-powered plant identification', enabled: true },
-            { label: 'Guided Tours', description: 'Enable guided virtual tour feature', enabled: true },
-            { label: 'Maintenance Mode', description: 'Show maintenance page to all users', enabled: false },
-            { label: 'New User Registration', description: 'Allow new user signups', enabled: true },
-          ].map((flag) => (
-            <div key={flag.label} className="flex items-center justify-between p-4 border-2 border-gray-200 rounded-lg hover:border-red-200 transition-colors">
-              <div>
-                <h4 className="text-sm font-medium text-gray-900">{flag.label}</h4>
-                <p className="text-xs text-gray-500">{flag.description}</p>
-              </div>
-              <Badge className={flag.enabled ? 'bg-green-100 text-green-700 border-green-300' : 'bg-gray-100 text-gray-500 border-gray-300'}>
-                {flag.enabled ? 'Enabled' : 'Disabled'}
-              </Badge>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+export { FeatureFlagsPage } from '../../../../features/system/pages/FeatureFlagsPage';
+
 
 // ── Role Management — /dashboard/system/role-management ──
 export function RoleManagementPage() {
@@ -143,36 +108,4 @@ export function AuditLogPage() {
   );
 }
 
-// ── AI Model Config — /dashboard/system/ai-model-config ──
-export function AIModelConfigPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-green-900">AI Model Configuration</h1>
-        <p className="text-green-600 mt-1">Configure AI plant identification settings</p>
-      </div>
-      <Card className="border-2 border-purple-200 bg-white">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-gray-900">
-            <Cpu className="w-5 h-5 text-purple-600" />
-            Active Model
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {[
-            { label: 'Model', value: 'Gemini 2.5 Flash' },
-            { label: 'Endpoint', value: 'generativelanguage.googleapis.com' },
-            { label: 'Max Tokens', value: '2048' },
-            { label: 'Temperature', value: '0.3' },
-            { label: 'Confidence Threshold', value: '75%' },
-          ].map((item) => (
-            <div key={item.label} className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-              <span className="text-sm text-gray-800">{item.label}</span>
-              <Badge className="bg-purple-100 text-purple-700">{item.value}</Badge>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+export { AIModelConfigPage } from '../../../../features/system';
