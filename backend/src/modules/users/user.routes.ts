@@ -26,4 +26,15 @@ router.get('/me/stats', userController.getStats);
 router.get('/me/dashboard-summary', userController.getDashboardSummary);
 router.delete('/me', userController.deleteAccount);
 
+// Sessions
+router.get('/me/sessions', userController.getSessions);
+router.delete('/me/sessions/:id', userController.deleteSession);
+router.post('/me/sessions/revoke-others', userController.revokeOtherSessions);
+
+// Preferences & History
+router.get('/me/preferences', userController.getPreferences);
+router.patch('/me/preferences', userController.updatePreferences);
+router.get('/me/login-history', userController.getLoginHistory);
+
+
 export default router;

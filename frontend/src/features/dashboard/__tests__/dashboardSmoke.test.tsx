@@ -31,6 +31,7 @@ import {
   HelpSupportPage,
 } from '../shared';
 import { GuidedToursPage } from '../../../app/components/dashboard/pages';
+import { RoleManagementPage, AuditLogPage } from '../../system';
 
 import * as adminApi from '../../admin/api/adminApi';
 import * as contributionsApi from '../../botanist/api/contributionsApi';
@@ -224,6 +225,8 @@ describe('Task 5: Dashboard Route Smoke Tests with Edge-Case Fixtures', () => {
     { name: 'Settings & Profile', path: '/dashboard/profile', element: <SettingsProfilePage /> },
     { name: 'Help & Support', path: '/dashboard/help', element: <HelpSupportPage /> },
     { name: 'Guided Tours', path: '/dashboard/tours', element: <GuidedToursPage /> },
+    { name: 'Role Management', path: '/dashboard/system/role-management', element: <RoleManagementPage /> },
+    { name: 'Audit Log', path: '/dashboard/system/audit-log', element: <AuditLogPage /> },
   ];
 
   routesToSmoke.forEach((route) => {

@@ -40,3 +40,18 @@ export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
   newPassword: z.string().min(8, 'New password must be at least 8 characters'),
 });
+
+export const reauthSchema = z.object({
+  password: z.string().optional(),
+  totpCode: z.string().optional(),
+});
+
+export const loginVerify2faSchema = z.object({
+  challengeToken: z.string().min(1, 'Challenge token is required'),
+  code: z.string().min(1, 'Code is required'),
+});
+
+export const disable2faSchema = z.object({
+  code: z.string().min(1, 'Verification code is required'),
+});
+

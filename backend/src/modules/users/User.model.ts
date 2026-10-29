@@ -1,5 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { UserRole, IOAuthAccount } from '../../types';
+import { UserRole, IOAuthAccount, INotificationPreferences } from '../../types';
+
+export interface ITwoFactorBackupCode {
+  codeHash: string;
+  used: boolean;
+  usedAt: Date | null;
+}
 
 export interface IUser extends Document {
   email: string;
@@ -11,6 +17,10 @@ export interface IUser extends Document {
   isEmailVerified: boolean;
   is2faEnabled: boolean;
   totpSecret: string | null;
+  twoFactorBackupCodes: ITwoFactorBackupCode[];
+  preferences: {
+    notifications: INotificationPreferences;
+  };
   isActive: boolean;
   banReason: string | null;
   bannedUntil: Date | null;
@@ -31,6 +41,27 @@ const OAuthAccountSchema = new Schema<IOAuthAccount>(
     provider: { type: String, required: true },
     providerUserId: { type: String, required: true },
     accessToken: { type: String, default: '' },
+  },
+  { _id: false },
+);
+
+const TwoFactorBackupCodeSchema = new Schema<ITwoFactorBackupCode>(
+  {
+    codeHash: { type: String, required: true },
+    used: { type: Boolean, default: false },
+    usedAt: { type: Date, default: null },
+  },
+  { _id: false },
+);
+
+const NotificationPreferencesSchema = new Schema<INotificationPreferences>(
+  {
+    newSubmission: { type: Boolean, default: true },
+    roleApplication: { type: Boolean, default: true },
+    support: { type: Boolean, default: true },
+    flaggedReview: { type: Boolean, default: true },
+    security: { type: Boolean, default: true },
+    system: { type: Boolean, default: true },
   },
   { _id: false },
 );
@@ -57,6 +88,20 @@ const UserSchema = new Schema<IUser>(
     isEmailVerified: { type: Boolean, default: false },
     is2faEnabled: { type: Boolean, default: false },
     totpSecret: { type: String, default: null },
+    twoFactorBackupCodes: { type: [TwoFactorBackupCodeSchema], default: [] },
+    preferences: {
+      notifications: {
+        type: NotificationPreferencesSchema,
+        default: () => ({
+          newSubmission: true,
+          roleApplication: true,
+          support: true,
+          flaggedReview: true,
+          security: true,
+          system: true,
+        }),
+      },
+    },
     isActive: { type: Boolean, default: true },
     banReason: { type: String, default: null },
     bannedUntil: { type: Date, default: null },
@@ -107,6 +152,7 @@ UserSchema.set('toJSON', {
   transform(_doc, ret) {
     delete (ret as any).passwordHash;
     delete (ret as any).totpSecret;
+    delete (ret as any).twoFactorBackupCodes;
     delete (ret as any).__v;
     return ret;
   },

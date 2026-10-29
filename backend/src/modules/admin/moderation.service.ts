@@ -345,11 +345,12 @@ export class ModerationService {
     // Audit log
     await createAuditLog({
       req,
-      action: AuditAction.UPDATE,
+      action: AuditAction.CONTENT_APPROVE,
       entityType: type === 'plant' ? 'Plant' : 'Remedy',
       entityId: item._id.toString(),
       oldValue: { status: previousStatus, isPublished: false },
       newValue: { status: ContentStatus.PUBLISHED, isPublished: true, isFeatured: item.isFeatured },
+      severity: 'INFO',
     });
 
     // Notify owner
@@ -418,11 +419,12 @@ export class ModerationService {
     // Audit log
     await createAuditLog({
       req,
-      action: AuditAction.UPDATE,
+      action: AuditAction.CONTENT_REJECT,
       entityType: type === 'plant' ? 'Plant' : 'Remedy',
       entityId: item._id.toString(),
       oldValue: { status: previousStatus },
       newValue: { status: ContentStatus.REJECTED, reason: reason.trim() },
+      severity: 'WARN',
     });
 
     // Notify owner
@@ -491,11 +493,12 @@ export class ModerationService {
     // Audit log
     await createAuditLog({
       req,
-      action: AuditAction.UPDATE,
+      action: AuditAction.CONTENT_REQUEST_CHANGES,
       entityType: type === 'plant' ? 'Plant' : 'Remedy',
       entityId: item._id.toString(),
       oldValue: { status: previousStatus },
       newValue: { status: ContentStatus.CHANGES_REQUESTED, comment: comment.trim() },
+      severity: 'INFO',
     });
 
     // Notify owner

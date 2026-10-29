@@ -36,12 +36,14 @@ import {
   FeaturedContentPage,
   AIScannerPage,
   GuidedToursPage,
-  SystemOverviewPage,
   FeatureFlagsPage,
-  RoleManagementPage,
-  AuditLogPage,
   AIModelConfigPage,
 } from "./app/components/dashboard/pages";
+import {
+  SystemOverviewPage,
+  RoleManagementPage,
+  AuditLogPage,
+} from "./features/system";
 
 // Admin feature pages (Part A)
 import {
@@ -157,11 +159,18 @@ export default function App() {
           <Route path="tours/analytics" element={<RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard"><AdminTourAnalyticsPage /></RequireRole>} />
 
           {/* Super Admin sub-routes */}
-          <Route path="system" element={<SystemOverviewPage />} />
-          <Route path="system/feature-flags" element={<FeatureFlagsPage />} />
-          <Route path="system/role-management" element={<RoleManagementPage />} />
-          <Route path="system/audit-log" element={<AuditLogPage />} />
-          <Route path="system/ai-model-config" element={<AIModelConfigPage />} />
+          <Route path="system" element={<RequireRole minimumRole="SUPER_ADMIN" forbiddenRedirect="/dashboard"><SystemOverviewPage /></RequireRole>} />
+          <Route path="system/feature-flags" element={<RequireRole minimumRole="SUPER_ADMIN" forbiddenRedirect="/dashboard"><FeatureFlagsPage /></RequireRole>} />
+          <Route path="system/role-management" element={<RequireRole minimumRole="SUPER_ADMIN" forbiddenRedirect="/dashboard"><RoleManagementPage /></RequireRole>} />
+          <Route path="system/audit-log" element={<RequireRole minimumRole="SUPER_ADMIN" forbiddenRedirect="/dashboard"><AuditLogPage /></RequireRole>} />
+          <Route path="system/ai-model-config" element={<RequireRole minimumRole="SUPER_ADMIN" forbiddenRedirect="/dashboard"><AIModelConfigPage /></RequireRole>} />
+
+          {/* Admin redirect aliases (prevents 404 on legacy or catalog links) */}
+          <Route path="admin/users" element={<Navigate to="/dashboard/users" replace />} />
+          <Route path="admin/content/plants" element={<Navigate to="/dashboard/content/plants" replace />} />
+          <Route path="admin/content/remedies" element={<Navigate to="/dashboard/content/remedies" replace />} />
+          <Route path="admin/content" element={<Navigate to="/dashboard/content/plants" replace />} />
+          <Route path="admin/tours" element={<Navigate to="/dashboard/tours/manage" replace />} />
         </Route>
 
         {/* ── Redirect aliases (keeps old URLs working) ── */}

@@ -309,6 +309,83 @@ export class UserService {
       ActivityLog.deleteMany({ user: userId }),
     ]);
   }
+
+  async getPreferences(userId: string) {
+    const user = await User.findById(userId);
+    if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
+
+    return (
+      user.preferences?.notifications || {
+        newSubmission: true,
+        roleApplication: true,
+        support: true,
+        flaggedReview: true,
+        security: true,
+        system: true,
+      }
+    );
+  }
+
+  async updatePreferences(userId: string, data: any) {
+    const user = await User.findById(userId);
+    if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
+
+    const incoming = data?.notifications || data;
+    const current = user.preferences?.notifications || {
+      newSubmission: true,
+      roleApplication: true,
+      support: true,
+      flaggedReview: true,
+      security: true,
+      system: true,
+    };
+
+    const updated = {
+      newSubmission: incoming.newSubmission !== undefined ? Boolean(incoming.newSubmission) : current.newSubmission,
+      roleApplication: incoming.roleApplication !== undefined ? Boolean(incoming.roleApplication) : current.roleApplication,
+      support: incoming.support !== undefined ? Boolean(incoming.support) : current.support,
+      flaggedReview: incoming.flaggedReview !== undefined ? Boolean(incoming.flaggedReview) : current.flaggedReview,
+      security: incoming.security !== undefined ? Boolean(incoming.security) : current.security,
+      system: incoming.system !== undefined ? Boolean(incoming.system) : current.system,
+    };
+
+    user.preferences = { notifications: updated };
+    await user.save();
+
+    return updated;
+  }
+
+  async getMyLoginHistory(userId: string) {
+    const AuditLog = (await import('../admin/AuditLog.model')).default;
+    const logs = await AuditLog.find({
+      $or: [{ user: userId }, { 'newValue.email': (await User.findById(userId))?.email }],
+      action: {
+        $in: [
+          'LOGIN',
+          'LOGIN_FAILED',
+          'LOGOUT',
+          'LOGOUT_ALL',
+          'REAUTH_SUCCESS',
+          'REAUTH_FAILED',
+          'TWO_FACTOR_ENABLE',
+          'TWO_FACTOR_DISABLE',
+        ],
+      },
+    })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    return logs.map((l) => ({
+      id: l._id.toString(),
+      action: l.action,
+      severity: l.severity || 'INFO',
+      ip: l.ipAddress,
+      userAgent: l.userAgent,
+      details: l.newValue,
+      createdAt: l.createdAt,
+    }));
+  }
 }
 
 export const userService = new UserService();

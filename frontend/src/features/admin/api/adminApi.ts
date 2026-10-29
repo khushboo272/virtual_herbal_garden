@@ -192,6 +192,32 @@ export async function bulkUnpublishContent(
   return res.data?.data || res.data;
 }
 
+export async function bulkPublishContent(
+  type: 'plants' | 'remedies',
+  ids: string[],
+): Promise<{ processed: number; success: boolean }> {
+  const res = await api.post(`/admin/content/${type}/bulk-publish`, { ids });
+  return res.data?.data || res.data;
+}
+
+export async function bulkFeatureContent(
+  type: 'plants' | 'remedies',
+  ids: string[],
+  isFeatured: boolean,
+): Promise<{ processed: number; success: boolean }> {
+  const res = await api.post(`/admin/content/${type}/bulk-feature`, { ids, isFeatured });
+  return res.data?.data || res.data;
+}
+
+export async function bulkStatusContent(
+  type: 'plants' | 'remedies',
+  ids: string[],
+  status: string,
+): Promise<{ processed: number; success: boolean }> {
+  const res = await api.post(`/admin/content/${type}/bulk-status`, { ids, status });
+  return res.data?.data || res.data;
+}
+
 export async function bulkDeleteContent(
   type: 'plants' | 'remedies',
   ids: string[],

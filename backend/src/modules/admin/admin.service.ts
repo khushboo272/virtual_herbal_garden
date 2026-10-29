@@ -12,6 +12,7 @@ import SystemConfig from './SystemConfig.model';
 import { UserRole, AuditAction, NotificationType, PaginationMeta, ContentStatus } from '../../types';
 import { AppError } from '../../core/utils/apiResponse';
 import { redis } from '../../core/config/redis';
+import { createAuditLog } from '../../core/utils/auditLogger';
 
 import RoleApplication, { RoleApplicationStatus } from './RoleApplication.model';
 import { getPendingReviewPredicate } from './moderation.service';
@@ -623,6 +624,14 @@ export class AdminService {
     } catch (e) {
       // Ignore if socket not initialized
     }
+
+    await createAuditLog({
+      action: AuditAction.ANNOUNCEMENT_SEND,
+      entityType: 'Broadcast',
+      details: { title: data.title, recipientCount: inserted.length, targetRoles: data.targetRoles },
+      severity: 'WARN',
+    });
+
     return inserted.length;
   }
 
@@ -696,7 +705,55 @@ export class AdminService {
     await redis.del('system:config');
     await redis.del('admin:stats:overview');
 
+    await createAuditLog({
+      action: AuditAction.CONFIG_CHANGE,
+      entityType: 'SystemConfig',
+      details: { changedKeys: Object.keys(data) },
+      severity: 'CRITICAL',
+    });
+
     return config;
+  }
+
+  async search(query: string): Promise<{ users: unknown[]; tours: unknown[] }> {
+    if (!query || !query.trim()) return { users: [], tours: [] };
+
+    const clean = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(clean, 'i');
+
+    const Tour = (await import('../tours/Tour.model')).default;
+
+    const [rawUsers, tours] = await Promise.all([
+      User.find({
+        $or: [{ displayName: regex }, { email: regex }],
+      })
+        .select('_id displayName email role avatarUrl')
+        .limit(5)
+        .lean(),
+      Tour.find({
+        $or: [{ title: regex }, { slug: regex }],
+      })
+        .select('_id title slug level isPublished durationMinutes coverImage')
+        .limit(5)
+        .lean(),
+    ]);
+
+    const users = rawUsers.map((u) => {
+      const parts = u.email.split('@');
+      const name = parts[0];
+      const domain = parts[1] || '';
+      const maskedName = name.length <= 2 ? `${name[0]}***` : `${name.slice(0, 2)}***${name.slice(-1)}`;
+      const maskedEmail = domain ? `${maskedName}@${domain}` : u.email;
+      return {
+        _id: u._id,
+        displayName: u.displayName,
+        email: maskedEmail,
+        role: u.role,
+        avatarUrl: u.avatarUrl,
+      };
+    });
+
+    return { users, tours };
   }
 }
 

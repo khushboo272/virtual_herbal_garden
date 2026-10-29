@@ -70,12 +70,14 @@ export function useAdminUsers() {
   const fetchUsers = useCallback(async (page = 1, limit = 20, search?: string) => {
     setIsLoading(true);
     try {
-      const res = await api.get<User[]>(
+      const res = await api.get<any>(
         '/admin/users',
         { page, limit, search },
       );
-      setUsers(res.data || []);
-      setTotal(res.meta?.total || 0);
+      const raw = res.data;
+      const userList = Array.isArray(raw) ? raw : (raw?.users || []);
+      setUsers(userList);
+      setTotal(res.meta?.total || raw?.pagination?.total || userList.length || 0);
     } catch {
       setUsers([]);
     } finally {

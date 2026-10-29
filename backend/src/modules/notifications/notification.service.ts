@@ -48,7 +48,44 @@ export class NotificationService {
     title: string,
     body: string,
     actionUrl?: string,
+    categoryOverride?: string,
   ): Promise<void> {
+    const isSecurityNotice =
+      /security|password|role|suspend|ban|reinstate|2fa|session|lockout|reauth/i.test(title + ' ' + body);
+
+    if (!isSecurityNotice) {
+      try {
+        const User = (await import('../users/User.model')).default;
+        const user = await User.findById(userId).select('preferences');
+        const prefs = user?.preferences?.notifications;
+
+        if (prefs) {
+          let category = categoryOverride;
+          if (!category) {
+            const text = (title + ' ' + body).toLowerCase();
+            if (text.includes('submission') || text.includes('draft') || text.includes('plant') || text.includes('remedy')) {
+              category = 'newSubmission';
+            } else if (text.includes('application') || text.includes('botanist')) {
+              category = 'roleApplication';
+            } else if (text.includes('support') || text.includes('ticket')) {
+              category = 'support';
+            } else if (text.includes('review') || text.includes('flag')) {
+              category = 'flaggedReview';
+            } else {
+              category = 'system';
+            }
+          }
+
+          if (category && (prefs as any)[category] === false) {
+            // User opted out of this non-critical notification type
+            return;
+          }
+        }
+      } catch (err) {
+        // Fallback to sending notification if checking preferences fails
+      }
+    }
+
     const notification = await Notification.create({
       user: userId,
       type,

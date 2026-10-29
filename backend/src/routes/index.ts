@@ -11,6 +11,7 @@ import homeRoutes from '../modules/home/home.routes';
 import contributionRoutes from '../modules/contributions/contribution.routes';
 import supportRoutes from '../modules/support/support.routes';
 import roleApplicationRoutes from '../modules/admin/roleApplications.routes';
+import systemRoutes from '../modules/system/system.routes';
 
 const router = Router();
 
@@ -21,10 +22,12 @@ router.use('/users/me/garden', gardenRoutes);
 router.use('/ai', aiRoutes);
 router.use('/users', userRoutes);
 router.use('/admin', adminRoutes);
+router.use('/system', systemRoutes);
 router.use('/tours', tourRoutes);
 router.use('/home', homeRoutes);
 router.use('/contributions', contributionRoutes);
 router.use('/support', supportRoutes);
 router.use('/role-applications', roleApplicationRoutes);
+
 
 export default router;

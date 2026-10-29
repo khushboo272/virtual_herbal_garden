@@ -12,3 +12,23 @@ export const createBookmarkSchema = z.object({
   collectionName: z.string().max(100).optional(),
   notes: z.string().max(500).optional(),
 });
+
+export const updatePreferencesSchema = z.object({
+  newSubmission: z.boolean().optional(),
+  roleApplication: z.boolean().optional(),
+  support: z.boolean().optional(),
+  flaggedReview: z.boolean().optional(),
+  security: z.boolean().optional(),
+  system: z.boolean().optional(),
+  notifications: z
+    .object({
+      newSubmission: z.boolean().optional(),
+      roleApplication: z.boolean().optional(),
+      support: z.boolean().optional(),
+      flaggedReview: z.boolean().optional(),
+      security: z.boolean().optional(),
+      system: z.boolean().optional(),
+    })
+    .optional(),
+});
+

@@ -12,62 +12,7 @@ import {
 import { useAdminUsers } from '../../../../hooks/useAdmin';
 
 // ── System Overview — /dashboard/system ──────────────────
-export function SystemOverviewPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-green-900">System Overview</h1>
-        <p className="text-green-600 mt-1">Super Admin system management panel</p>
-      </div>
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card className="border-2 border-red-200 bg-white">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-gray-900">
-              <Settings className="w-5 h-5 text-red-600" />
-              System Configuration
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {[
-              { label: 'API Version', value: 'v1.0.0' },
-              { label: 'AI Model', value: 'Gemini 2.5 Flash' },
-              { label: 'Max Upload Size', value: '10 MB' },
-              { label: 'Detection TTL', value: '90 days' },
-            ].map((item) => (
-              <div key={item.label} className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                <span className="text-sm text-gray-800">{item.label}</span>
-                <Badge className="bg-red-100 text-red-700">{item.value}</Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-        <Card className="border-2 border-red-200 bg-white">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-gray-900">
-              <Wrench className="w-5 h-5 text-red-600" />
-              System Health
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {[
-              { label: 'Database', status: 'Connected', ok: true },
-              { label: 'R2 Storage', status: 'Connected', ok: true },
-              { label: 'Socket.io', status: 'Active', ok: true },
-              { label: 'AI Service', status: 'Ready', ok: true },
-            ].map((item) => (
-              <div key={item.label} className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                <span className="text-sm text-gray-800">{item.label}</span>
-                <Badge className={item.ok ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
-                  {item.status}
-                </Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
+export { SystemOverviewPage } from '../../../../features/system/pages/SystemOverviewPage';
 
 // ── Feature Flags — /dashboard/system/feature-flags ──────
 export function FeatureFlagsPage() {

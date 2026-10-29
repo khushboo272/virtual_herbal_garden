@@ -311,7 +311,7 @@
 
 ---
 
-## BUG-047 Admin user suspension is immediately inverted/unbanned and user remains active
+## BUG-047-PREV Admin user suspension is immediately inverted/unbanned and user remains active
 **Status:** FIXED
 **Description:** When an admin attempted to suspend a user in User Management, the user was immediately unbanned / reinstated, sending an "Account Reinstated" notification, and the user remained "Active" in the admin table.
 **Root Cause:**
@@ -329,7 +329,7 @@
 
 ---
 
-## BUG-048 NotificationPanel crashes with RangeError: Invalid time value
+## BUG-048-PREV NotificationPanel crashes with RangeError: Invalid time value
 **Status:** FIXED
 **Description:** On the user side, navigating or opening notifications threw an unhandled `RangeError: Invalid time value` at `formatDistanceToNow` inside `NotificationPanel.tsx`, triggering an "Application Error" fallback screen instead of showing the real issue.
 **Root Cause:**
@@ -340,3 +340,101 @@ In `frontend/src/app/components/dashboard/NotificationPanel.tsx`, `formatDistanc
 3. Added suspension verification in `GoogleStrategy` so banned users cannot bypass suspension using Google OAuth.
 4. Added custom failure callback in `auth.routes.ts` passing the exact suspension message in the redirect URL.
 5. Added unit test in `NotificationPanel.test.tsx` verifying safe rendering with invalid and missing dates.
+
+---
+
+## BUG-047 Role Management page crashes ("Unable to load page")
+**Status:** FIXED (Super Admin Dashboard Part S1)
+**Description:** Navigating to `/dashboard/system/role-management` crashes the page with the RouteErrorBoundary ("Unable to load page").
+**Root Cause:** In `useAdminUsers()`, the hook stored the entire API response object `{ users, pagination, ... }` into `users` state instead of extracting the users array, causing `adminUsers.forEach is not a function` in `RoleManagementPage`.
+**Fix:**
+1. Refactored `useAdminUsers` hook to guarantee `users` is always an array of user objects (`res.data.users || res.data || []`), exposing `{ users, total, isLoading, fetchUsers }`.
+2. Created `frontend/src/features/system/pages/RoleManagementPage.tsx` with tabs for Users & Roles, Admin Accounts, and Permission Matrix. Wrapped with `<RequireRole minimumRole="SUPER_ADMIN" forbiddenRedirect="/dashboard">` in `App.tsx`.
+3. Verified via Vitest smoke tests (`dashboardSmoke.test.tsx` 18/18 PASS) and feature tests (`systemFeature.test.tsx` 6/6 PASS).
+
+---
+
+## BUG-048 Audit Log shows hard-coded sample rows (emails that do not exist in the DB)
+**Status:** FIXED (Super Admin Dashboard Part S1)
+**Description:** `/dashboard/system/audit-log` displayed 3 static mock entries (`admin@garden.com`, `botanist@garden.com`, Shatavari) with dummy timestamps instead of reading live AuditLog documents.
+**Root Cause:** The page rendered a hardcoded local array instead of fetching from the backend audit log API.
+**Fix:**
+1. Implemented real backend endpoints: `GET /api/v1/system/audit-logs`, `GET /api/v1/system/audit/summary`, `GET /api/v1/system/audit-logs/export.csv`, and `GET /api/v1/system/security/events`.
+2. Built real-time `AuditLogPage.tsx` with filter toolbar (Actor, Action multi-select, TargetType, Severity, Date Range, text query), Summary metrics cards (24h, 7d, 30d, top actors), full slide-over Detail Drawer with formatted JSON and diff highlighting, CSV streaming export with `X-Reauth-Token`, and Security Events tab with suspicious IP tracking (≥5 failed logins / 10m).
+3. Verified via backend tests (`system-super-admin.test.ts` 21/21 PASS) and frontend tests (`systemFeature.test.tsx` 6/6 PASS).
+
+---
+
+## BUG-049 Settings & Profile has generic copy for admin roles and no security center
+**Status:** FIXED (Super Admin Dashboard Part S1)
+**Description:** Settings & Profile used static copy ("Herbal explorer", "botanical profile") regardless of role, and lacked a security center (2FA setup/disable with backup codes, active sessions with revocation, personal login history, notification preferences).
+**Root Cause:** No role-aware configuration or backend/frontend security center and session tracking existed.
+**Fix:**
+1. Built role-aware copy configuration dictionary (`ROLE_COPY_CONFIG`) for `SUPER_ADMIN`, `ADMIN`, `BOTANIST`, and `USER` with custom page subtitles, badges, and bio labels.
+2. Built 2FA Security Center supporting TOTP QR code data URL setup, 10 single-use hashed backup codes with print/download modal, single-use verification, and password/TOTP reauth disable flow.
+3. Built Active Sessions manager showing device, browser, OS, IP, and relative time with "Revoke" and "Log Out Other Devices" actions.
+4. Built Login History log table and granular Notification Preferences toggle switches (`User.preferences.notifications`).
+5. Verified via frontend feature test (`systemFeature.test.tsx` 6/6 PASS).
+
+---
+
+## BUG-050 Dashboard search triggers browser email-autofill popup and shows misleading empty message for admin queries
+**Status:** FIXED (Super Admin Dashboard Part S1)
+**Description:** The dashboard header search input triggered autofill suggestions for email credentials and only searched plants/remedies even when logged in as an ADMIN or SUPER_ADMIN searching for users or tours.
+**Root Cause:** Input lacked appropriate `autoComplete="off"`, type, and name attributes; backend search endpoint and frontend search lacked ADMIN+ user/tour search integration and role-aware empty states.
+**Fix:**
+1. Updated `HeaderSearchDropdown.tsx` with `type="search"`, `autoComplete="off"`, `name="dashboard-header-search"`, and `data-lpignore="true"` to prevent autofill heuristics.
+2. Implemented `GET /api/v1/admin/search` returning grouped Users and Tours alongside Plants and Remedies for ADMIN and SUPER_ADMIN users.
+3. Added role-aware empty states guiding the user on what categories are searchable based on their active role.
+4. Verified via Vitest unit tests in `systemFeature.test.tsx`.
+
+---
+
+## BUG-051 Sensitive super-admin actions need no re-authentication
+**Status:** FIXED (Super Admin Dashboard Part S1)
+**Description:** High-privilege actions (granting/revoking ADMIN, disabling 2FA, regenerating backup codes, revoking user sessions, exporting audit logs) could be executed without recent password or TOTP re-authentication.
+**Root Cause:** No step-up re-authentication endpoint, token, or middleware existed.
+**Fix:**
+1. Implemented `POST /api/v1/auth/reauth` issuing a signed 5-minute scoped JWT (`purpose: "reauth"`). Rate-limited to 5 attempts per minute per IP. Audits failures without logging passwords.
+2. Created `requireRecentAuth` middleware validating the `X-Reauth-Token` header, verifying user match, expiration, and purpose.
+3. Protected role changes (`PATCH /system/users/:id/role`), admin session revocation (`DELETE /system/users/:id/sessions/:sessionId`), CSV export (`GET /system/audit-logs/export.csv`), and backup codes regeneration (`POST /auth/2fa/regenerate-backup-codes`).
+4. Created reusable modal `ReauthDialog.tsx` and custom hook `useReauth.ts` handling both password and TOTP modes.
+5. Verified via 21 backend Jest tests and frontend Vitest component tests.
+
+---
+
+## BUG-052 Logging in to a 2FA-enabled account fails silently without prompting for verification code
+**Status:** FIXED
+**Description:** After enabling two-factor verification, when the user logs out and attempts to log back in via the login modal on the home page (`Layout.tsx`), clicking "Sign In" silently did nothing: no error was shown and the user was not logged in.
+**Root Cause:**
+1. In `backend/src/modules/auth/auth.controller.ts`, when 2FA is active for the user, `POST /api/v1/auth/login` returns `{ requires2fa: true, challengeToken: string, message: "Please provide your 2FA code" }` with HTTP 200.
+2. In `frontend/src/contexts/AuthContext.tsx`, `login(email, password)` assumed the response always contained `{ accessToken, user }`. When `requires2fa` was returned, `accessToken` and `user` were `undefined`, so no session was created and no error was thrown.
+3. In `frontend/src/app/Layout.tsx`, `handleAuthSubmit` blindly called `login()`, closed the auth modal (`setShowAuthDialog(false)`), and navigated to `/`. There was no secondary step or input UI to collect the 6-digit TOTP authenticator code or 8-character single-use backup code.
+**Fix:**
+1. Created TDD test suite `frontend/src/features/auth/__tests__/twoFactorLogin.test.tsx` verifying `AuthContext` returns the 2FA challenge and `Layout` prompts for the code and calls `verify2faLogin`.
+2. Updated `AuthContext.tsx`: defined `AuthLoginResult` interface (`{ requires2fa: boolean; challengeToken?: string }`). If `requires2fa` is true, returns the challenge token without setting the user or tokens. Added `verify2faLogin(challengeToken: string, code: string)` calling `POST /api/v1/auth/2fa/login-verify` to complete authentication and establish the WebSocket connection.
+3. Updated `Layout.tsx`: added a 2FA step state in the login modal. When `requires2fa` is received, keeps the modal open and renders the 2-Step Verification view with a 6-digit TOTP / backup code input, "Verify & Sign In" button, and "Back to Email & Password" option.
+---
+
+## BUG-053 Database Collections & Catalog Distribution "Manage" buttons open 404 "Lost in the Garden?" page
+**Status:** FIXED
+**Description:** Clicking the "Manage ↗" button next to any database collection (e.g. User Accounts, Medicinal Plants, Herbal Remedies, Virtual Guided Tours) in the "Database Collections & Catalog Distribution" table on the System Overview page (`/dashboard/system`) opens a 404 page: "ERROR 404 — PAGE NOT FOUND. Lost in the Garden?".
+**Root Cause:**
+1. In `backend/src/modules/system/system.service.ts`, the database collections catalog array defined management URLs prefixed with `/dashboard/admin/*` (`/dashboard/admin/users`, `/dashboard/admin/content/plants`, `/dashboard/admin/content/remedies`, `/dashboard/admin/tours`).
+2. In `frontend/src/App.tsx`, all dashboard pages are nested under `<Route path="/dashboard" element={<DashboardLayout />}>`, where the actual routes are defined as `users` (`/dashboard/users`), `content/plants` (`/dashboard/content/plants`), `content/remedies` (`/dashboard/content/remedies`), and `tours/manage` (`/dashboard/tours/manage`). There was no `/dashboard/admin/*` routing branch, causing the router to fall back to the 404 catch-all route.
+**Fix:**
+1. Wrote TDD assertions in `backend/tests/system-overview.test.ts` verifying collection management paths point to valid active routes (`/dashboard/users`, `/dashboard/content/plants`, etc.). Observed test failure with `Expected: "/dashboard/users", Received: "/dashboard/admin/users"`.
+2. Updated `backend/src/modules/system/system.service.ts` so collection records provide the canonical active dashboard paths:
+   - `users`: `/dashboard/users`
+   - `plants`: `/dashboard/content/plants`
+   - `remedies`: `/dashboard/content/remedies`
+   - `tours`: `/dashboard/tours/manage`
+3. Added backward-compatibility alias redirects in `frontend/src/App.tsx` within `<Route path="/dashboard">`:
+   - `admin/users` -> `<Navigate to="/dashboard/users" replace />`
+   - `admin/content/plants` -> `<Navigate to="/dashboard/content/plants" replace />`
+   - `admin/content/remedies` -> `<Navigate to="/dashboard/content/remedies" replace />`
+   - `admin/content` -> `<Navigate to="/dashboard/content/plants" replace />`
+   - `admin/tours` -> `<Navigate to="/dashboard/tours/manage" replace />`
+4. Updated mock data and added a component test in `frontend/src/features/system/__tests__/SystemOverviewPage.test.tsx` verifying manage links render valid dashboard paths (4/4 tests PASS).
+5. Re-ran backend integration tests (7/7 PASS), frontend smoke tests (18/18 PASS), frontend lint (0 errors), and production build (clean bundle).
+

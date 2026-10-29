@@ -18,7 +18,10 @@ export {
 export {
   SystemOverviewPage,
   FeatureFlagsPage,
-  RoleManagementPage,
-  AuditLogPage,
   AIModelConfigPage,
 } from './SystemPages';
+export {
+  RoleManagementPage,
+  AuditLogPage,
+} from '../../../../features/system';
+

@@ -30,7 +30,11 @@ export class AuthController {
     const result = await authService.login(email, password, req, totpCode);
 
     if (result.requires2fa) {
-      sendSuccess(res, { requires2fa: true, message: 'Please provide your 2FA code' });
+      sendSuccess(res, {
+        requires2fa: true,
+        challengeToken: result.challengeToken,
+        message: 'Please provide your 2FA code',
+      });
       return;
     }
 
@@ -47,6 +51,30 @@ export class AuthController {
       accessToken: result.accessToken,
       user: result.user,
     });
+  }
+
+  async loginVerify2fa(req: Request, res: Response) {
+    const { challengeToken, code } = req.body;
+    const result = await authService.loginVerify2fa(challengeToken, code, req);
+
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+
+    sendSuccess(res, {
+      accessToken: result.accessToken,
+      user: result.user,
+    });
+  }
+
+  async reauth(req: Request, res: Response) {
+    const { password, totpCode } = req.body;
+    const result = await authService.reauth(req.user!.sub, password, totpCode, req);
+    sendSuccess(res, result);
   }
 
   async logout(req: Request, res: Response) {
@@ -93,25 +121,40 @@ export class AuthController {
     sendSuccess(res, { message: 'Password reset successful' });
   }
 
+  async get2faStatus(req: Request, res: Response) {
+    const status = await authService.get2faStatus(req.user!.sub);
+    sendSuccess(res, status);
+  }
+
   async setup2fa(req: Request, res: Response) {
     const result = await authService.setup2fa(req.user!.sub);
     sendSuccess(res, result);
   }
 
   async verify2fa(req: Request, res: Response) {
-    await authService.verify2fa(req.user!.sub, req.body.totpCode);
-    sendSuccess(res, { message: '2FA enabled successfully' });
+    const result = await authService.verify2fa(req.user!.sub, req.body.totpCode, req);
+    sendSuccess(res, result);
+  }
+
+  async regenerateBackupCodes(req: Request, res: Response) {
+    const result = await authService.regenerateBackupCodes(req.user!.sub, req);
+    sendSuccess(res, result);
+  }
+
+  async disable2fa(req: Request, res: Response) {
+    const result = await authService.disable2fa(req.user!.sub, req.body.code, req);
+    sendSuccess(res, result);
   }
 
   async logoutAll(req: Request, res: Response) {
-    await authService.logoutAll(req.user!.sub);
+    await authService.logoutAll(req.user!.sub, req);
     res.clearCookie('refreshToken', { path: '/' });
     sendSuccess(res, { message: 'Logged out from all devices' });
   }
 
   async changePassword(req: Request, res: Response) {
     const { currentPassword, newPassword } = req.body;
-    await authService.changePassword(req.user!.sub, currentPassword, newPassword);
+    await authService.changePassword(req.user!.sub, currentPassword, newPassword, req);
     sendSuccess(res, { message: 'Password changed successfully' });
   }
 

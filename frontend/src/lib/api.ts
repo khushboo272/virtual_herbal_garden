@@ -130,7 +130,7 @@ export const api = {
   get: <T>(
     endpoint: string,
     params?: Record<string, string | number | boolean | undefined>,
-    options?: { signal?: AbortSignal },
+    options?: { signal?: AbortSignal; headers?: Record<string, string> },
   ) => {
     const searchParams = new URLSearchParams();
     if (params) {
@@ -147,31 +147,38 @@ export const api = {
       });
     }
     const query = searchParams.toString();
-    return request<T>(`${endpoint}${query ? `?${query}` : ''}`, { signal: options?.signal });
+    return request<T>(`${endpoint}${query ? `?${query}` : ''}`, {
+      signal: options?.signal,
+      headers: options?.headers,
+    });
   },
 
-  post: <T>(endpoint: string, body?: unknown) =>
+  post: <T>(endpoint: string, body?: unknown, options?: { headers?: Record<string, string> }) =>
     request<T>(endpoint, {
       method: 'POST',
       body: body instanceof FormData ? body : JSON.stringify(body),
+      headers: options?.headers,
     }),
 
-  put: <T>(endpoint: string, body?: unknown) =>
+  put: <T>(endpoint: string, body?: unknown, options?: { headers?: Record<string, string> }) =>
     request<T>(endpoint, {
       method: 'PUT',
       body: body instanceof FormData ? body : JSON.stringify(body),
+      headers: options?.headers,
     }),
 
-  patch: <T>(endpoint: string, body?: unknown) =>
+  patch: <T>(endpoint: string, body?: unknown, options?: { headers?: Record<string, string> }) =>
     request<T>(endpoint, {
       method: 'PATCH',
       body: JSON.stringify(body),
+      headers: options?.headers,
     }),
 
-  delete: <T>(endpoint: string, body?: unknown) =>
+  delete: <T>(endpoint: string, body?: unknown, options?: { headers?: Record<string, string> }) =>
     request<T>(endpoint, {
       method: 'DELETE',
       body: body ? JSON.stringify(body) : undefined,
+      headers: options?.headers,
     }),
 
   upload: <T>(endpoint: string, formData: FormData) =>

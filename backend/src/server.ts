@@ -9,6 +9,7 @@ import { logger } from './core/utils/logger';
 // Import workers to start them
 import './modules/notifications/email.worker';
 
+
 async function bootstrap(): Promise<void> {
   // Connect to MongoDB
   await connectDB();

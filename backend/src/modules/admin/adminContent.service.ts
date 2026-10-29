@@ -404,6 +404,110 @@ export class AdminContentService {
 
     return { processed: items.length, success: true };
   }
+
+  /**
+   * Bulk publish items (max 50)
+   */
+  async bulkPublish(type: 'plants' | 'remedies', ids: string[], adminUser: any, req?: any) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new AppError('IDs array is required', 400);
+    }
+    if (ids.length > 50) {
+      throw new AppError('Bulk action limit is 50 items maximum', 400, 'LIMIT_EXCEEDED');
+    }
+
+    const Model = type === 'plants' ? Plant : (Remedy as any);
+    const validIds = ids.filter((id) => Types.ObjectId.isValid(id));
+    const items = await Model.find({ _id: { $in: validIds }, isDeleted: { $ne: true } });
+
+    for (const item of items) {
+      item.isPublished = true;
+      item.status = ContentStatus.PUBLISHED;
+      await item.save();
+
+      await writeAuditLog({
+        actor: adminUser._id,
+        action: 'CONTENT_PUBLISHED',
+        targetModel: type === 'plants' ? 'Plant' : 'Remedy',
+        targetId: item._id,
+        details: { slug: item.slug, bulk: true },
+        req,
+      });
+    }
+
+    return { processed: items.length, success: true };
+  }
+
+  /**
+   * Bulk feature or unfeature items (max 50)
+   */
+  async bulkFeature(type: 'plants' | 'remedies', ids: string[], isFeatured: boolean, adminUser: any, req?: any) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new AppError('IDs array is required', 400);
+    }
+    if (ids.length > 50) {
+      throw new AppError('Bulk action limit is 50 items maximum', 400, 'LIMIT_EXCEEDED');
+    }
+
+    const Model = type === 'plants' ? Plant : (Remedy as any);
+    const validIds = ids.filter((id) => Types.ObjectId.isValid(id));
+    const items = await Model.find({ _id: { $in: validIds }, isDeleted: { $ne: true } });
+
+    for (const item of items) {
+      item.isFeatured = Boolean(isFeatured);
+      await item.save();
+
+      await writeAuditLog({
+        actor: adminUser._id,
+        action: isFeatured ? 'CONTENT_FEATURED' : 'CONTENT_UNFEATURED',
+        targetModel: type === 'plants' ? 'Plant' : 'Remedy',
+        targetId: item._id,
+        details: { slug: item.slug, isFeatured: Boolean(isFeatured), bulk: true },
+        req,
+      });
+    }
+
+    return { processed: items.length, success: true };
+  }
+
+  /**
+   * Bulk change workflow status (max 50)
+   */
+  async bulkStatus(type: 'plants' | 'remedies', ids: string[], status: ContentStatus, adminUser: any, req?: any) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new AppError('IDs array is required', 400);
+    }
+    if (ids.length > 50) {
+      throw new AppError('Bulk action limit is 50 items maximum', 400, 'LIMIT_EXCEEDED');
+    }
+
+    const validStatuses = Object.values(ContentStatus);
+    if (!validStatuses.includes(status)) {
+      throw new AppError(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`, 400);
+    }
+
+    const Model = type === 'plants' ? Plant : (Remedy as any);
+    const validIds = ids.filter((id) => Types.ObjectId.isValid(id));
+    const items = await Model.find({ _id: { $in: validIds }, isDeleted: { $ne: true } });
+
+    for (const item of items) {
+      item.status = status;
+      item.isPublished = status === ContentStatus.PUBLISHED;
+      await item.save();
+
+      await writeAuditLog({
+        actor: adminUser._id,
+        action: 'CONTENT_STATUS_CHANGED',
+        targetModel: type === 'plants' ? 'Plant' : 'Remedy',
+        targetId: item._id,
+        details: { slug: item.slug, newStatus: status, bulk: true },
+        req,
+      });
+    }
+
+    return { processed: items.length, success: true };
+  }
 }
 
 export const adminContentService = new AdminContentService();
+

@@ -338,11 +338,12 @@ export class AdminUsersService {
     // Audit log
     await createAuditLog({
       req,
-      action: ban ? AuditAction.UPDATE : AuditAction.UPDATE,
+      action: ban ? AuditAction.USER_BAN : AuditAction.USER_UNBAN,
       entityType: 'User',
       entityId: targetUser._id.toString(),
       oldValue: oldStatus,
       newValue: { isActive: targetUser.isActive, banReason: targetUser.banReason, bannedUntil: targetUser.bannedUntil },
+      severity: ban ? 'WARN' : 'INFO',
     });
 
     // Notify user
@@ -402,10 +403,11 @@ export class AdminUsersService {
 
     await createAuditLog({
       req,
-      action: AuditAction.LOGOUT,
+      action: AuditAction.LOGOUT_ALL,
       entityType: 'User',
       entityId: targetUserId,
       newValue: { forceLogout: true },
+      severity: 'WARN',
     });
   }
 }

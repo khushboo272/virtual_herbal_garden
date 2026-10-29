@@ -13,13 +13,19 @@ const ROLE_HIERARCHY: Record<UserRole, number> = {
   SUPER_ADMIN: 4,
 };
 
+export interface AuthLoginResult {
+  requires2fa: boolean;
+  challengeToken?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   role: UserRole;
   hasMinRole: (minimum: UserRole) => boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthLoginResult>;
+  verify2faLogin: (challengeToken: string, code: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -95,8 +101,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [refreshUser]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await api.post<{ accessToken: string; user: User }>('/auth/login', { email, password });
+  const login = useCallback(async (email: string, password: string): Promise<AuthLoginResult> => {
+    const res = await api.post<{
+      accessToken?: string;
+      user?: User;
+      requires2fa?: boolean;
+      challengeToken?: string;
+    }>('/auth/login', { email, password });
+
+    if (res.data?.requires2fa) {
+      return {
+        requires2fa: true,
+        challengeToken: res.data.challengeToken,
+      };
+    }
+
+    if (res.data?.accessToken && res.data?.user) {
+      setAccessToken(res.data.accessToken);
+      setUser(res.data.user);
+      import('../lib/socket').then(({ connectSocket }) => connectSocket(res.data.accessToken!));
+    }
+    return { requires2fa: false };
+  }, []);
+
+  const verify2faLogin = useCallback(async (challengeToken: string, code: string): Promise<void> => {
+    const res = await api.post<{ accessToken: string; user: User }>('/auth/2fa/login-verify', {
+      challengeToken,
+      code,
+    });
     setAccessToken(res.data.accessToken);
     setUser(res.data.user);
     import('../lib/socket').then(({ connectSocket }) => connectSocket(res.data.accessToken));
@@ -130,6 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role,
         hasMinRole,
         login,
+        verify2faLogin,
         register,
         logout,
         refreshUser,

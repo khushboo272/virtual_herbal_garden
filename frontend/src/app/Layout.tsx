@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
-import { Leaf, BookOpen, Sparkles, Map, Pill, Award, LayoutDashboard, LogIn, LogOut, User, Palette } from "lucide-react";
+import { Leaf, BookOpen, Sparkles, Map, Pill, Award, LayoutDashboard, LogIn, LogOut, User, Palette, ShieldCheck } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { useState } from "react";
@@ -11,13 +11,21 @@ import { Navbar } from "../components/navbar/Navbar";
 export function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAuthenticated, login, register, logout, refreshUser } = useAuth();
+  const { user, isAuthenticated, login, verify2faLogin, register, logout, refreshUser } = useAuth();
   const [showAuthDialog, setShowAuthDialog] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
+
+  // 2-Step Verification challenge state
+  const [twoFactorChallenge, setTwoFactorChallenge] = useState<{
+    challengeToken: string;
+    email: string;
+  } | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
 
   const handleAuthSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -29,7 +37,13 @@ export function Layout() {
 
     try {
       if (authMode === "login") {
-        await login(email, password);
+        const result = await login(email, password);
+        if (result?.requires2fa && result.challengeToken) {
+          setTwoFactorChallenge({ challengeToken: result.challengeToken, email });
+          setTwoFactorCode("");
+          setAuthError(null);
+          return;
+        }
       } else {
         const name = formData.get("name") as string;
         await register(name, email, password);
@@ -40,6 +54,25 @@ export function Layout() {
       setAuthError(err?.message || "Authentication failed");
     } finally {
       setAuthLoading(false);
+    }
+  };
+
+  const handle2faSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!twoFactorChallenge) return;
+    setAuthError(null);
+    setTwoFactorLoading(true);
+
+    try {
+      await verify2faLogin(twoFactorChallenge.challengeToken, twoFactorCode.trim());
+      setTwoFactorChallenge(null);
+      setTwoFactorCode("");
+      setShowAuthDialog(false);
+      navigate("/");
+    } catch (err: any) {
+      setAuthError(err?.message || "Invalid 2FA code or backup code");
+    } finally {
+      setTwoFactorLoading(false);
     }
   };
 
@@ -209,124 +242,197 @@ export function Layout() {
       )}
 
       {/* Auth Dialog */}
-      <Dialog open={showAuthDialog} onOpenChange={setShowAuthDialog}>
+      <Dialog
+        open={showAuthDialog}
+        onOpenChange={(open) => {
+          setShowAuthDialog(open);
+          if (!open) {
+            setTwoFactorChallenge(null);
+            setTwoFactorCode("");
+            setAuthError(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-md bg-gradient-to-br from-green-50 to-white border-2 border-green-200">
-          <DialogHeader>
-            <DialogTitle className="text-2xl text-green-900">
-              {authMode === "login" ? "Welcome Back" : "Join the Garden"}
-            </DialogTitle>
-            <DialogDescription className="text-green-600">
-              {authMode === "login"
-                ? "Sign in to access your dashboard and bookmarks"
-                : "Create an account to save plants and track your progress"}
-            </DialogDescription>
-          </DialogHeader>
+          {twoFactorChallenge ? (
+            <div className="space-y-4">
+              <DialogHeader>
+                <DialogTitle className="text-2xl text-green-900 flex items-center gap-2">
+                  <ShieldCheck className="w-6 h-6 text-emerald-600 shrink-0" />
+                  Two-Factor Verification
+                </DialogTitle>
+                <DialogDescription className="text-green-700 text-xs leading-relaxed">
+                  Enter the 6-digit verification code from your authenticator app or an 8-character backup code for{" "}
+                  <span className="font-semibold text-green-900 font-mono">{twoFactorChallenge.email}</span>.
+                </DialogDescription>
+              </DialogHeader>
 
-          <form onSubmit={handleAuthSubmit} className="space-y-4 pt-4">
-            {authMode === "register" && (
-              <div className="space-y-2">
-                <Label htmlFor="auth-name" className="text-green-800">Full Name</Label>
-                <Input
-                  id="auth-name"
-                  name="name"
-                  placeholder="John Doe"
-                  required
-                  className="border-green-200 focus:border-green-400"
-                />
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="auth-email" className="text-green-800">Email</Label>
-              <Input
-                id="auth-email"
-                name="email"
-                type="email"
-                placeholder="you@example.com"
-                required
-                className="border-green-200 focus:border-green-400"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="auth-password" className="text-green-800">Password</Label>
-              <Input
-                id="auth-password"
-                name="password"
-                type="password"
-                placeholder="••••••••"
-                required
-                minLength={8}
-                className="border-green-200 focus:border-green-400"
-              />
-            </div>
+              <form onSubmit={handle2faSubmit} className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label htmlFor="auth-2fa-code" className="text-green-800 text-xs font-semibold">
+                    6-Digit Code / Backup Code
+                  </Label>
+                  <Input
+                    id="auth-2fa-code"
+                    name="twoFactorCode"
+                    value={twoFactorCode}
+                    onChange={(e) => setTwoFactorCode(e.target.value)}
+                    placeholder="123456 or XXXX-XXXX"
+                    required
+                    autoFocus
+                    className="border-green-200 focus:border-green-400 font-mono text-center tracking-widest text-lg font-bold"
+                  />
+                </div>
 
-            {authError && (
-              <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{authError}</p>
-            )}
+                {authError && (
+                  <p className="text-sm text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200">
+                    {authError}
+                  </p>
+                )}
 
-            <Button
-              type="submit"
-              className="w-full bg-green-600 hover:bg-green-700"
-              disabled={authLoading}
-            >
-              {authLoading ? "Please wait..." : authMode === "login" ? "Sign In" : "Create Account"}
-            </Button>
+                <Button
+                  type="submit"
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  disabled={twoFactorLoading || !twoFactorCode.trim()}
+                >
+                  {twoFactorLoading ? "Verifying..." : "Verify & Sign In"}
+                </Button>
 
-            {/* ── Divider ── */}
-            <div className="auth-divider">
-              <span>or</span>
-            </div>
-
-            {/* ── Google Sign-In Button ── */}
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={googleLoading}
-              className="btn-google"
-              aria-label="Continue with Google"
-            >
-              {googleLoading ? (
-                <span className="spinner-sm" />
-              ) : (
-                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-                  <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
-                  <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2.04a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
-                  <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/>
-                  <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.31z"/>
-                </svg>
-              )}
-              <span>{googleLoading ? "Signing in..." : "Continue with Google"}</span>
-            </button>
-
-            {googleError && (
-              <p className="auth-error" role="alert">{googleError}</p>
-            )}
-
-            <p className="text-center text-sm text-green-600">
-              {authMode === "login" ? (
-                <>
-                  Don't have an account?{" "}
+                <div className="text-center pt-2">
                   <button
                     type="button"
-                    className="text-green-800 font-semibold hover:underline"
-                    onClick={() => { setAuthMode("register"); setAuthError(null); setGoogleError(null); }}
+                    onClick={() => {
+                      setTwoFactorChallenge(null);
+                      setTwoFactorCode("");
+                      setAuthError(null);
+                    }}
+                    className="text-xs text-green-700 hover:text-green-900 hover:underline"
                   >
-                    Sign up
+                    ← Back to Email & Password
                   </button>
-                </>
-              ) : (
-                <>
-                  Already have an account?{" "}
-                  <button
-                    type="button"
-                    className="text-green-800 font-semibold hover:underline"
-                    onClick={() => { setAuthMode("login"); setAuthError(null); setGoogleError(null); }}
-                  >
-                    Sign in
-                  </button>
-                </>
-              )}
-            </p>
-          </form>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-2xl text-green-900">
+                  {authMode === "login" ? "Welcome Back" : "Join the Garden"}
+                </DialogTitle>
+                <DialogDescription className="text-green-600">
+                  {authMode === "login"
+                    ? "Sign in to access your dashboard and bookmarks"
+                    : "Create an account to save plants and track your progress"}
+                </DialogDescription>
+              </DialogHeader>
+
+              <form onSubmit={handleAuthSubmit} className="space-y-4 pt-4">
+                {authMode === "register" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="auth-name" className="text-green-800">Full Name</Label>
+                    <Input
+                      id="auth-name"
+                      name="name"
+                      placeholder="John Doe"
+                      required
+                      className="border-green-200 focus:border-green-400"
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="auth-email" className="text-green-800">Email</Label>
+                  <Input
+                    id="auth-email"
+                    name="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    required
+                    className="border-green-200 focus:border-green-400"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="auth-password" className="text-green-800">Password</Label>
+                  <Input
+                    id="auth-password"
+                    name="password"
+                    type="password"
+                    placeholder="••••••••"
+                    required
+                    minLength={8}
+                    className="border-green-200 focus:border-green-400"
+                  />
+                </div>
+
+                {authError && (
+                  <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{authError}</p>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full bg-green-600 hover:bg-green-700"
+                  disabled={authLoading}
+                >
+                  {authLoading ? "Please wait..." : authMode === "login" ? "Sign In" : "Create Account"}
+                </Button>
+
+                {/* ── Divider ── */}
+                <div className="auth-divider">
+                  <span>or</span>
+                </div>
+
+                {/* ── Google Sign-In Button ── */}
+                <button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  disabled={googleLoading}
+                  className="btn-google"
+                  aria-label="Continue with Google"
+                >
+                  {googleLoading ? (
+                    <span className="spinner-sm" />
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+                      <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"/>
+                      <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2.04a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"/>
+                      <path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"/>
+                      <path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.31z"/>
+                    </svg>
+                  )}
+                  <span>{googleLoading ? "Signing in..." : "Continue with Google"}</span>
+                </button>
+
+                {googleError && (
+                  <p className="auth-error" role="alert">{googleError}</p>
+                )}
+
+                <p className="text-center text-sm text-green-600">
+                  {authMode === "login" ? (
+                    <>
+                      Don't have an account?{" "}
+                      <button
+                        type="button"
+                        className="text-green-800 font-semibold hover:underline"
+                        onClick={() => { setAuthMode("register"); setAuthError(null); setGoogleError(null); }}
+                      >
+                        Sign up
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      Already have an account?{" "}
+                      <button
+                        type="button"
+                        className="text-green-800 font-semibold hover:underline"
+                        onClick={() => { setAuthMode("login"); setAuthError(null); setGoogleError(null); }}
+                      >
+                        Sign in
+                      </button>
+                    </>
+                  )}
+                </p>
+              </form>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

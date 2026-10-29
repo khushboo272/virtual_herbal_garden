@@ -95,8 +95,52 @@ export enum AuditAction {
   UPDATE = 'UPDATE',
   DELETE = 'DELETE',
   LOGIN = 'LOGIN',
+  LOGIN_FAILED = 'LOGIN_FAILED',
   LOGOUT = 'LOGOUT',
+  LOGOUT_ALL = 'LOGOUT_ALL',
   ROLE_CHANGE = 'ROLE_CHANGE',
+  USER_BAN = 'USER_BAN',
+  USER_UNBAN = 'USER_UNBAN',
+  CONTENT_APPROVE = 'CONTENT_APPROVE',
+  CONTENT_REJECT = 'CONTENT_REJECT',
+  CONTENT_REQUEST_CHANGES = 'CONTENT_REQUEST_CHANGES',
+  CONTENT_PUBLISH = 'CONTENT_PUBLISH',
+  CONTENT_UNPUBLISH = 'CONTENT_UNPUBLISH',
+  CONTENT_DELETE = 'CONTENT_DELETE',
+  FEATURED_UPDATE = 'FEATURED_UPDATE',
+  ANNOUNCEMENT_SEND = 'ANNOUNCEMENT_SEND',
+  CONFIG_CHANGE = 'CONFIG_CHANGE',
+  EXPORT = 'EXPORT',
+  REAUTH_SUCCESS = 'REAUTH_SUCCESS',
+  REAUTH_FAILED = 'REAUTH_FAILED',
+  SESSION_REVOKE = 'SESSION_REVOKE',
+  TWO_FACTOR_ENABLE = 'TWO_FACTOR_ENABLE',
+  TWO_FACTOR_DISABLE = 'TWO_FACTOR_DISABLE',
+  TWO_FACTOR_BACKUP_GENERATE = 'TWO_FACTOR_BACKUP_GENERATE',
+}
+
+export interface INotificationPreferences {
+  newSubmission: boolean;
+  roleApplication: boolean;
+  support: boolean;
+  flaggedReview: boolean;
+  security: boolean;
+  system: boolean;
+}
+
+export interface ISessionInfo {
+  id: string;
+  ip: string;
+  userAgent: string;
+  device: string;
+  deviceInfo?: {
+    browser: string;
+    os: string;
+    device: string;
+  };
+  isCurrent: boolean;
+  createdAt: Date;
+  lastUsedAt: Date;
 }
 
 export enum ActivityType {

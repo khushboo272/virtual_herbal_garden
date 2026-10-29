@@ -92,6 +92,41 @@ export class UserController {
     res.clearCookie('refreshToken', { path: '/api/v1/auth' });
     sendSuccess(res, { message: 'Account deleted successfully' });
   }
+
+  async getSessions(req: Request, res: Response) {
+    const { authService } = await import('../auth/auth.service');
+    const refreshToken = req.cookies?.refreshToken;
+    const sessions = await authService.getUserSessions(req.user!.sub, refreshToken);
+    sendSuccess(res, sessions);
+  }
+
+  async deleteSession(req: Request, res: Response) {
+    const { authService } = await import('../auth/auth.service');
+    await authService.revokeSession(req.user!.sub, req.params.id, req);
+    sendSuccess(res, { message: 'Session revoked' });
+  }
+
+  async revokeOtherSessions(req: Request, res: Response) {
+    const { authService } = await import('../auth/auth.service');
+    const refreshToken = req.cookies?.refreshToken;
+    await authService.revokeOtherSessions(req.user!.sub, refreshToken, req);
+    sendSuccess(res, { message: 'All other sessions revoked' });
+  }
+
+  async getPreferences(req: Request, res: Response) {
+    const preferences = await userService.getPreferences(req.user!.sub);
+    sendSuccess(res, preferences);
+  }
+
+  async updatePreferences(req: Request, res: Response) {
+    const preferences = await userService.updatePreferences(req.user!.sub, req.body);
+    sendSuccess(res, preferences);
+  }
+
+  async getLoginHistory(req: Request, res: Response) {
+    const history = await userService.getMyLoginHistory(req.user!.sub);
+    sendSuccess(res, history);
+  }
 }
 
 export const userController = new UserController();

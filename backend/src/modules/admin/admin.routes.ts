@@ -23,6 +23,7 @@ router.get('/dashboard-summary', adminController.getDashboardSummary);
 router.get('/stats', adminController.getStats);
 router.get('/stats/overview', adminController.getOverviewStats);
 router.get('/stats/analytics', adminController.getAnalytics);
+router.get('/search', adminController.search);
 
 // --- User Management ---
 router.get('/users', adminController.listUsers);
@@ -57,6 +58,9 @@ router.post('/content/:type/:id/toggle-feature', adminController.toggleFeatureCo
 router.get('/content/:type/:id/impact', adminController.getImpactContent);
 router.delete('/content/:type/:id', adminController.deleteContent);
 router.post('/content/:type/bulk-unpublish', adminController.bulkUnpublishContent);
+router.post('/content/:type/bulk-publish', adminController.bulkPublishContent);
+router.post('/content/:type/bulk-feature', adminController.bulkFeatureContent);
+router.post('/content/:type/bulk-status', adminController.bulkStatusContent);
 router.post('/content/:type/bulk-delete', adminController.bulkDeleteContent);
 
 // --- Role Applications (Admin review) ---

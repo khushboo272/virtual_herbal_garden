@@ -30,6 +30,12 @@ export class AdminController {
     sendSuccess(res, analytics);
   }
 
+  async search(req: Request, res: Response) {
+    const q = (req.query.q as string) || '';
+    const results = await adminService.search(q);
+    sendSuccess(res, results);
+  }
+
   // --- Users Management ---
   async listUsers(req: Request, res: Response) {
     const result = await adminUsersService.listUsers(req.query as any);
@@ -189,6 +195,27 @@ export class AdminController {
     const { type } = req.params;
     const { ids } = req.body || {};
     const result = await adminContentService.bulkUnpublish(type as any, ids, req.user, req);
+    sendSuccess(res, result);
+  }
+
+  async bulkPublishContent(req: Request, res: Response) {
+    const { type } = req.params;
+    const { ids } = req.body || {};
+    const result = await adminContentService.bulkPublish(type as any, ids, req.user, req);
+    sendSuccess(res, result);
+  }
+
+  async bulkFeatureContent(req: Request, res: Response) {
+    const { type } = req.params;
+    const { ids, isFeatured } = req.body || {};
+    const result = await adminContentService.bulkFeature(type as any, ids, isFeatured, req.user, req);
+    sendSuccess(res, result);
+  }
+
+  async bulkStatusContent(req: Request, res: Response) {
+    const { type } = req.params;
+    const { ids, status } = req.body || {};
+    const result = await adminContentService.bulkStatus(type as any, ids, status, req.user, req);
     sendSuccess(res, result);
   }
 

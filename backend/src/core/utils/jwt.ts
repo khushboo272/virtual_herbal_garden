@@ -42,3 +42,31 @@ export function verifyResetToken(token: string): { sub: string; purpose: string 
 export function generateOTP(): string {
   return crypto.randomInt(100000, 999999).toString();
 }
+
+export function signReauthToken(userId: string): string {
+  return jwt.sign({ sub: userId, scope: 'reauth' }, privateKey, {
+    algorithm: 'RS256',
+    expiresIn: '5m',
+  });
+}
+
+export function verifyReauthToken(token: string): { sub: string; scope: string } {
+  return jwt.verify(token, publicKey, { algorithms: ['RS256'] }) as {
+    sub: string;
+    scope: string;
+  };
+}
+
+export function sign2faChallengeToken(userId: string): string {
+  return jwt.sign({ sub: userId, scope: '2fa_challenge' }, privateKey, {
+    algorithm: 'RS256',
+    expiresIn: '5m',
+  });
+}
+
+export function verify2faChallengeToken(token: string): { sub: string; scope: string } {
+  return jwt.verify(token, publicKey, { algorithms: ['RS256'] }) as {
+    sub: string;
+    scope: string;
+  };
+}
