@@ -100,4 +100,4 @@ credentials*.txt
 # Local assets for bulk upload to R2
 assets/*
 !assets/README.md
-
+ MODULE_AUDIT.md

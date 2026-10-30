@@ -23,6 +23,18 @@ import FeatureFlag, { IFeatureFlag } from './FeatureFlag.model';
 import SystemConfig from '../admin/SystemConfig.model';
 import { redis } from '../../core/config/redis';
 
+function parseEmailFrom(emailFrom?: string): { name?: string; email: string } {
+  if (!emailFrom) return { email: 'noreply@virtualherbalgarden.org' };
+  const match = emailFrom.match(/^(?:["']?([^"'<]+)["']?\s*<)?([^>]+)>?$/);
+  if (match && match[2]) {
+    return {
+      name: match[1]?.trim(),
+      email: match[2].trim(),
+    };
+  }
+  return { email: emailFrom.trim() };
+}
+
 export class SystemService {
   async getRolesMatrix() {
     return {
@@ -1366,8 +1378,8 @@ export class SystemService {
           smtpHost: env.SMTP_HOST || 'smtp.gmail.com',
           smtpPort: env.SMTP_PORT || 587,
           smtpUser: env.SMTP_USER || '',
-          senderName: 'Virtual Herbal Garden',
-          senderEmail: env.EMAIL_FROM || 'noreply@virtualherbalgarden.org',
+          senderName: parseEmailFrom(env.EMAIL_FROM).name || 'Virtual Herbal Garden',
+          senderEmail: parseEmailFrom(env.EMAIL_FROM).email,
           isSecure: false,
           digestFrequency: 'WEEKLY',
         },
@@ -1428,9 +1440,9 @@ export class SystemService {
       smtpHost: configObj.email?.smtpHost || env.SMTP_HOST || 'smtp.gmail.com',
       smtpPort: configObj.email?.smtpPort || env.SMTP_PORT || 587,
       smtpUser: configObj.email?.smtpUser || env.SMTP_USER || '',
-      senderName: configObj.email?.senderName || 'Virtual Herbal Garden',
+      senderName: configObj.email?.senderName || parseEmailFrom(env.EMAIL_FROM).name || 'Virtual Herbal Garden',
       senderEmail:
-        configObj.email?.senderEmail || env.EMAIL_FROM || 'noreply@virtualherbalgarden.org',
+        parseEmailFrom(configObj.email?.senderEmail || env.EMAIL_FROM).email,
       isSecure: Boolean(configObj.email?.isSecure),
       digestFrequency: configObj.email?.digestFrequency || 'WEEKLY',
     };
@@ -1481,7 +1493,7 @@ export class SystemService {
       smtpPort: env.SMTP_PORT || 587,
       smtpUser: env.SMTP_USER || '',
       smtpConfigured: Boolean(env.SMTP_PASS),
-      senderEmail: env.EMAIL_FROM || '',
+      senderEmail: parseEmailFrom(env.EMAIL_FROM).email,
       allowedDetectionsPerHour: env.DETECTION_RATE_LIMIT_MAX || 10,
       apiRateLimitPerMin: env.RATE_LIMIT_MAX || 100,
       authRateLimitPer15Min: env.AUTH_RATE_LIMIT_MAX || 5,
@@ -1524,8 +1536,8 @@ export class SystemService {
         smtpHost: env.SMTP_HOST || 'smtp.gmail.com',
         smtpPort: env.SMTP_PORT || 587,
         smtpUser: env.SMTP_USER || '',
-        senderName: 'Virtual Herbal Garden',
-        senderEmail: env.EMAIL_FROM || 'noreply@virtualherbalgarden.org',
+        senderName: parseEmailFrom(env.EMAIL_FROM).name || 'Virtual Herbal Garden',
+        senderEmail: parseEmailFrom(env.EMAIL_FROM).email,
         isSecure: false,
         digestFrequency: 'WEEKLY' as const,
       },
@@ -1588,6 +1600,10 @@ export class SystemService {
       security: { ...current.security, ...(data.security || {}) },
       general: { ...current.general, ...(data.general || {}) },
     };
+
+    if (merged.email?.senderEmail) {
+      merged.email.senderEmail = parseEmailFrom(merged.email.senderEmail).email;
+    }
 
     if (merged.security?.allowedDetectionsPerHour) {
       (merged as any).allowedDetectionsPerHour = merged.security.allowedDetectionsPerHour;

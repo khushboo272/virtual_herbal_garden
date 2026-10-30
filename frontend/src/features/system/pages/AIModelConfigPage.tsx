@@ -61,6 +61,10 @@ export function AIModelConfigPage() {
     try {
       setLoading(true);
       const res = await systemConfigApi.getSystemConfig();
+      if (res.email?.senderEmail) {
+        const match = res.email.senderEmail.match(/<([^>]+)>$/);
+        if (match) res.email.senderEmail = match[1].trim();
+      }
       setConfig(res);
     } catch (err: any) {
       toast.error(err.message || 'Failed to load system configuration.');
@@ -94,17 +98,36 @@ export function AIModelConfigPage() {
 
     try {
       setSaving(true);
+      const cleanEmail = (val?: string) => {
+        if (!val) return val;
+        const match = val.match(/<([^>]+)>$/);
+        return match ? match[1].trim() : val.trim();
+      };
+
+      const emailPayload = config.email
+        ? {
+            ...config.email,
+            senderEmail: cleanEmail(config.email.senderEmail) || config.email.senderEmail,
+          }
+        : config.email;
+
       const updated = await systemConfigApi.updateSystemConfig({
         ai: config.ai,
         storage: config.storage,
-        email: config.email,
+        email: emailPayload,
         security: config.security,
         general: config.general,
       });
       setConfig(updated);
       toast.success('System configuration and AI model parameters saved successfully.');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save system configuration.');
+      const detailMsg =
+        err.details && Array.isArray(err.details)
+          ? err.details.map((d: any) => `${d.field}: ${d.message}`).join(', ')
+          : '';
+      toast.error(
+        detailMsg ? `Validation failed: ${detailMsg}` : (err.message || 'Failed to save system configuration.')
+      );
     } finally {
       setSaving(false);
     }

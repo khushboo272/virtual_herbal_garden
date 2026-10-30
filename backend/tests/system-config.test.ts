@@ -141,6 +141,30 @@ describe('Super Admin System Configuration & AI Model Control Tests', () => {
       const logs = await AuditLog.find({ action: 'CONFIG_CHANGE' });
       expect(logs.length).toBeGreaterThan(0);
     });
+
+    it('accepts senderEmail formatted as RFC 5322 mailbox (Name <email@domain.com>) and empty strings without 400 validation error', async () => {
+      const payload = {
+        ai: {
+          model: 'gemini-3.8-flash',
+        },
+        email: {
+          senderName: 'Virtual Herbal Garden',
+          senderEmail: 'Virtual Herbal Garden <aniket.kr2103@gmail.com>',
+        },
+        general: {
+          supportEmail: '',
+        },
+      };
+
+      const res = await request(app)
+        .patch('/api/v1/system/config')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send(payload);
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.ai.model).toBe('gemini-3.8-flash');
+    });
   });
 
   describe('POST /api/v1/system/config/test-ai', () => {

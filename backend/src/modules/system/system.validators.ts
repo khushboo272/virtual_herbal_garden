@@ -18,6 +18,20 @@ export const systemAuditLogsQuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(20),
 });
 
+export const emailOrMailboxSchema = z
+  .string()
+  .trim()
+  .refine(
+    (val) => {
+      if (!val || val === '') return true;
+      const match = val.match(/<([^>]+)>$/);
+      const emailToTest = match ? match[1].trim() : val.trim();
+      return z.string().email().safeParse(emailToTest).success;
+    },
+    { message: 'Invalid email address or mailbox format' }
+  )
+  .optional();
+
 export const updateSystemConfigurationSchema = z.object({
   ai: z
     .object({
@@ -45,7 +59,7 @@ export const updateSystemConfigurationSchema = z.object({
       smtpPort: z.number().optional(),
       smtpUser: z.string().optional(),
       senderName: z.string().optional(),
-      senderEmail: z.string().email().optional(),
+      senderEmail: emailOrMailboxSchema,
       isSecure: z.boolean().optional(),
       digestFrequency: z.enum(['DAILY', 'WEEKLY', 'NEVER']).optional(),
     })
@@ -64,7 +78,7 @@ export const updateSystemConfigurationSchema = z.object({
   general: z
     .object({
       platformName: z.string().min(1).optional(),
-      supportEmail: z.string().email().optional(),
+      supportEmail: emailOrMailboxSchema,
       defaultTaxonomy: z.string().optional(),
       autoPublishConfidence: z.number().min(50).max(100).optional(),
     })
