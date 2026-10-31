@@ -38,6 +38,9 @@ export function authenticate(optional = false) {
       { session: false },
       (err: Error | null, user: JwtPayload | false) => {
         if (err) {
+          if (optional) {
+            return next();
+          }
           if (err instanceof AppError) {
             sendError(res, err.code, err.message, err.statusCode);
             return;

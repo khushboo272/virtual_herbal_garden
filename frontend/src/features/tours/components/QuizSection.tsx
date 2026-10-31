@@ -87,12 +87,13 @@ export function QuizSection({
           <div>
             <span className="font-semibold">Log in to save progress:</span> You are currently exploring as a guest. You can review all lesson materials, but must sign in to submit server-scored quizzes and preserve your certified completion records.
             <div className="mt-2">
-              <Link
-                to="/oauth/callback"
-                className="font-semibold text-blue-700 hover:text-blue-900 underline inline-flex items-center gap-1"
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { mode: 'login' } }))}
+                className="font-semibold text-blue-700 hover:text-blue-900 underline inline-flex items-center gap-1 cursor-pointer"
               >
                 Sign in or create account <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+              </button>
             </div>
           </div>
         </div>

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { Upload, Camera, Sparkles, Check, Leaf, Eye, AlertTriangle, RefreshCw, Search, Clock } from "lucide-react";
+import { Upload, Camera, Sparkles, Check, Leaf, Eye, AlertTriangle, RefreshCw, Search, Clock, Lock } from "lucide-react";
+import { useAuth } from "../../../contexts/AuthContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../../../app/components/ui/dialog";
 import { Button } from "../../../app/components/ui/button";
 import { Card } from "../../../app/components/ui/card";
 import { Badge } from "../../../app/components/ui/badge";
@@ -7,6 +9,29 @@ import { motion } from "motion/react";
 import { useNavigate } from "react-router-dom";
 import { useDetection } from "../hooks/useDetection";
 import type { DetectionResult } from "../types/detection.types";
+
+
+const GUEST_MAX_SCANS = 5;
+const GUEST_STORAGE_KEY = 'vhg_guest_scans_count';
+
+function getGuestScanCount(): number {
+  try {
+    const val = localStorage.getItem(GUEST_STORAGE_KEY);
+    return val ? parseInt(val, 10) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function incrementGuestScanCount(): number {
+  try {
+    const current = getGuestScanCount() + 1;
+    localStorage.setItem(GUEST_STORAGE_KEY, current.toString());
+    return current;
+  } catch {
+    return 1;
+  }
+}
 
 interface AIPlantDetectionProps {
   onViewDetails?: (plantName: string) => void;
@@ -288,6 +313,9 @@ function RecentScans({
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function AIPlantDetection({ onViewDetails: _onViewDetails }: AIPlantDetectionProps) {
+  const { isAuthenticated, openAuthModal } = useAuth();
+  const [guestScansUsed, setGuestScansUsed] = useState<number>(() => getGuestScanCount());
+  const [showLimitDialog, setShowLimitDialog] = useState(false);
   const [selectedImagePreview, setSelectedImagePreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -308,14 +336,22 @@ export function AIPlantDetection({ onViewDetails: _onViewDetails }: AIPlantDetec
     loadHistory();
   }, [loadHistory]);
 
-  function handleFileSelected(file: File) {
+  async function handleFileSelected(file: File) {
+    if (!isAuthenticated && guestScansUsed >= GUEST_MAX_SCANS) {
+      setShowLimitDialog(true);
+      return;
+    }
     setSelectedFile(file);
     const reader = new FileReader();
     reader.onload = (e) => {
       setSelectedImagePreview(e.target?.result as string);
     };
     reader.readAsDataURL(file);
-    analyze(file);
+    const res = await analyze(file);
+    if (res && !isAuthenticated) {
+      const updated = incrementGuestScanCount();
+      setGuestScansUsed(updated);
+    }
   }
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -340,9 +376,17 @@ export function AIPlantDetection({ onViewDetails: _onViewDetails }: AIPlantDetec
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  function handleRetry() {
+  async function handleRetry() {
     if (selectedFile) {
-      analyze(selectedFile);
+      if (!isAuthenticated && guestScansUsed >= GUEST_MAX_SCANS) {
+        setShowLimitDialog(true);
+        return;
+      }
+      const res = await analyze(selectedFile);
+      if (res && !isAuthenticated) {
+        const updated = incrementGuestScanCount();
+        setGuestScansUsed(updated);
+      }
     }
   }
 
@@ -363,6 +407,44 @@ export function AIPlantDetection({ onViewDetails: _onViewDetails }: AIPlantDetec
           <p className="text-xl text-green-600 max-w-2xl mx-auto">
             Upload a plant image and let our AI identify it with detailed information about its medicinal properties
           </p>
+
+          {/* Guest Mode Notice */}
+          {!isAuthenticated && (
+            <div className="mt-6 max-w-2xl mx-auto p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs bg-white/90 backdrop-blur-sm border-emerald-300 text-left">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center shrink-0 text-sm">
+                  {Math.max(0, GUEST_MAX_SCANS - guestScansUsed)}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-emerald-950">
+                    Guest Mode: {Math.max(0, GUEST_MAX_SCANS - guestScansUsed)} of {GUEST_MAX_SCANS} free scans remaining
+                  </p>
+                  <p className="text-xs text-emerald-700">
+                    {guestScansUsed >= GUEST_MAX_SCANS
+                      ? "You have used all 5 free guest scans. Sign in or register to continue scanning."
+                      : "Create an account or sign in for unlimited scans and cloud scan history."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => openAuthModal ? openAuthModal('login') : undefined}
+                  className="text-xs border-emerald-300 text-emerald-900 hover:bg-emerald-50"
+                >
+                  Sign In
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => openAuthModal ? openAuthModal('register') : undefined}
+                  className="text-xs bg-emerald-700 hover:bg-emerald-800 text-white"
+                >
+                  Create Account
+                </Button>
+              </div>
+            </div>
+          )}
         </motion.div>
       </div>
 
@@ -523,6 +605,41 @@ export function AIPlantDetection({ onViewDetails: _onViewDetails }: AIPlantDetec
           </Card>
         </motion.div>
       </div>
+
+      {/* Guest Limit Dialog */}
+      <Dialog open={showLimitDialog} onOpenChange={setShowLimitDialog}>
+        <DialogContent className="sm:max-w-md bg-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-800">
+              <Lock className="w-5 h-5 text-amber-600" />
+              Guest Scan Limit Reached (5/5)
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            You have used all 5 free guest plant identifications! Please create a free account or sign in to your existing account to continue using the AI Plant Scanner without limits.
+          </p>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowLimitDialog(false);
+                if (openAuthModal) openAuthModal('login');
+              }}
+            >
+              Sign In
+            </Button>
+            <Button
+              className="bg-emerald-700 hover:bg-emerald-800 text-white"
+              onClick={() => {
+                setShowLimitDialog(false);
+                if (openAuthModal) openAuthModal('register');
+              }}
+            >
+              Create Free Account &rarr;
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Recent Scans */}
       <RecentScans history={history} onSelect={loadScan} />

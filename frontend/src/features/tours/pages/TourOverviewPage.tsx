@@ -190,6 +190,18 @@ export function TourOverviewPage() {
                   <div className="text-xs text-emerald-800 mt-2">
                     {checkpoints.filter((c) => isCompleted(c.key)).length} of {checkpoints.length} checkpoints completed
                   </div>
+                  {!isAuthenticated && (
+                    <div className="mt-2.5 text-[11px] text-amber-900 bg-amber-50/90 border border-amber-200/80 rounded-lg p-2 flex items-center justify-between">
+                      <span>💡 Exploring as guest. Sign in to save your learning progress.</span>
+                      <button
+                        type="button"
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { mode: 'login' } }))}
+                        className="underline font-semibold ml-2 text-amber-950 hover:text-emerald-800 cursor-pointer"
+                      >
+                        Sign in
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0">

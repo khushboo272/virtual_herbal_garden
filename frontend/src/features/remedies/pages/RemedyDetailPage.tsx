@@ -17,6 +17,9 @@ import {
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
 import { useRemedy } from '../hooks/useRemedy';
 import { useRemedyFavorite, useShare } from '../hooks/useRemedyFavorite';
+import { Lock } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '../../../contexts/AuthContext';
 import { RemedyCard } from '../components/RemedyCard';
 import { PlantImage } from '../../library';
 import { ThemedImage } from '../../../components/common/ThemedImage';
@@ -29,6 +32,7 @@ export function RemedyDetailPage() {
   useDocumentTitle(remedy?.title ? `${remedy.title} | Traditional Herbal Remedy` : 'Traditional Herbal Remedy');
 
   const { isFavorite, toggle, isAuthenticated } = useRemedyFavorite(remedy?._id || '');
+  const { openAuthModal } = useAuth();
   const { share, copied } = useShare();
 
   // Local state for preparation step completion checklist
@@ -52,7 +56,12 @@ export function RemedyDetailPage() {
 
   const handleFavoriteClick = () => {
     if (!isAuthenticated) {
-      navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
+      toast.info('Please sign in to save remedies to your bookmarks.');
+      if (openAuthModal) {
+        openAuthModal('login');
+      } else {
+        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { mode: 'login' } }));
+      }
       return;
     }
     toggle();
@@ -146,15 +155,28 @@ export function RemedyDetailPage() {
             <button
               type="button"
               onClick={handleFavoriteClick}
-              aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              aria-label={!isAuthenticated ? 'Sign in to save remedy' : isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              title={!isAuthenticated ? 'Sign in to save remedy' : isFavorite ? 'Remove from favorites' : 'Add to favorites'}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-xs font-semibold text-gray-700 transition-colors shadow-xs"
             >
-              <Heart
-                className={`w-4 h-4 ${
-                  isFavorite ? 'fill-rose-500 stroke-rose-500 text-rose-500' : 'text-gray-500'
-                }`}
-              />
-              <span className="hidden sm:inline">{isFavorite ? 'Saved' : 'Save'}</span>
+              {!isAuthenticated ? (
+                <>
+                  <div className="relative flex items-center">
+                    <Heart className="w-4 h-4 text-gray-400 stroke-gray-400 opacity-60" />
+                    <Lock className="w-2.5 h-2.5 text-amber-600 absolute -bottom-1 -right-1" />
+                  </div>
+                  <span className="hidden sm:inline text-gray-500">Sign in to Save</span>
+                </>
+              ) : (
+                <>
+                  <Heart
+                    className={`w-4 h-4 ${
+                      isFavorite ? 'fill-rose-500 stroke-rose-500 text-rose-500' : 'text-gray-500'
+                    }`}
+                  />
+                  <span className="hidden sm:inline">{isFavorite ? 'Saved' : 'Save'}</span>
+                </>
+              )}
             </button>
 
             <button

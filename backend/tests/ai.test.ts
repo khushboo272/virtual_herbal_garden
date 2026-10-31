@@ -1,9 +1,12 @@
 import mongoose from 'mongoose';
+import request from 'supertest';
+import app from '../src/app';
+import FeatureFlag from '../src/modules/system/FeatureFlag.model';
 import Detection from '../src/modules/ai-scanner/Detection.model';
 import User from '../src/modules/users/User.model';
 import Plant from '../src/modules/library/Plant.model';
 import { hashPassword } from '../src/core/utils/hash';
-import { DetectionStatus } from '../src/types';
+import { DetectionStatus, UserRole } from '../src/types';
 
 import './setup';
 
@@ -164,6 +167,34 @@ describe('AI Scanner — DetectionService (Gemini mocked)', () => {
     expect(result.processingTimeMs).toBeGreaterThan(0);
   });
 
+  it('success — guest scan without userId returns COMPLETE detection with null user', async () => {
+    mockIdentifyPlant.mockResolvedValueOnce({
+      isPlant: true,
+      commonName: 'Neem',
+      scientificName: 'Azadirachta indica',
+      family: 'Meliaceae',
+      confidence: 0.95,
+      description: 'A renowned medicinal tree.',
+      medicinalUses: ['Skin health', 'Antimicrobial'],
+      keyBenefits: ['Purifier'],
+      partsUsed: ['Leaves', 'Bark'],
+      precautions: [],
+      alternatives: [],
+      imageQualityNote: '',
+    });
+
+    const { detectionService } = await import('../src/modules/ai-scanner/detection.service');
+    const result = await detectionService.detect(null, fakeBuffer, fakeMime);
+
+    expect(result.status).toBe(DetectionStatus.COMPLETE);
+    expect(result.isPlant).toBe(true);
+    expect(result.topMatch?.commonName).toBe('Neem');
+
+    const Detection = (await import('../src/modules/ai-scanner/Detection.model')).default;
+    const doc = await Detection.findById(result.id);
+    expect(doc?.user).toBeNull();
+  });
+
   it('isPlant false — returns COMPLETE with isPlant=false', async () => {
     mockIdentifyPlant.mockResolvedValueOnce({
       isPlant: false,
@@ -254,3 +285,77 @@ describe('AI Scanner — DetectionService (Gemini mocked)', () => {
     expect(result.plantId).toBe((plant._id as mongoose.Types.ObjectId).toString());
   });
 });
+
+describe('AI Scanner — Integration & Guest Access Endpoints', () => {
+  const validJpegBuffer = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
+
+  beforeEach(async () => {
+    mockIdentifyPlant.mockReset();
+    await FeatureFlag.deleteMany({});
+    // Setup ai_scanner feature flag with GUEST minimumRole
+    await FeatureFlag.create({
+      key: 'ai_scanner',
+      name: 'AI Plant Scanner',
+      category: 'AI',
+      isEnabled: true,
+      rolloutPercentage: 100,
+      minimumRole: UserRole.GUEST,
+      isSystem: true,
+    });
+  });
+
+  it('allows unauthenticated guest requests to POST /api/v1/ai/detect without 401 UNAUTHORIZED', async () => {
+    mockIdentifyPlant.mockResolvedValueOnce({
+      isPlant: true,
+      commonName: 'Japanese Maple',
+      scientificName: 'Acer palmatum',
+      family: 'Sapindaceae',
+      confidence: 0.95,
+      description: 'An ornamental tree.',
+      medicinalUses: ['Astringent bark'],
+      keyBenefits: ['Ornamental'],
+      partsUsed: ['Bark', 'Leaves'],
+      precautions: [],
+      alternatives: [],
+      imageQualityNote: '',
+    });
+
+    const res = await request(app)
+      .post('/api/v1/ai/detect')
+      .attach('image', validJpegBuffer, 'maple.jpg');
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.isPlant).toBe(true);
+    expect(res.body.data.topMatch.commonName).toBe('Japanese Maple');
+
+    const created = await Detection.findById(res.body.data.id);
+    expect(created?.user).toBeNull();
+  });
+
+  it('allows unauthenticated guest requests even if expired or invalid token is sent', async () => {
+    mockIdentifyPlant.mockResolvedValueOnce({
+      isPlant: true,
+      commonName: 'Japanese Maple',
+      scientificName: 'Acer palmatum',
+      family: 'Sapindaceae',
+      confidence: 0.95,
+      description: 'An ornamental tree.',
+      medicinalUses: [],
+      keyBenefits: [],
+      partsUsed: [],
+      precautions: [],
+      alternatives: [],
+      imageQualityNote: '',
+    });
+
+    const res = await request(app)
+      .post('/api/v1/ai/detect')
+      .set('Authorization', 'Bearer invalid.expired.token')
+      .attach('image', validJpegBuffer, 'maple.jpg');
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+  });
+});
+

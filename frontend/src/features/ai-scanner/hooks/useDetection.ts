@@ -78,6 +78,7 @@ export function useDetection() {
         // Prepend to history
         history: [result, ...prev.history].slice(0, 20),
       }));
+      return result;
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         return; // Unmounted — silently discard
@@ -122,7 +123,7 @@ export function useDetection() {
   const loadHistory = useCallback(async () => {
     try {
       const history = await getHistory();
-      setState((prev) => ({ ...prev, history }));
+      setState((prev) => ({ ...prev, history: Array.isArray(history) ? history : [] }));
     } catch {
       // Silent fail — history is non-critical
     }

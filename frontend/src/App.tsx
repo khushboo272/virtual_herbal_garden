@@ -92,11 +92,9 @@ export default function App() {
             <Route
               path="/ai-detect"
               element={
-                <RequireRole minimumRole="USER">
-                  <RequireFeature featureKey="ai_scanner" featureName="AI Plant Scanner">
-                    <AIPlantDetectionPage />
-                  </RequireFeature>
-                </RequireRole>
+                <RequireFeature featureKey="ai_scanner" featureName="AI Plant Scanner">
+                  <AIPlantDetectionPage />
+                </RequireFeature>
               }
             />
             <Route path="/remedies" element={<RemediesPage />} />
@@ -245,6 +243,10 @@ export default function App() {
           />
 
           {/* OAuth callback — captures token from Google redirect */}
+          {/* Auth modal fallback routes */}
+          <Route path="/login" element={<Navigate to="/?auth=login" replace />} />
+          <Route path="/register" element={<Navigate to="/?auth=register" replace />} />
+
           <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
         </Routes>
       </MaintenanceGuard>

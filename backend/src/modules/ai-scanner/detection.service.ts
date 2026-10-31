@@ -48,7 +48,7 @@ export class DetectionService {
    * Validate, resize, call Gemini, save, and return a completed detection
    * in a single synchronous request cycle. No queue, no polling.
    */
-  async detect(userId: string, fileBuffer: Buffer, mimeType: string): Promise<ReturnType<typeof buildDetectionResponse>> {
+  async detect(userId: string | null | undefined, fileBuffer: Buffer, mimeType: string): Promise<ReturnType<typeof buildDetectionResponse>> {
     // 1. Validate mime type
     if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
       throw new AppError('Invalid image format. Accepted: JPEG, PNG, WebP', 400, 'INVALID_FORMAT');
@@ -67,7 +67,7 @@ export class DetectionService {
 
     // 4. Create detection record with PROCESSING status
     const detection = await Detection.create({
-      user: userId,
+      user: userId || null,
       imageUrl: '', // placeholder until storage resolves
       status: DetectionStatus.PROCESSING,
       modelVersion: env.GEMINI_MODEL,

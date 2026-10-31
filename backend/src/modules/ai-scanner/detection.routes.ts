@@ -43,8 +43,7 @@ const scanLimiter = rateLimit({
 
 router.post(
   '/detect',
-  authenticate(),
-  requireRole(UserRole.USER),
+  authenticate(true),
   requireFeatureFlag('ai_scanner'),
   scanLimiter,
   uploadSingle,
@@ -52,15 +51,13 @@ router.post(
 );
 router.get(
   '/detect/:jobId',
-  authenticate(),
-  requireRole(UserRole.USER),
+  authenticate(true),
   requireFeatureFlag('ai_scanner'),
   detectionController.getDetection,
 );
 router.get(
   '/history',
-  authenticate(),
-  requireRole(UserRole.USER),
+  authenticate(true),
   requireFeatureFlag('ai_scanner'),
   detectionController.getHistory,
 );

@@ -1,5 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Clock, Flame, Heart, ArrowRight, Sparkles } from 'lucide-react';
+import { Clock, Flame, Heart, ArrowRight, Sparkles, Lock } from 'lucide-react';
+import { toast } from 'sonner';
+import { useAuth } from '../../../contexts/AuthContext';
 import { ThemedImage } from '../../../components/common/ThemedImage';
 import type { Remedy } from '../types/remedy.types';
 import { useRemedyFavorite } from '../hooks/useRemedyFavorite';
@@ -12,6 +14,7 @@ interface RemedyCardProps {
 export function RemedyCard({ remedy, compact = false }: RemedyCardProps) {
   const navigate = useNavigate();
   const { isFavorite, toggle, isAuthenticated } = useRemedyFavorite(remedy._id || remedy.id || '');
+  const { openAuthModal } = useAuth();
 
   // Resolve best image URL with strict fallback hierarchy:
   // 1. Own remedy cover image
@@ -38,7 +41,12 @@ export function RemedyCard({ remedy, compact = false }: RemedyCardProps) {
     e.preventDefault();
     e.stopPropagation();
     if (!isAuthenticated) {
-      navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
+      toast.info('Please sign in to save remedies to your bookmarks.');
+      if (openAuthModal) {
+        openAuthModal('login');
+      } else {
+        window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { mode: 'login' } }));
+      }
       return;
     }
     toggle();
@@ -60,16 +68,24 @@ export function RemedyCard({ remedy, compact = false }: RemedyCardProps) {
           <button
             type="button"
             onClick={handleFavoriteClick}
-            aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            aria-label={!isAuthenticated ? 'Sign in to save remedy' : isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            title={!isAuthenticated ? 'Sign in to save remedy' : isFavorite ? 'Remove from favorites' : 'Add to favorites'}
             className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 backdrop-blur-sm shadow hover:bg-white transition-colors"
           >
-            <Heart
-              className={`w-4 h-4 transition-colors ${
-                isFavorite
-                  ? 'fill-rose-500 stroke-rose-500 text-rose-500'
-                  : 'stroke-gray-400 hover:stroke-rose-500'
-              }`}
-            />
+            {!isAuthenticated ? (
+              <div className="relative">
+                <Heart className="w-4 h-4 text-gray-400 stroke-gray-400 opacity-60" />
+                <Lock className="w-2.5 h-2.5 text-amber-600 absolute -bottom-1 -right-1" />
+              </div>
+            ) : (
+              <Heart
+                className={`w-4 h-4 transition-colors ${
+                  isFavorite
+                    ? 'fill-rose-500 stroke-rose-500 text-rose-500'
+                    : 'stroke-gray-400 hover:stroke-rose-500'
+                }`}
+              />
+            )}
           </button>
         </div>
         <div className="p-3.5 flex flex-col flex-1">

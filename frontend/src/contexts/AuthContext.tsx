@@ -29,6 +29,7 @@ interface AuthContextType {
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  openAuthModal: (mode?: 'login' | 'register') => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -153,6 +154,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const openAuthModal = useCallback((mode: 'login' | 'register' = 'login') => {
+    window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { mode } }));
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -166,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         logout,
         refreshUser,
+        openAuthModal,
       }}
     >
       {children}

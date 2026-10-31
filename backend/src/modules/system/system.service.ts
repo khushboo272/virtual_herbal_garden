@@ -952,7 +952,7 @@ export class SystemService {
       category: 'AI' as const,
       isEnabled: true,
       rolloutPercentage: 100,
-      minimumRole: UserRole.USER,
+      minimumRole: UserRole.GUEST,
       isSystem: true,
       tags: ['AI', 'Vision', 'Diagnostics'],
     },
@@ -963,7 +963,7 @@ export class SystemService {
       category: 'EXPERIENCE' as const,
       isEnabled: true,
       rolloutPercentage: 100,
-      minimumRole: UserRole.USER,
+      minimumRole: UserRole.GUEST,
       isSystem: true,
       tags: ['Audio', 'Interactive', 'Tours'],
     },
@@ -1077,6 +1077,11 @@ export class SystemService {
         const found = await FeatureFlag.findOne({ key: defFlag.key });
         if (!found) {
           await FeatureFlag.create(defFlag);
+        } else if (
+          (defFlag.key === 'ai_scanner' || defFlag.key === 'guided_tours') &&
+          found.minimumRole === UserRole.USER
+        ) {
+          await FeatureFlag.updateOne({ key: defFlag.key }, { $set: { minimumRole: UserRole.GUEST } });
         }
       }
     }

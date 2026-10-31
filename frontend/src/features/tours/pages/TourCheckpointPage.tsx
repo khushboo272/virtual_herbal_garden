@@ -12,6 +12,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle';
+import { toast } from 'sonner';
 import { useTour } from '../hooks/useTour';
 import { useTourProgress } from '../hooks/useTourProgress';
 import { AudioNarrationPlayer } from '../components/AudioNarrationPlayer';
@@ -78,6 +79,9 @@ export function TourCheckpointPage() {
 
   const handleManualComplete = async () => {
     await markComplete(checkpoint.key);
+    if (!isAuthenticated) {
+      toast.info('Checkpoint completed! Sign in to permanently save your tour progress.');
+    }
   };
 
   const handleQuizSubmit = async (answers: number[]) => {

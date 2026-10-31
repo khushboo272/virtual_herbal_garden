@@ -334,7 +334,7 @@ function TourCard({ tour }: { tour: FeaturedTour }) {
 // ── "For You" section ─────────────────────────────────────────────────────────
 
 function ForYouSection() {
-  const { isAuthenticated, hasMinRole, user } = useAuth();
+  const { isAuthenticated, hasMinRole, user, openAuthModal } = useAuth();
   const navigate = useNavigate();
   const [recentScans, setRecentScans] = useState<{ id: string; name: string; imageUrl?: string }[]>([]);
   const [recentFavorites, setRecentFavorites] = useState<{ _id: string; entityId: string }[]>([]);
@@ -367,14 +367,14 @@ function ForYouSection() {
                 id="home-login-btn"
                 variant="outline"
                 className="border-white text-white hover:bg-white hover:text-green-700"
-                onClick={() => navigate('/login')}
+                onClick={() => openAuthModal ? openAuthModal('login') : navigate('/?auth=login')}
               >
                 Sign In
               </Button>
               <Button
                 id="home-register-btn"
                 className="bg-white text-green-700 hover:bg-green-50"
-                onClick={() => navigate('/register')}
+                onClick={() => openAuthModal ? openAuthModal('register') : navigate('/?auth=register')}
               >
                 Create Account
               </Button>
@@ -508,14 +508,10 @@ export function HomePage() {
   const featuredTours = data?.featuredTours ?? [];
   const popularSearches = data?.popularSearches ?? [];
 
-  // Handle the /ai-detect navigation: guests get redirected to login
+  // Handle the /ai-detect navigation: guests now have 5 free scans!
   const handleScanClick = useCallback(() => {
-    if (isAuthenticated) {
-      navigate('/ai-detect');
-    } else {
-      navigate('/login?next=/ai-detect');
-    }
-  }, [isAuthenticated, navigate]);
+    navigate('/ai-detect');
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50/50 to-emerald-50/30">

@@ -81,9 +81,34 @@ describe('Super Admin Feature Flags Management Tests', () => {
       expect(maintenanceFlag.isEnabled).toBe(false);
       expect(maintenanceFlag.isSystem).toBe(true);
 
+      const aiScannerFlag = res.body.data.flags.find((f: any) => f.key === 'ai_scanner');
+      expect(aiScannerFlag).toBeDefined();
+      expect(aiScannerFlag.minimumRole).toBe(UserRole.GUEST);
+
+      const guidedToursFlag = res.body.data.flags.find((f: any) => f.key === 'guided_tours');
+      expect(guidedToursFlag).toBeDefined();
+      expect(guidedToursFlag.minimumRole).toBe(UserRole.GUEST);
+
       expect(res.body.data.summary).toBeDefined();
       expect(typeof res.body.data.summary.total).toBe('number');
       expect(typeof res.body.data.summary.enabledCount).toBe('number');
+    });
+
+    it('auto-migrates existing USER minimumRole on ai_scanner and guided_tours to GUEST', async () => {
+      const FeatureFlag = (await import('../src/modules/system/FeatureFlag.model')).default;
+      // Force them to USER
+      await FeatureFlag.updateOne({ key: 'ai_scanner' }, { $set: { minimumRole: UserRole.USER } });
+      await FeatureFlag.updateOne({ key: 'guided_tours' }, { $set: { minimumRole: UserRole.USER } });
+
+      const res = await request(app)
+        .get('/api/v1/system/feature-flags')
+        .set('Authorization', `Bearer ${superAdminToken}`);
+
+      expect(res.status).toBe(200);
+      const ai = res.body.data.flags.find((f: any) => f.key === 'ai_scanner');
+      expect(ai.minimumRole).toBe(UserRole.GUEST);
+      const tours = res.body.data.flags.find((f: any) => f.key === 'guided_tours');
+      expect(tours.minimumRole).toBe(UserRole.GUEST);
     });
   });
 

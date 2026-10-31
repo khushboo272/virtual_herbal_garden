@@ -168,9 +168,13 @@ export function TourCompletionPage() {
             </div>
           ) : (
             <div className="text-xs text-gray-500 mb-8">
-              <Link to="/oauth/callback" className="font-semibold text-emerald-700 hover:underline">
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-auth-modal', { detail: { mode: 'login' } }))}
+                className="font-semibold text-emerald-700 hover:underline cursor-pointer"
+              >
                 Sign in
-              </Link>{' '}
+              </button>{' '}
               to save persistent tour achievements and submit reviews.
             </div>
           )}

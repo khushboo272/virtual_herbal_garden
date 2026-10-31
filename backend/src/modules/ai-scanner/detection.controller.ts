@@ -11,19 +11,22 @@ export class DetectionController {
     const mime = validateImageMagicBytes(file.buffer);
     if (!mime) throw new AppError('Invalid image format', 400, 'INVALID_FORMAT');
 
-    const result = await detectionService.detect(req.user!.sub, file.buffer, mime);
+    const result = await detectionService.detect(req.user?.sub, file.buffer, mime);
     sendCreated(res, result);
   }
 
   async getDetection(req: Request, res: Response) {
-    const detection = await detectionService.getDetection(req.params.jobId, req.user!.sub);
+    const detection = await detectionService.getDetection(req.params.jobId, req.user?.sub || '');
     sendSuccess(res, detection);
   }
 
   async getHistory(req: Request, res: Response) {
+    if (!req.user?.sub) {
+      return sendSuccess(res, [], 200, { page: 1, limit: 20, total: 0, totalPages: 0 });
+    }
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
-    const result = await detectionService.getHistory(req.user!.sub, page, limit);
+    const result = await detectionService.getHistory(req.user.sub, page, limit);
     sendSuccess(res, result.detections, 200, result.meta);
   }
 

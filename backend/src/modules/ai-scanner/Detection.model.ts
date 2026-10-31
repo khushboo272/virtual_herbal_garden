@@ -16,7 +16,7 @@ export interface IGeminiResult {
 }
 
 export interface IDetection extends Document {
-  user: Types.ObjectId;
+  user?: Types.ObjectId | null;
   imageUrl: string;
   imageThumbnailUrl: string | null;
   status: DetectionStatus;
@@ -85,7 +85,7 @@ const GeminiResultSchema = new Schema<IGeminiResult>(
 
 const DetectionSchema = new Schema<IDetection>(
   {
-    user: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    user: { type: Schema.Types.ObjectId, ref: 'User', required: false, default: null, index: true },
     imageUrl: { type: String, default: '' },
     imageThumbnailUrl: { type: String, default: null },
     status: {

@@ -3,7 +3,7 @@ import { Leaf, BookOpen, Sparkles, Map, Pill, Award, LayoutDashboard, LogIn, Log
 import { Button } from "./components/ui/button";
 import { useAuth } from "../contexts/AuthContext";
 import { useFeatureFlags } from "../contexts/FeatureFlagsContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./components/ui/dialog";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
@@ -37,6 +37,33 @@ export function Layout() {
   } | null>(null);
   const [twoFactorCode, setTwoFactorCode] = useState("");
   const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  // Global listener for open-auth-modal event and URL queries
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const custom = e as CustomEvent<{ mode?: 'login' | 'register' }>;
+      const mode = custom.detail?.mode === 'register' ? 'register' : 'login';
+      setAuthMode(mode);
+      setAuthError(null);
+      setGoogleError(null);
+      setShowAuthDialog(true);
+    };
+    window.addEventListener('open-auth-modal', handler);
+    return () => window.removeEventListener('open-auth-modal', handler);
+  }, []);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const authQuery = searchParams.get('auth');
+    const openAuthState = (location.state as any)?.openAuth;
+    if (authQuery === 'login' || openAuthState === 'login') {
+      setAuthMode('login');
+      setShowAuthDialog(true);
+    } else if (authQuery === 'register' || openAuthState === 'register') {
+      setAuthMode('register');
+      setShowAuthDialog(true);
+    }
+  }, [location.search, location.state]);
+
 
   const handleAuthSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -60,7 +87,7 @@ export function Layout() {
         await register(name, email, password);
       }
       setShowAuthDialog(false);
-      navigate("/");  // ✅ Redirect to home after success
+      const searchParams = new URLSearchParams(location.search); const redirectUrl = searchParams.get("redirect") || searchParams.get("next") || "/"; navigate(redirectUrl);
     } catch (err: any) {
       setAuthError(err?.message || "Authentication failed");
     } finally {
@@ -79,7 +106,7 @@ export function Layout() {
       setTwoFactorChallenge(null);
       setTwoFactorCode("");
       setShowAuthDialog(false);
-      navigate("/");
+      const searchParams = new URLSearchParams(location.search); const redirectUrl = searchParams.get("redirect") || searchParams.get("next") || "/"; navigate(redirectUrl);
     } catch (err: any) {
       setAuthError(err?.message || "Invalid 2FA code or backup code");
     } finally {

@@ -68,14 +68,16 @@ describe('useDetection', () => {
     const { result } = renderHook(() => useDetection());
     const file = makeFakeFile();
 
+    let returnedResult: DetectionResult | undefined;
     await act(async () => {
-      await result.current.analyze(file);
+      returnedResult = await result.current.analyze(file);
     });
 
     expect(result.current.status).toBe('success');
     expect(result.current.result?.id).toBe('det-123');
     expect(result.current.result?.topMatch?.commonName).toBe('Tulsi');
     expect(result.current.error).toBeNull();
+    expect(returnedResult?.id).toBe('det-123');
   });
 
   it('error — 429 maps to busy message', async () => {

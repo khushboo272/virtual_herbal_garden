@@ -2,7 +2,7 @@ import mongoose, { Schema, Document, Types } from 'mongoose';
 import { DetectionStatus, IPrediction, IDetectionFeedback } from '../../types';
 
 export interface IDetection extends Document {
-  user: Types.ObjectId;
+  user?: Types.ObjectId | null;
   imageUrl: string;
   imageThumbnailUrl: string | null;
   status: DetectionStatus;
@@ -40,7 +40,7 @@ const FeedbackSchema = new Schema<IDetectionFeedback>(
 
 const DetectionSchema = new Schema<IDetection>(
   {
-    user: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    user: { type: Schema.Types.ObjectId, ref: 'User', required: false, default: null, index: true },
     imageUrl: { type: String, required: true },
     imageThumbnailUrl: { type: String, default: null },
     status: {
