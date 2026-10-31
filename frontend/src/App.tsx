@@ -8,7 +8,7 @@ import { RouteErrorBoundary } from "./app/components/RouteErrorBoundary";
 import { HomePage } from "./features/home";
 import { LibraryPage, PlantDetailPage } from './features/library';
 import { AIPlantDetectionPage } from "./features/ai-scanner";
-import { VirtualGarden3DPage } from "./app/pages/VirtualGarden3DPage";
+import { VirtualGarden3DPage } from "./features/3d-garden";
 import { RemediesPage, RemedyDetailPage } from "./features/remedies";
 import { NotFoundPage } from "./app/pages/NotFoundPage";
 import {

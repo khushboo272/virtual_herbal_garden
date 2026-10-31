@@ -438,3 +438,119 @@ In `frontend/src/app/components/dashboard/NotificationPanel.tsx`, `formatDistanc
 4. Updated mock data and added a component test in `frontend/src/features/system/__tests__/SystemOverviewPage.test.tsx` verifying manage links render valid dashboard paths (4/4 tests PASS).
 5. Re-ran backend integration tests (7/7 PASS), frontend smoke tests (18/18 PASS), frontend lint (0 errors), and production build (clean bundle).
 
+
+
+---
+
+## BUG-057 Garden plants are generic trees/blobs and database plants look identical
+**Status:** FIXED (3D Garden Part G1)
+**Description:** In the 3D garden, plants were rendered as generic trees or blob-like placeholder meshes without distinguishing botanical characteristics, causing diverse database plants to look virtually identical in the scene.
+**Root Cause:** `Plant.tsx` fell back to `FallbackPlant.tsx` whenever `model3dUrl` was null. `FallbackPlant` rendered a hardcoded trunk with 3 dodecahedron balls for every plant regardless of botanical species or habit.
+**Fix:**
+1. Added visual botanical schema to `Plant.model.ts`: habit (`HERB`, `SHRUB`, `TREE`, `GRASS`, `CLIMBER`, `SUCCULENT`, `ROOT`), `heightM`, `spreadM`, `foliageColor`, `flowerColor`, `leafShape` (`LANCEOLATE`, `OVATE`, `HEART`, `PINNATE`, `SPIKY`, `ROUND`), with read-time fallback derivation (`deriveVisualDefaults`).
+2. Built `ProceduralPlant.tsx` with habit-specific morphological generators utilizing low-poly InstancedMesh leaf cards, procedural canvas cutout textures, deterministic PRNG seed from plant ID, and wind-sway shaders.
+
+---
+
+## BUG-058 The garden uses mock/fallback plant data from hooks/usePlants.ts
+**Status:** FIXED (3D Garden Part G1)
+**Description:** The 3D garden loaded fallback/mock plant data from `hooks/usePlants.ts` instead of directly syncing with all published database plants, causing discrepancies between actual catalog plants and what appears in the 3D garden.
+**Root Cause:** Hardcoded mock arrays (`mock1`, `mock2`) existed in `usePlants.ts` and `useGardenPlants.ts`, and the scene did not fetch all published plants from a dedicated showcase endpoint.
+**Fix:**
+1. Created public backend endpoint `GET /api/v1/garden/showcase` with ETag caching returning every published plant.
+2. Built `useShowcasePlants.ts` with ETag-aware caching, live WebSocket updates (`garden:plantsChanged`), and a 60s polling fallback.
+3. Completely eliminated all mock plant data from `usePlants.ts` and `useGardenPlants.ts`. Built friendly empty state when 0 plants are published.
+
+---
+
+## BUG-059 Uploaded GLB models do not appear automatically and models of arbitrary scale/origin break the layout
+**Status:** FIXED (3D Garden Part G1)
+**Description:** When botanists or admins uploaded real 3D GLB models for a plant, the garden did not automatically update live. Furthermore, models with arbitrary bounding-box scales or off-center origins clipped into the terrain or overshadowed neighboring plants, breaking the showcase layout.
+**Root Cause:** Upload endpoints did not emit WebSocket events or validate GLB magic bytes. Model rendering did not normalize bounding boxes or support transforms.
+**Fix:**
+1. Enforced binary glTF magic bytes (`glTF`) and 25MB limit in `plant.controller.ts`.
+2. Emitted `garden:plantsChanged` (`ADDED`, `UPDATED`, `REMOVED`) on model uploads, removals, and plant publications.
+3. Created `normalizeModel.ts` to automatically recenter the base-center to $Y=0$, uniformly scale to `targetHeightM` / `visual.heightM`, and apply fine transform overrides (`scale`, `rotationY`, `offsetY`).
+4. Added Model Error reporting (`POST /garden/model-error`) with client rate limiting and graceful fallback to procedural plants.
+
+---
+
+## BUG-060 Plant labels are blurry and unreadable
+**Status:** FIXED (3D Garden Part G1)
+**Description:** Plant 3D text/labels were rendered using low-resolution canvas textures or poorly scaled billboards, resulting in blurry, unreadable labels at varying camera distances and viewing angles.
+**Root Cause:** Billboarded Text components lacked high-resolution SDF rasterization, outlines, distance-based culling, and ground nameplates.
+**Fix:**
+1. Implemented sharp Signed Distance Field (SDF) billboarded `<Text>` with dark contrasting outlines (`GARDEN_CONFIG.labels.outlineWidth`).
+2. Added distance fade logic fading out beyond 14m and culling completely beyond 20m unless hovered/selected.
+3. Added physical 3D botanical slate nameplates at the base of every plant displaying common and scientific names.
+
+---
+
+## BUG-061 Terrain is flat and featureless
+**Status:** FIXED (3D Garden Part G2)
+**Description:** The 3D garden ground is a flat planar mesh with basic green circles and lack of topography, terracing, retaining walls, or organic elevation contours.
+**Root Cause:** Legacy `RealisticGround.tsx` used a single flat `PlaneGeometry(200, 200)` without heightmapping, grading, or procedural surface classification.
+**Fix:**
+1. Implemented continuous heightmapped terrain in `terrainGenerator.ts` using deterministic Simplex noise with rolling peripheral berms.
+2. Smoothly graded and flattened the central plaza ($R=10.5m$) and each of the 10 botanical zone beds.
+3. Created `GardenTerrain.tsx` with vertex color blending (plaza pavers, graded gravel paths, mulch beds, meadow grass, pond silt).
+4. Exported continuous `getGroundY(x, z)` and `getTerrainSurfaceType(x, z)` used by camera, player controls, plants, and props.
+
+---
+
+## BUG-062 The whole image is blurry with chromatic aberration
+**Status:** FIXED (3D Garden Part G2)
+**Description:** The 3D viewport exhibits heavy color fringing (red/blue split edges) and generalized blurring due to misconfigured full-screen post-processing passes.
+**Root Cause:** `PostProcessingStack.tsx` included `ChromaticAberration` with offset `[0.002, 0.002]`, an active `DepthOfField` with `focusDistance={0}` and `bokehScale={2}`, and heavy `Vignette darkness={1.1}`.
+**Fix:**
+1. Replaced legacy stack with `GardenPostProcessing.tsx`.
+2. Completely removed `ChromaticAberration` and global `DepthOfField` from default navigation.
+3. Implemented Subpixel Morphological Anti-Aliasing (`SMAA`) for sharp, artifact-free foliage outlines.
+4. Tuned `Bloom` to a high luminance threshold ($\ge 0.92$) and subtle intensity ($\le 0.28$) targeting only lantern glows and water glints.
+5. Confined `DepthOfField` bokeh strictly to Photo Mode.
+
+---
+
+## BUG-063 A dark gray rectangle is visible across the top of the sky
+**Status:** FIXED (3D Garden Part G2)
+**Description:** A dark gray horizontal artifact or bar cuts across the top portion of the viewport sky dome.
+**Root Cause:** `ProceduralCloudSystem.tsx` had a flat planar geometry `PlaneGeometry(1000, 1000)` hovering at $Y=150$, while `Sky distance={450000}` was being clipped by the camera far clipping plane ($far=500$).
+**Fix:**
+1. Increased camera far clipping plane from $500m$ to $3000m$ in `gardenConfig.ts` (`camera.far = 3000`).
+2. Replaced the planar cloud geometry with procedural `GardenAtmosphere.tsx` utilizing `@react-three/drei`'s `Sky` scaled to $1500m$, safely enclosed within the camera frustum.
+3. Replaced CDN Environment presets with zero-network procedural `Lightformer`s.
+
+---
+
+## BUG-064 The water renders as a glitchy glowing line
+**Status:** FIXED (3D Garden Part G2)
+**Description:** Water is represented as an over-bright, artifacted linear mesh with rainbow refraction noise instead of a natural garden pond and cascading stream.
+**Root Cause:** `River.tsx` passed `format: gl.outputColorSpace` (a string like `'srgb'`) into WebGL render target options expecting a `PixelFormat` enum, combined with `distortionScale: 3.7` and reliance on a missing external R2 normal map.
+**Fix:**
+1. Replaced legacy river with landscaped `GardenPond.tsx` featuring a custom procedural water shader with Gerstner wave displacement.
+2. Added soft shoreline foam, aquatic absorption tinting, and depth gradient shading.
+3. Modeled rock waterfall cascade, floating lily pads, wetland reeds, and a deep-water player collision barrier.
+
+---
+
+## BUG-065 Trees are blobs
+**Status:** FIXED (3D Garden Part G2)
+**Description:** Decorative trees and background vegetation resemble clustered dodecahedron blobs without natural botanical branching, leaf clumps, or canopies.
+**Root Cause:** Legacy `DecorativeFlora.tsx` used low-poly clustered dodecahedrons and icospheres as generic green blobs.
+**Fix:**
+1. Created `DecorativeTrees.tsx` with 4 distinct architectural botanical tree species: Weeping Willow, Flowering Cherry, Eastern Pine/Cedar, and Spreading Oak.
+2. Built multi-tier canopies with realistic trunk branching, foliage clusters, and natural species-specific colors.
+3. Added non-database ornamental filler planting in `FillerPlanting.tsx` (hydrangeas, lavender spikes, fountain grasses, and groundcover).
+
+---
+
+## BUG-066 The garden has no structure (paths, walls, beds, props)
+**Status:** FIXED (3D Garden Part G2)
+**Description:** The garden lacks architectural structure, retaining walls, delineated paths, raised herb beds, and resting spots.
+**Root Cause:** The scene previously rendered only bare ground and plant models without architectural landscaping elements.
+**Fix:**
+1. Created `GardenStructures.tsx` featuring curved split-level stone retaining walls around the central plaza.
+2. Built raised limestone kerbing and dark mulch mounds delineating all 10 botanical zone beds.
+3. Constructed a timber entrance pergola with creeping vines, along with perimeter split-rail cedar fencing.
+4. Added `GardenProps.tsx` with weathered teak benches, carved stone birdbath, flagstone stepping stones, and animated butterflies.
+**Description:** The scene lacks landscaped architectural elements such as curved gravel paths, stone retaining walls, raised herb beds, pergolas, benches, lanterns, and garden borders.

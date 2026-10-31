@@ -4,6 +4,7 @@ export const SOCKET_EVENTS = {
   ADMIN_ALERT: 'admin:alert',
   GARDEN_SYNCED: 'garden:synced',
   PLANT_UPDATED: 'plant:updated',
+  GARDEN_PLANTS_CHANGED: 'garden:plantsChanged',
 } as const;
 
 export type SocketEvent = (typeof SOCKET_EVENTS)[keyof typeof SOCKET_EVENTS];

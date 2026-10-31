@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   Leaf,
@@ -60,6 +60,7 @@ export function PlantEditorPage() {
   useDocumentTitle(isEditing ? 'Edit Plant Draft | Virtual Herbal Garden' : 'New Plant Draft | Virtual Herbal Garden');
 
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { user } = useAuth();
   const isAdminMode =
     searchParams.get('admin') === 'true' ||
@@ -113,6 +114,19 @@ export function PlantEditorPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [model3dUrl, setModel3dUrl] = useState<string | null>(null);
   const [uploadingModel, setUploadingModel] = useState(false);
+
+  // 3D Visual & Transform state
+  const [habit, setHabit] = useState<'HERB' | 'SHRUB' | 'TREE' | 'GRASS' | 'CLIMBER' | 'SUCCULENT' | 'ROOT'>('HERB');
+  const [heightM, setHeightM] = useState<number>(0.5);
+  const [spreadM, setSpreadM] = useState<number>(0.4);
+  const [foliageColor, setFoliageColor] = useState<string>('#2d7a3a');
+  const [flowerColor, setFlowerColor] = useState<string>('#f8bbd0');
+  const [leafShape, setLeafShape] = useState<'LANCEOLATE' | 'OVATE' | 'HEART' | 'PINNATE' | 'SPIKY' | 'ROUND'>('OVATE');
+
+  const [targetHeightM, setTargetHeightM] = useState<number>(1.0);
+  const [rotationY, setRotationY] = useState<number>(0);
+  const [offsetY, setOffsetY] = useState<number>(0);
+  const [modelStatus, setModelStatus] = useState<'NONE' | 'READY' | 'FAILED'>('NONE');
 
   // Metadata / Server State
   const [currentId, setCurrentId] = useState<string | null>(id || null);
@@ -175,6 +189,20 @@ export function PlantEditorPage() {
             setImages(doc.images.map((img: any, i: number) => ({ url: img.cardUrl || img.fullUrl || img.url, caption: img.caption || img.alt || '', isHero: img.isPrimary ?? (i === 0) })));
           }
           if (doc.model3dUrl || doc.modelUrl) setModel3dUrl(doc.model3dUrl || doc.modelUrl);
+          if (doc.visual) {
+            if (doc.visual.habit) setHabit(doc.visual.habit);
+            if (doc.visual.heightM !== undefined) setHeightM(doc.visual.heightM);
+            if (doc.visual.spreadM !== undefined) setSpreadM(doc.visual.spreadM);
+            if (doc.visual.foliageColor) setFoliageColor(doc.visual.foliageColor);
+            if (doc.visual.flowerColor) setFlowerColor(doc.visual.flowerColor);
+            if (doc.visual.leafShape) setLeafShape(doc.visual.leafShape);
+          }
+          if (doc.modelTransform) {
+            if (doc.modelTransform.targetHeightM !== undefined) setTargetHeightM(doc.modelTransform.targetHeightM);
+            if (doc.modelTransform.rotationY !== undefined) setRotationY(doc.modelTransform.rotationY);
+            if (doc.modelTransform.offsetY !== undefined) setOffsetY(doc.modelTransform.offsetY);
+          }
+          if (doc.modelStatus) setModelStatus(doc.modelStatus);
         }
       } catch (err: any) {
         toast.error('Failed to load plant draft');
@@ -184,6 +212,29 @@ export function PlantEditorPage() {
     }
     loadItem();
   }, [id]);
+
+  // Check location.state for prefill if creating a new plant
+  useEffect(() => {
+    if (id) return;
+    const prefill = (location.state as any)?.prefill;
+    if (prefill) {
+      if (prefill.commonName) setCommonName(prefill.commonName);
+      if (prefill.scientificName) setScientificName(prefill.scientificName);
+      if (prefill.family) setFamily(prefill.family);
+      if (prefill.description) setDescription(prefill.description);
+      if (Array.isArray(prefill.medicinalUses) && prefill.medicinalUses.length > 0) {
+        setMedicinalUses(
+          prefill.medicinalUses.map((u: any) => ({
+            use: typeof u === 'string' ? u : u.use || '',
+            details: typeof u === 'string' ? 'Observed medicinal benefit' : u.details || 'Observed medicinal benefit',
+          }))
+        );
+      }
+      if (prefill.imageUrl) {
+        setImages([{ url: prefill.imageUrl, caption: prefill.commonName || 'Plant specimen', isHero: true }]);
+      }
+    }
+  }, [id, location.state]);
 
   // Live duplicate scientificName warning check
   useEffect(() => {
@@ -374,6 +425,19 @@ export function PlantEditorPage() {
         precautions: precautions.filter((p) => p.trim().length > 0),
         references: cleanReferences,
         aliases,
+        visual: {
+          habit,
+          heightM: Number(heightM),
+          spreadM: Number(spreadM),
+          foliageColor,
+          flowerColor,
+          leafShape,
+        },
+        modelTransform: {
+          targetHeightM: Number(targetHeightM),
+          rotationY: Number(rotationY),
+          offsetY: Number(offsetY),
+        },
       };
 
       if (currentId) {
@@ -512,8 +576,14 @@ export function PlantEditorPage() {
 
     try {
       setUploadingModel(true);
-      await uploadPlantModel(currentId, file, 'lod0');
-      toast.success('3D model uploaded successfully');
+      await uploadPlantModel(currentId, file, 'lod0', {
+        targetHeightM: Number(targetHeightM),
+        rotationY: Number(rotationY),
+        offsetY: Number(offsetY),
+      });
+      setModelStatus('READY');
+      setModel3dUrl(URL.createObjectURL(file));
+      toast.success('3D model uploaded and synced live to garden!');
       setIsDirty(true);
     } catch (err: any) {
       toast.error(err?.message || 'Failed to upload 3D model. Cloudflare R2 may not be configured.');
@@ -1218,15 +1288,152 @@ export function PlantEditorPage() {
               </div>
             )}
 
-            {/* Optional 3D Model Upload */}
-            <div className="border-t border-slate-100 pt-4">
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Interactive 3D Botanical Model (Optional, GLB format up to 10 MB)
-              </label>
+            {/* 3D Appearance Section (Procedural Fallback Parameters) */}
+            <div className="border-t border-slate-100 pt-5 mt-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-600" /> 3D Botanical Appearance (Procedural Engine)
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Defines realistic morphological traits when no custom 3D model is attached or while it loads.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">Habit / Architecture</label>
+                  <select
+                    value={habit}
+                    onChange={(e) => { setHabit(e.target.value as any); setIsDirty(true); }}
+                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-slate-800"
+                  >
+                    <option value="HERB">Herb (Low mound / Rosette)</option>
+                    <option value="SHRUB">Shrub (Branching bush)</option>
+                    <option value="TREE">Tree (Arboreal canopy)</option>
+                    <option value="GRASS">Grass (Slender blades)</option>
+                    <option value="CLIMBER">Climber (Trellised vine)</option>
+                    <option value="SUCCULENT">Succulent (Fleshy rosette)</option>
+                    <option value="ROOT">Root (Leafy tuft / rhizome)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">Height (Meters)</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    max="30"
+                    value={heightM}
+                    onChange={(e) => { setHeightM(parseFloat(e.target.value) || 0.5); setIsDirty(true); }}
+                    className="h-9 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">Spread / Width (Meters)</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    max="15"
+                    value={spreadM}
+                    onChange={(e) => { setSpreadM(parseFloat(e.target.value) || 0.4); setIsDirty(true); }}
+                    className="h-9 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">Leaf Shape</label>
+                  <select
+                    value={leafShape}
+                    onChange={(e) => { setLeafShape(e.target.value as any); setIsDirty(true); }}
+                    className="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-slate-800"
+                  >
+                    <option value="OVATE">Ovate (Egg-shaped)</option>
+                    <option value="LANCEOLATE">Lanceolate (Pointed spear)</option>
+                    <option value="HEART">Heart (Cordate)</option>
+                    <option value="PINNATE">Pinnate (Feather-like)</option>
+                    <option value="SPIKY">Spiky (Aloe/Cactus)</option>
+                    <option value="ROUND">Round (Orbicular)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">Foliage Color</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={foliageColor}
+                      onChange={(e) => { setFoliageColor(e.target.value); setIsDirty(true); }}
+                      className="w-8 h-8 rounded-lg cursor-pointer border border-slate-200 p-0.5"
+                    />
+                    <Input
+                      value={foliageColor}
+                      onChange={(e) => { setFoliageColor(e.target.value); setIsDirty(true); }}
+                      className="h-9 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">Flower / Accent Color</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={flowerColor}
+                      onChange={(e) => { setFlowerColor(e.target.value); setIsDirty(true); }}
+                      className="w-8 h-8 rounded-lg cursor-pointer border border-slate-200 p-0.5"
+                    />
+                    <Input
+                      value={flowerColor}
+                      onChange={(e) => { setFlowerColor(e.target.value); setIsDirty(true); }}
+                      className="h-9 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive 3D Model Upload & Calibration */}
+            <div className="border-t border-slate-100 pt-5 mt-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Interactive 3D Botanical Model (GLB)
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Upload real photorealistic GLB models. Hot-swaps automatically in the live 3D garden.
+                  </p>
+                </div>
+                <div>
+                  {modelStatus === 'READY' || model3dUrl ? (
+                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Real 3D Model Attached
+                    </Badge>
+                  ) : modelStatus === 'FAILED' ? (
+                    <Badge className="bg-rose-100 text-rose-800 border-rose-300 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> Model Failed (Using Procedural)
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-amber-100 text-amber-800 border-amber-300">
+                      Procedural Placeholder Active
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Guidelines text */}
+              <div className="p-3 rounded-xl bg-purple-50/70 border border-purple-100 text-[11px] text-purple-900 leading-relaxed">
+                <strong>Model Guidelines:</strong> Binary glTF (.glb) under 10 MB, Y-up orientation, base centered at origin (0,0,0), meters scale. The engine automatically recenters base vertices, applies Draco/meshopt decoding, and normalizes height.
+              </div>
+
               <div className="flex items-center gap-3">
-                <label className="inline-flex items-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-800 font-semibold px-4 py-2 rounded-xl text-xs cursor-pointer border border-purple-200 transition-colors">
+                <label className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2.5 rounded-xl text-xs cursor-pointer shadow-xs transition-colors">
                   <Upload className="w-4 h-4" />
-                  {uploadingModel ? 'Uploading GLB Model...' : 'Upload GLB Model'}
+                  {uploadingModel ? 'Uploading & Validating GLB...' : 'Upload GLB Model'}
                   <input
                     type="file"
                     accept=".glb"
@@ -1237,9 +1444,48 @@ export function PlantEditorPage() {
                 </label>
                 {model3dUrl && (
                   <span className="text-xs font-semibold text-emerald-700 flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4" /> Model Attached
+                    <CheckCircle2 className="w-4 h-4" /> Ready & Live in Garden
                   </span>
                 )}
+              </div>
+
+              {/* Model Transform Adjustments */}
+              <div className="pt-2 grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">Target Height (m)</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    max="20"
+                    value={targetHeightM}
+                    onChange={(e) => { setTargetHeightM(parseFloat(e.target.value) || 1.0); setIsDirty(true); }}
+                    className="h-8 text-xs"
+                    placeholder="1.0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">Rotation Y (rad)</label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    value={rotationY}
+                    onChange={(e) => { setRotationY(parseFloat(e.target.value) || 0); setIsDirty(true); }}
+                    className="h-8 text-xs"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">Vertical Offset Y (m)</label>
+                  <Input
+                    type="number"
+                    step="0.05"
+                    value={offsetY}
+                    onChange={(e) => { setOffsetY(parseFloat(e.target.value) || 0); setIsDirty(true); }}
+                    className="h-8 text-xs"
+                    placeholder="0"
+                  />
+                </div>
               </div>
             </div>
           </Card>

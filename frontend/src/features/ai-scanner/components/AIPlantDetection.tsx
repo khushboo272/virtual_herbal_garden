@@ -25,9 +25,23 @@ function ResultCard({ result }: { result: DetectionResult }) {
     if (result.plantSlug) {
       // Navigate directly to the plant detail page using its slug
       navigate(`/plant/${result.plantSlug}`);
-    } else if (result.topMatch?.scientificName) {
-      // No slug in DB — search library; open=1 triggers auto-navigate on exactMatch
-      navigate(`/library?q=${encodeURIComponent(result.topMatch.scientificName)}&open=1`);
+    } else {
+      const query = result.topMatch?.commonName || result.topMatch?.scientificName || '';
+      navigate(`/library?q=${encodeURIComponent(query)}&fromScan=1`, {
+        state: {
+          scannedPlant: {
+            commonName: result.topMatch?.commonName || query,
+            scientificName: result.topMatch?.scientificName || '',
+            family: result.topMatch?.family || '',
+            description: result.description || '',
+            medicinalUses: result.medicinalUses || [],
+            keyBenefits: result.keyBenefits || [],
+            precautions: result.precautions || [],
+            imageUrl: result.imageUrl || '',
+            confidence: result.topMatch?.confidence,
+          },
+        },
+      });
     }
   }
 

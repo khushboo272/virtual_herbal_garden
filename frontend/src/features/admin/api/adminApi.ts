@@ -359,3 +359,32 @@ export async function getMyRoleApplication(): Promise<RoleApplicationItem | null
   const res = await api.get('/role-applications/mine');
   return res.data?.data || res.data;
 }
+
+// --- Plant Registration Requests (Community Inquiries) ---
+export async function getPlantRegistrationRequests(params: {
+  status?: string;
+  page?: number;
+  limit?: number;
+  q?: string;
+} = {}): Promise<{ items: any[]; pagination: PaginationData }> {
+  const res = await api.get<any[]>('/plants/registration-requests', params as any);
+  const rawItems = Array.isArray(res.data) ? res.data : [];
+  const rawPagination = res.meta || {
+    total: rawItems.length,
+    page: params.page || 1,
+    limit: params.limit || 20,
+    totalPages: 1,
+  };
+  return {
+    items: rawItems,
+    pagination: rawPagination as PaginationData,
+  };
+}
+
+export async function updatePlantRegistrationRequestStatus(
+  id: string,
+  data: { status: string; adminNotes?: string },
+): Promise<any> {
+  const res = await api.patch(`/plants/registration-requests/${id}/status`, data);
+  return res.data?.data || res.data;
+}

@@ -53,7 +53,32 @@ export interface ModerationSummary {
   plants: number;
   remedies: number;
   applications: number;
+  requests?: number;
   total: number;
+}
+
+export interface PlantRegistrationRequestItem {
+  _id: string;
+  commonName: string;
+  scientificName?: string;
+  family?: string;
+  description?: string;
+  medicinalUses: string[];
+  imageUrl?: string;
+  notes?: string;
+  requestedBy?: {
+    _id: string;
+    displayName: string;
+    email: string;
+    avatarUrl?: string;
+  } | null;
+  requesterName?: string;
+  requesterEmail?: string;
+  status: 'PENDING' | 'RESEARCHING' | 'CATALOGED' | 'DISMISSED';
+  reviewedBy?: string | null;
+  adminNotes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ModerationQueueItem {

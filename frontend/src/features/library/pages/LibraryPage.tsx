@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Grid3x3, List, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { SearchBar } from '../components/SearchBar';
 import { FiltersSidebar } from '../components/FiltersSidebar';
@@ -6,10 +7,14 @@ import { PlantCard } from '../components/PlantCard';
 import { LibrarySkeleton, EmptyResults, LibraryError } from '../components/LibraryStates';
 import { usePlantSearch } from '../hooks/usePlantSearch';
 import { useDebounce } from '../hooks/useDebounce';
+import { reportMissingPlantSearch } from '../api/libraryApi';
 import { PlantViewer3DModal } from '../../../app/components/PlantViewer3DModal';
 import type { LibraryPlant } from '../types/library.types';
 
 export function LibraryPage() {
+  const location = useLocation();
+  const scannedPlant = location.state?.scannedPlant;
+
   const {
     params,
     setQ,
@@ -33,6 +38,18 @@ export function LibraryPage() {
 
   // Debounced search — only triggers URL update after 350ms inactivity
   const debouncedSetQ = useDebounce(useCallback((q: string) => setQ(q), [setQ]), 350);
+
+  // Automatically alert botanists, admins, and superadmins when an uncataloged plant is searched
+  useEffect(() => {
+    if (!isLoading && !error && plants.length === 0 && params.q && params.q.trim().length > 0) {
+      reportMissingPlantSearch({
+        query: params.q.trim(),
+        scientificName: scannedPlant?.scientificName,
+        family: scannedPlant?.family,
+        source: scannedPlant ? 'ai-scanner' : 'library-search',
+      });
+    }
+  }, [isLoading, error, plants.length, params.q, scannedPlant]);
 
   const viewMode = params.view ?? 'grid';
   const currentPage = params.page ?? 1;
@@ -169,7 +186,7 @@ export function LibraryPage() {
             ) : error ? (
               <LibraryError message={error} onRetry={retry} />
             ) : plants.length === 0 ? (
-              <EmptyResults query={params.q} onReset={clearFilters} />
+              <EmptyResults query={params.q} scannedPlant={scannedPlant} onReset={clearFilters} />
             ) : (
               <div
                 className={

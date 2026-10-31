@@ -153,10 +153,17 @@ export async function uploadPlantModel(
   id: string,
   file: File,
   lod: 'lod0' | 'lod1' | 'lod2' = 'lod0',
+  transform?: { targetHeightM?: number; rotationY?: number; offsetY?: number; scale?: number },
 ): Promise<unknown> {
   const formData = new FormData();
   formData.append('model', file);
   formData.append('lod', lod);
+  if (transform) {
+    if (transform.targetHeightM !== undefined) formData.append('targetHeightM', String(transform.targetHeightM));
+    if (transform.rotationY !== undefined) formData.append('rotationY', String(transform.rotationY));
+    if (transform.offsetY !== undefined) formData.append('offsetY', String(transform.offsetY));
+    if (transform.scale !== undefined) formData.append('scale', String(transform.scale));
+  }
   const res = await api.upload(`/plants/${id}/model`, formData);
   return res.data;
 }

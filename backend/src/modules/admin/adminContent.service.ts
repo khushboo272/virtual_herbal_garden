@@ -148,6 +148,11 @@ export class AdminContentService {
 
     invalidateHomeCache();
 
+    if (targetType === 'plants') {
+      const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+      gardenShowcaseService.emitGardenPlantChange('ADDED', item);
+    }
+
     return item;
   }
 
@@ -182,6 +187,11 @@ export class AdminContentService {
     });
 
     invalidateHomeCache();
+
+    if (targetType === 'plants') {
+      const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+      gardenShowcaseService.emitGardenPlantChange('REMOVED', item);
+    }
 
     return item;
   }
@@ -313,6 +323,11 @@ export class AdminContentService {
     (item as any).deletedAt = new Date();
     await item.save();
 
+    if (type === 'plants') {
+      const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+      gardenShowcaseService.emitGardenPlantChange('REMOVED', item);
+    }
+
     await writeAuditLog({
       actor: adminUser._id,
       action: 'CONTENT_DELETED',
@@ -348,6 +363,11 @@ export class AdminContentService {
         item.isPublished = false;
         item.status = ContentStatus.DRAFT;
         await item.save();
+
+        if (type === 'plants') {
+          const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+          gardenShowcaseService.emitGardenPlantChange('REMOVED', item);
+        }
 
         await writeAuditLog({
           actor: adminUser._id,
@@ -392,6 +412,11 @@ export class AdminContentService {
       (item as any).deletedAt = new Date();
       await item.save();
 
+      if (type === 'plants') {
+        const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+        gardenShowcaseService.emitGardenPlantChange('REMOVED', item);
+      }
+
       await writeAuditLog({
         actor: adminUser._id,
         action: 'CONTENT_DELETED',
@@ -424,6 +449,11 @@ export class AdminContentService {
       item.isPublished = true;
       item.status = ContentStatus.PUBLISHED;
       await item.save();
+
+      if (type === 'plants') {
+        const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+        gardenShowcaseService.emitGardenPlantChange('ADDED', item);
+      }
 
       await writeAuditLog({
         actor: adminUser._id,

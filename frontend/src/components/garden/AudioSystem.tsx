@@ -1,11 +1,12 @@
 // ─────────────────────────────────────────────────────
 // AudioSystem.tsx — Positional audio for birds and river
-// Uses Howler for ambient and PositionalAudio from drei for spatial
+// Uses procedural Web Audio synthesis for zero-asset soundscape,
+// plus Howler and PositionalAudio when external sound files are present.
 // ─────────────────────────────────────────────────────
 import { useRef, useEffect, useState } from 'react';
-import { useThree } from '@react-three/fiber';
 import { PositionalAudio } from '@react-three/drei';
 import { Howl } from 'howler';
+import { gardenSoundscape } from '../../features/3d-garden/utils/proceduralAudio';
 
 /* ── Safe audio wrapper — only renders if file exists ── */
 
@@ -21,10 +22,13 @@ function SafePositionalAudio({
   const [exists, setExists] = useState(false);
 
   useEffect(() => {
-    // Check if audio file exists before trying to load
+    // Check if audio file exists and is actual audio, not Vite SPA fallback HTML
     fetch(url, { method: 'HEAD' })
       .then((res) => {
-        if (res.ok) setExists(true);
+        const ct = res.headers.get('content-type') || '';
+        if (res.ok && !ct.includes('text/html') && (ct.includes('audio') || ct.includes('octet-stream'))) {
+          setExists(true);
+        }
       })
       .catch(() => {
         // Audio file not found — silently skip
@@ -42,25 +46,42 @@ function SafePositionalAudio({
 
 /* ── AudioSystem ──────────────────────────────────── */
 
-export function useAmbientAudio(isAudioEnabled = true, isNight = false) {
+export function useAmbientAudio(isAudioEnabled = true, isNight = false, volume = 0.7) {
   const birdsRef = useRef<Howl | null>(null);
   const nightRef = useRef<Howl | null>(null);
 
-  // Initialize howls
+  // Procedural Web Audio Synthesis (guarantees sound even with zero MP3 assets)
+  useEffect(() => {
+    if (isAudioEnabled) {
+      gardenSoundscape.start(volume, isNight);
+    } else {
+      gardenSoundscape.stop();
+    }
+  }, [isAudioEnabled]);
+
+  useEffect(() => {
+    gardenSoundscape.setNight(isNight);
+  }, [isNight]);
+
+  useEffect(() => {
+    gardenSoundscape.setVolume(volume);
+  }, [volume]);
+
+  // Optional Howler audio clips (when MP3 files are present in /sounds/)
   useEffect(() => {
     if (!isAudioEnabled) return;
     try {
       birdsRef.current = new Howl({
         src: ['/sounds/birds.mp3'],
         loop: true,
-        volume: isNight ? 0 : 0.5,
+        volume: isNight ? 0 : 0.5 * volume,
         autoplay: true,
       });
 
       nightRef.current = new Howl({
         src: ['/sounds/night-insects.mp3'],
         loop: true,
-        volume: isNight ? 0.5 : 0,
+        volume: isNight ? 0.5 * volume : 0,
         autoplay: true,
       });
 
@@ -78,34 +99,43 @@ export function useAmbientAudio(isAudioEnabled = true, isNight = false) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAudioEnabled]);
 
-  // Handle fading
+  // Handle crossfading
   useEffect(() => {
     if (!isAudioEnabled) return;
     const fadeDuration = 2000;
     
     if (isNight) {
-      // Fade out birds, fade in night
-      if (birdsRef.current) birdsRef.current.fade(0.5, 0, fadeDuration);
-      if (nightRef.current) nightRef.current.fade(0, 0.5, fadeDuration);
+      if (birdsRef.current) birdsRef.current.fade(0.5 * volume, 0, fadeDuration);
+      if (nightRef.current) nightRef.current.fade(0, 0.5 * volume, fadeDuration);
     } else {
-      // Fade out night, fade in birds
-      if (birdsRef.current) birdsRef.current.fade(0, 0.5, fadeDuration);
-      if (nightRef.current) nightRef.current.fade(0.5, 0, fadeDuration);
+      if (birdsRef.current) birdsRef.current.fade(0, 0.5 * volume, fadeDuration);
+      if (nightRef.current) nightRef.current.fade(0.5 * volume, 0, fadeDuration);
     }
-  }, [isNight, isAudioEnabled]);
+  }, [isNight, isAudioEnabled, volume]);
 }
 
-export function AudioSystem({ isAudioEnabled = true, isNight = false }: { isAudioEnabled?: boolean, isNight?: boolean }) {
-  useAmbientAudio(isAudioEnabled, isNight);
+export function AudioSystem({
+  isAudioEnabled = true,
+  isPlaying,
+  isNight = false,
+  volume = 0.7,
+}: {
+  isAudioEnabled?: boolean;
+  isPlaying?: boolean;
+  isNight?: boolean;
+  volume?: number;
+}) {
+  const active = isPlaying ?? isAudioEnabled;
+  useAmbientAudio(active, isNight, volume);
 
   return (
-    <>
-      {/* River — positioned at river location */}
+    <group name="GardenAudioSystem">
+      {/* Pond Waterfall — positioned at pond location */}
       <SafePositionalAudio
         url="/sounds/river.mp3"
         distance={10}
-        position={[0, 0.5, 25]}
+        position={[19, 0, 19]}
       />
-    </>
+    </group>
   );
 }

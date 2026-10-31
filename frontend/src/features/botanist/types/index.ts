@@ -69,6 +69,21 @@ export interface IPlantDraftInput {
   toxicity?: string;
   precautions?: string[];
   references: string[];
+  visual?: {
+    habit?: 'HERB' | 'SHRUB' | 'TREE' | 'GRASS' | 'CLIMBER' | 'SUCCULENT' | 'ROOT';
+    heightM?: number;
+    spreadM?: number;
+    foliageColor?: string;
+    flowerColor?: string;
+    leafShape?: 'LANCEOLATE' | 'OVATE' | 'HEART' | 'PINNATE' | 'SPIKY' | 'ROUND';
+  };
+  modelTransform?: {
+    scale?: number;
+    rotationY?: number;
+    offsetY?: number;
+    targetHeightM?: number;
+  };
+  modelStatus?: 'NONE' | 'READY' | 'FAILED';
 }
 
 export interface IRemedyDraftInput {

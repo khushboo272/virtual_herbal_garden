@@ -75,6 +75,7 @@ export const moderationSummarySchema = z.object({
   plants: z.number().default(0),
   remedies: z.number().default(0),
   applications: z.number().default(0),
+  requests: z.number().default(0),
   total: z.number().default(0),
 });
 

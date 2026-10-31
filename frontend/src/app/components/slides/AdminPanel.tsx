@@ -175,6 +175,7 @@ export function AdminPanel() {
                         <TableHead className="text-green-800">Botanical Name</TableHead>
                         <TableHead className="text-green-800">Category</TableHead>
                         <TableHead className="text-green-800">Status</TableHead>
+                        <TableHead className="text-green-800">3D</TableHead>
                         <TableHead className="text-green-800">Views</TableHead>
                         <TableHead className="text-green-800 text-right">Actions</TableHead>
                       </TableRow>
@@ -197,6 +198,15 @@ export function AdminPanel() {
                             }>
                               {plant.status}
                             </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {(plant as any).modelUrl ? (
+                              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300">Real</Badge>
+                            ) : (plant as any).modelStatus === 'FAILED' ? (
+                              <Badge className="bg-rose-100 text-rose-700 border-rose-300">Failed</Badge>
+                            ) : (
+                              <Badge className="bg-slate-100 text-slate-700 border-slate-300">Placeholder</Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-green-700">{plant.views.toLocaleString()}</TableCell>
                           <TableCell className="text-right">

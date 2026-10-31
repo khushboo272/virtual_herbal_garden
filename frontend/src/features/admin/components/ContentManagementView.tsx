@@ -584,6 +584,7 @@ export function ContentManagementView({ type, title, description }: ContentManag
                   </TableHead>
                   <TableHead>Item</TableHead>
                   <TableHead>Status</TableHead>
+                  {isPlants && <TableHead>3D Model</TableHead>}
                   <TableHead>Owner</TableHead>
                   <TableHead>Featured</TableHead>
                   <TableHead>Updated</TableHead>
@@ -646,6 +647,23 @@ export function ContentManagementView({ type, title, description }: ContentManag
                           </Badge>
                         )}
                       </TableCell>
+                      {isPlants && (
+                        <TableCell>
+                          {(it as any).modelStatus === 'READY' || (it as any).modelUrl ? (
+                            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300">
+                              Real
+                            </Badge>
+                          ) : (it as any).modelStatus === 'FAILED' ? (
+                            <Badge className="bg-rose-100 text-rose-800 border-rose-300">
+                              Failed
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-slate-100 text-slate-700 border-slate-200">
+                              Placeholder
+                            </Badge>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell>
                         <span className="text-sm text-slate-700">{ownerName}</span>
                       </TableCell>

@@ -110,3 +110,57 @@ export async function getBookmarks(): Promise<
   );
   return Array.isArray(res.data) ? res.data : [];
 }
+
+// ── Missing Plant Search Alert & Registration Requests ────────────────────
+
+export interface PlantRegistrationPayload {
+  commonName: string;
+  scientificName?: string;
+  family?: string;
+  description?: string;
+  medicinalUses?: string[];
+  imageUrl?: string;
+  notes?: string;
+}
+
+export interface PlantRegistrationResponse {
+  success: boolean;
+  message: string;
+  redirect?: {
+    url: string;
+    prefill: {
+      motivation: string;
+      qualifications: string;
+    };
+  };
+}
+
+export async function reportMissingPlantSearch(data: {
+  query: string;
+  scientificName?: string;
+  family?: string;
+  source?: string;
+}): Promise<{ success: boolean; deduplicated?: boolean; message?: string }> {
+  try {
+    const res = await api.post<{ success: boolean; deduplicated?: boolean; message?: string }>(
+      '/plants/missing-search-alert',
+      data,
+    );
+    return res.data;
+  } catch {
+    // Non-blocking telemetry
+    return { success: false };
+  }
+}
+
+export async function submitPlantRegistrationRequest(
+  data: PlantRegistrationPayload,
+): Promise<PlantRegistrationResponse> {
+  const res = await api.post<any>('/plants/register-request', data);
+  const payload = res?.data || res;
+  return {
+    success: payload?.success ?? res?.success ?? true,
+    message: payload?.message || res?.message || 'Thank you for contributing to the Virtual Herbal Garden!',
+    redirect: payload?.redirect || res?.redirect,
+  };
+}

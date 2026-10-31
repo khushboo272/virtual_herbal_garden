@@ -17,6 +17,22 @@ const growingConditionsSchema = z.object({
   hardinessZone: z.string().optional(),
 });
 
+export const plantVisualSchema = z.object({
+  habit: z.enum(['HERB', 'SHRUB', 'TREE', 'GRASS', 'CLIMBER', 'SUCCULENT', 'ROOT']).optional(),
+  heightM: z.number().positive().optional(),
+  spreadM: z.number().positive().optional(),
+  foliageColor: z.string().optional(),
+  flowerColor: z.string().optional(),
+  leafShape: z.enum(['LANCEOLATE', 'OVATE', 'HEART', 'PINNATE', 'SPIKY', 'ROUND']).optional(),
+});
+
+export const modelTransformSchema = z.object({
+  scale: z.number().positive().optional(),
+  rotationY: z.number().optional(),
+  offsetY: z.number().optional(),
+  targetHeightM: z.number().positive().optional(),
+});
+
 export const createPlantSchema = z.object({
   commonName: z.string().min(1).max(200),
   scientificName: z.string().min(1).max(300).optional(),
@@ -55,6 +71,8 @@ export const createPlantSchema = z.object({
   growingConditions: growingConditionsSchema.optional(),
   images: z.array(imageSchema).optional(),
   model3dUrl: z.string().url().optional(),
+  visual: plantVisualSchema.optional(),
+  modelTransform: modelTransformSchema.optional(),
   categories: z.array(z.string()).optional(),
   tags: z.array(z.string()).optional(),
   attributes: z.record(z.unknown()).optional(),

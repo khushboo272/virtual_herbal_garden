@@ -9,7 +9,7 @@ import { logger } from './core/utils/logger';
 // Import workers to start them
 import './modules/notifications/email.worker';
 
-// Trigger tsx watch reload: maintenance mode allowedRoles and schedule activation
+// Trigger tsx watch reload: plant registration requests model, workflow, and moderation integration
 
 async function bootstrap(): Promise<void> {
   // Connect to MongoDB
@@ -58,3 +58,4 @@ bootstrap().catch((err) => {
   logger.error('Failed to start server:', err);
   process.exit(1);
 });
+// Plant registration request routes synced: 2026-10-31 20:07:00

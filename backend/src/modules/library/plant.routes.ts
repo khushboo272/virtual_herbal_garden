@@ -21,6 +21,20 @@ router.get('/featured', plantController.featured);
 router.get('/search/autocomplete', plantController.autocomplete);
 router.get('/autocomplete', plantController.autocomplete);
 router.get('/garden', plantController.getGardenPlants);
+router.post('/missing-search-alert', authenticate(true), plantController.reportMissingPlantSearch);
+router.post('/register-request', authenticate(true), plantController.submitPlantRegistrationRequest);
+router.get(
+  '/registration-requests',
+  authenticate(),
+  requireRole(UserRole.BOTANIST),
+  plantController.getPlantRegistrationRequests,
+);
+router.patch(
+  '/registration-requests/:id/status',
+  authenticate(),
+  requireRole(UserRole.BOTANIST),
+  plantController.updatePlantRegistrationRequestStatus,
+);
 // :slug accepts both slug strings and Mongo ObjectIds
 router.get('/:slug', authenticate(true), plantController.getBySlug);
 router.get('/:id/related', plantController.getRelated);

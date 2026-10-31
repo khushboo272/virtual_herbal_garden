@@ -3,24 +3,24 @@ import { z } from 'zod';
 // ── Zod schema that validates Gemini's structured JSON output ──
 
 const AlternativeSchema = z.object({
-  commonName: z.string(),
-  scientificName: z.string(),
-  confidence: z.number().min(0).max(1),
+  commonName: z.string().default(''),
+  scientificName: z.string().default(''),
+  confidence: z.number().min(0).max(1).default(0),
 });
 
 export const PlantIdentificationSchema = z.object({
   isPlant: z.boolean(),
-  commonName: z.string(),
-  scientificName: z.string(),
-  family: z.string(),
-  confidence: z.number().min(0).max(1),
-  description: z.string(),
-  medicinalUses: z.array(z.string()).max(6),
-  keyBenefits: z.array(z.string()).max(6),
-  partsUsed: z.array(z.string()),
-  precautions: z.array(z.string()),
-  alternatives: z.array(AlternativeSchema),
-  imageQualityNote: z.string(),
+  commonName: z.string().optional().default(''),
+  scientificName: z.string().optional().default(''),
+  family: z.string().optional().default(''),
+  confidence: z.number().min(0).max(1).optional().default(0),
+  description: z.string().optional().default(''),
+  medicinalUses: z.array(z.string()).max(6).optional().default([]),
+  keyBenefits: z.array(z.string()).max(6).optional().default([]),
+  partsUsed: z.array(z.string()).optional().default([]),
+  precautions: z.array(z.string()).optional().default([]),
+  alternatives: z.array(AlternativeSchema).optional().default([]),
+  imageQualityNote: z.string().optional().default(''),
 });
 
 export type PlantIdentification = z.infer<typeof PlantIdentificationSchema>;

@@ -1,6 +1,52 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 import { ToxicityLevel, PlantPart, IGrowingConditions, IPlantImage, ImageType, ContentStatus, IReviewNote } from '../../types';
 
+export enum PlantHabit {
+  HERB = 'HERB',
+  SHRUB = 'SHRUB',
+  TREE = 'TREE',
+  GRASS = 'GRASS',
+  CLIMBER = 'CLIMBER',
+  SUCCULENT = 'SUCCULENT',
+  ROOT = 'ROOT',
+}
+
+export enum LeafShape {
+  LANCEOLATE = 'LANCEOLATE',
+  OVATE = 'OVATE',
+  HEART = 'HEART',
+  PINNATE = 'PINNATE',
+  SPIKY = 'SPIKY',
+  ROUND = 'ROUND',
+}
+
+export enum ModelStatus {
+  NONE = 'NONE',
+  READY = 'READY',
+  FAILED = 'FAILED',
+}
+
+export interface IPlantVisual {
+  habit?: PlantHabit;
+  heightM?: number;
+  spreadM?: number;
+  foliageColor?: string;
+  flowerColor?: string;
+  leafShape?: LeafShape;
+}
+
+export interface IModelTransform {
+  scale?: number;
+  rotationY?: number;
+  offsetY?: number;
+  targetHeightM?: number;
+}
+
+export interface ILastModelError {
+  at: Date;
+  message: string;
+}
+
 export interface IPlant extends Document {
   commonName: string;
   scientificName: string;
@@ -50,8 +96,127 @@ export interface IPlant extends Document {
   avgRating: number;
   reviewCount: number;
   viewCount: number;
+  // 3D Appearance and Model Pipeline fields
+  visual?: IPlantVisual;
+  modelVersion?: number;
+  modelStatus?: ModelStatus;
+  modelTransform?: IModelTransform;
+  lastModelError?: ILastModelError;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export function deriveVisualDefaults(plant: {
+  plantType?: string | null;
+  commonName?: string;
+  scientificName?: string;
+  visual?: IPlantVisual;
+}): Required<IPlantVisual> {
+  const v = plant.visual || {};
+  const typeStr = (plant.plantType || '').toLowerCase();
+  const nameStr = `${plant.commonName || ''} ${plant.scientificName || ''}`.toLowerCase();
+
+  let habit: PlantHabit = PlantHabit.HERB;
+  let heightM = 0.5;
+  let spreadM = 0.4;
+  let leafShape: LeafShape = LeafShape.OVATE;
+
+  if (typeStr === 'tree' || typeStr.includes('tree')) {
+    habit = PlantHabit.TREE;
+    heightM = 6.0;
+    spreadM = 4.0;
+    leafShape = LeafShape.PINNATE;
+  } else if (typeStr === 'shrub' || typeStr.includes('shrub')) {
+    habit = PlantHabit.SHRUB;
+    heightM = 1.2;
+    spreadM = 0.9;
+    leafShape = LeafShape.OVATE;
+  } else if (typeStr === 'herb' || typeStr.includes('herb')) {
+    habit = PlantHabit.HERB;
+    heightM = 0.5;
+    spreadM = 0.4;
+    leafShape = LeafShape.OVATE;
+  } else if (typeStr === 'climber' || typeStr.includes('climber') || typeStr.includes('vine') || typeStr.includes('creeper')) {
+    habit = PlantHabit.CLIMBER;
+    heightM = 1.8;
+    spreadM = 0.6;
+    leafShape = LeafShape.HEART;
+  } else if (typeStr === 'succulent' || typeStr.includes('succulent')) {
+    habit = PlantHabit.SUCCULENT;
+    heightM = 0.6;
+    spreadM = 0.5;
+    leafShape = LeafShape.SPIKY;
+  } else if (typeStr === 'grass' || typeStr.includes('grass')) {
+    habit = PlantHabit.GRASS;
+    heightM = 0.8;
+    spreadM = 0.5;
+    leafShape = LeafShape.LANCEOLATE;
+  } else if (typeStr === 'root' || typeStr.includes('root')) {
+    habit = PlantHabit.ROOT;
+    heightM = 0.7;
+    spreadM = 0.5;
+    leafShape = LeafShape.LANCEOLATE;
+  } else if (
+    nameStr.includes('neem') ||
+    nameStr.includes('amla') ||
+    nameStr.includes('arjuna') ||
+    nameStr.includes('banyan') ||
+    nameStr.includes('peepal')
+  ) {
+    habit = PlantHabit.TREE;
+    heightM = 6.0;
+    spreadM = 4.0;
+    leafShape = LeafShape.PINNATE;
+  } else if (
+    nameStr.includes('ashwagandha') ||
+    nameStr.includes('mulethi')
+  ) {
+    habit = PlantHabit.SHRUB;
+    heightM = 1.2;
+    spreadM = 0.9;
+    leafShape = LeafShape.OVATE;
+  } else if (
+    nameStr.includes('giloy') ||
+    nameStr.includes('shatavari')
+  ) {
+    habit = PlantHabit.CLIMBER;
+    heightM = 1.8;
+    spreadM = 0.6;
+    leafShape = LeafShape.HEART;
+  } else if (
+    nameStr.includes('aloe') ||
+    nameStr.includes('cactus')
+  ) {
+    habit = PlantHabit.SUCCULENT;
+    heightM = 0.6;
+    spreadM = 0.5;
+    leafShape = LeafShape.SPIKY;
+  } else if (
+    nameStr.includes('lemongrass') ||
+    nameStr.includes('vetiver')
+  ) {
+    habit = PlantHabit.GRASS;
+    heightM = 0.8;
+    spreadM = 0.5;
+    leafShape = LeafShape.LANCEOLATE;
+  } else if (
+    nameStr.includes('turmeric') ||
+    nameStr.includes('ginger')
+  ) {
+    habit = PlantHabit.ROOT;
+    heightM = 0.7;
+    spreadM = 0.5;
+    leafShape = LeafShape.LANCEOLATE;
+  }
+
+  return {
+    habit: v.habit || habit,
+    heightM: v.heightM ?? heightM,
+    spreadM: v.spreadM ?? spreadM,
+    foliageColor: v.foliageColor || '#2d7a3a',
+    flowerColor: v.flowerColor || '#f8bbd0',
+    leafShape: v.leafShape || leafShape,
+  };
 }
 
 const GrowingConditionsSchema = new Schema<IGrowingConditions>(
@@ -167,6 +332,30 @@ const PlantSchema = new Schema<IPlant>(
     avgRating: { type: Number, default: 0 },
     reviewCount: { type: Number, default: 0 },
     viewCount: { type: Number, default: 0 },
+    visual: {
+      habit: { type: String, enum: Object.values(PlantHabit) },
+      heightM: { type: Number },
+      spreadM: { type: Number },
+      foliageColor: { type: String },
+      flowerColor: { type: String },
+      leafShape: { type: String, enum: Object.values(LeafShape) },
+    },
+    modelVersion: { type: Number, default: 0 },
+    modelStatus: {
+      type: String,
+      enum: Object.values(ModelStatus),
+      default: ModelStatus.NONE,
+    },
+    modelTransform: {
+      scale: { type: Number },
+      rotationY: { type: Number },
+      offsetY: { type: Number },
+      targetHeightM: { type: Number },
+    },
+    lastModelError: {
+      at: { type: Date },
+      message: { type: String },
+    },
   },
   { timestamps: true },
 );

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   Sparkles,
   Clock,
@@ -25,6 +26,8 @@ import { toast } from 'sonner';
 export function BecomeContributorPage() {
   const { user } = useAuth();
   const currentRole = user?.role || 'USER';
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
 
   const [application, setApplication] = useState<RoleApplicationItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,6 +38,28 @@ export function BecomeContributorPage() {
   const [qualifications, setQualifications] = useState('');
   const [links, setLinks] = useState<string[]>(['']);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Auto-fill form if user redirected from missing plant registration request
+  useEffect(() => {
+    const prefill = location.state?.prefill;
+    const plant = location.state?.plantName || searchParams.get('plant');
+
+    if (prefill) {
+      if (prefill.motivation) {
+        setMotivation(prefill.motivation);
+      }
+      if (prefill.qualifications) {
+        setQualifications(prefill.qualifications);
+      }
+    } else if (plant && !motivation) {
+      setMotivation(
+        `I noticed that ${plant} was missing from the Virtual Herbal Garden catalog and submitted a registration request. As an enthusiastic researcher of traditional herbal plants, I would like to join as an official Botanist to contribute verified taxonomy, traditional formulations, and botanical profiles for this and other herbal species.`
+      );
+      setQualifications(
+        `Botanical enthusiast experienced in identifying and documenting medicinal plant properties, including ${plant}.`
+      );
+    }
+  }, [location.state, searchParams]);
 
   const loadApplication = async () => {
     setIsLoading(true);
@@ -196,6 +221,19 @@ export function BecomeContributorPage() {
                 </div>
               </CardContent>
             </Card>
+          )}
+
+          {(location.state?.prefill || location.state?.plantName || searchParams.get('plant')) && (
+            <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-3 text-emerald-900 shadow-sm">
+              <Sparkles className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+              <div>
+                <h4 className="font-semibold text-emerald-950 text-sm">Application Details Pre-filled</h4>
+                <p className="text-xs text-emerald-700 mt-0.5">
+                  Your application has been pre-populated based on your registration request for{' '}
+                  <strong>{location.state?.plantName || searchParams.get('plant') || 'an uncataloged species'}</strong>. You can review or edit the fields below and submit directly!
+                </p>
+              </div>
+            </div>
           )}
 
           <Card>

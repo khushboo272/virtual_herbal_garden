@@ -32,18 +32,21 @@ export class ModerationService {
    * Summary of pending items across plants, remedies, and role applications.
    * NOTE: Tours are not part of moderation.
    */
-  async getSummary(): Promise<{ plants: number; remedies: number; applications: number; total: number }> {
-    const [plants, remedies, applications] = await Promise.all([
+  async getSummary(): Promise<{ plants: number; remedies: number; applications: number; requests: number; total: number }> {
+    const PlantRegistrationRequest = (await import('../library/PlantRegistrationRequest.model')).default;
+    const [plants, remedies, applications, requests] = await Promise.all([
       Plant.countDocuments(getPendingReviewPredicate()),
       Remedy.countDocuments(getPendingReviewPredicate()),
       RoleApplication.countDocuments({ status: RoleApplicationStatus.PENDING }),
+      PlantRegistrationRequest.countDocuments({ status: 'PENDING' }),
     ]);
 
     return {
       plants,
       remedies,
       applications,
-      total: plants + remedies + applications,
+      requests,
+      total: plants + remedies + applications + requests,
     };
   }
 
@@ -339,6 +342,11 @@ export class ModerationService {
 
     await item.save();
 
+    if (targetType === 'plant') {
+      const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+      gardenShowcaseService.emitGardenPlantChange('ADDED', item);
+    }
+
     await redis.del('admin:dashboard-summary');
     await redis.del('plants:featured');
 
@@ -414,6 +422,11 @@ export class ModerationService {
 
     await item.save();
 
+    if (targetType === 'plant') {
+      const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+      gardenShowcaseService.emitGardenPlantChange('ADDED', item);
+    }
+
     await redis.del('admin:dashboard-summary');
 
     // Audit log
@@ -487,6 +500,11 @@ export class ModerationService {
     });
 
     await item.save();
+
+    if (targetType === 'plant') {
+      const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+      gardenShowcaseService.emitGardenPlantChange('ADDED', item);
+    }
 
     await redis.del('admin:dashboard-summary');
 

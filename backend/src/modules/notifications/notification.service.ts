@@ -120,6 +120,21 @@ export class NotificationService {
       ),
     );
   }
+
+  async notifyBotanistsAndAdmins(
+    type: NotificationType,
+    title: string,
+    body: string,
+    actionUrl?: string,
+  ): Promise<void> {
+    const User = (await import('../users/User.model')).default;
+    const recipients = await User.find({ role: { $in: ['ADMIN', 'SUPER_ADMIN', 'BOTANIST'] } }).select('_id');
+    await Promise.all(
+      recipients.map((recipient) =>
+        this.createNotification(recipient._id.toString(), type, title, body, actionUrl),
+      ),
+    );
+  }
 }
 
 export const notificationService = new NotificationService();

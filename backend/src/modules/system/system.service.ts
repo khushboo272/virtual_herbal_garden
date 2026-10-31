@@ -1579,15 +1579,35 @@ export class SystemService {
   }
 
   async getActiveAIModel(): Promise<string> {
+    const settings = await this.getAIModelSettings();
+    return settings.activeModel;
+  }
+
+  async getAIModelSettings(): Promise<{
+    activeModel: string;
+    fallbackModel: string;
+    temperature: number;
+    maxTokens: number;
+  }> {
     try {
-      const config = await SystemConfig.findById('global').select('ai.model').lean();
-      if (config?.ai?.model && config.ai.model !== 'gemini-2.5-flash') {
-        return config.ai.model;
+      const config = await SystemConfig.findById('global').select('ai').lean();
+      if (config?.ai) {
+        return {
+          activeModel: config.ai.model || env.GEMINI_MODEL || 'gemini-3.5-flash',
+          fallbackModel: config.ai.fallbackModel || 'gemini-1.5-flash',
+          temperature: config.ai.temperature ?? 0.3,
+          maxTokens: config.ai.maxTokens ?? 2048,
+        };
       }
     } catch {
       // Fallback if DB not ready
     }
-    return env.GEMINI_MODEL || 'gemini-3.5-flash';
+    return {
+      activeModel: env.GEMINI_MODEL || 'gemini-3.5-flash',
+      fallbackModel: 'gemini-1.5-flash',
+      temperature: 0.3,
+      maxTokens: 2048,
+    };
   }
 
   async updateSystemConfig(data: any, user: any, req?: Request) {

@@ -3,7 +3,17 @@ import { plantService } from './plant.service';
 import { storageService } from '../../core/utils/storageService';
 import { validateImageMagicBytes } from '../../core/utils/imageProcessor';
 import { sendSuccess, sendCreated, AppError } from '../../core/utils/apiResponse';
+import { notificationService } from '../notifications/notification.service';
+import { NotificationType } from '../../types';
+import User from '../users/User.model';
+import PlantRegistrationRequest from './PlantRegistrationRequest.model';
 import crypto from 'crypto';
+
+const missingPlantAlertCache = new Map<string, number>();
+
+export function clearMissingPlantAlertCache() {
+  missingPlantAlertCache.clear();
+}
 
 export class PlantController {
   async list(req: Request, res: Response) {
@@ -121,26 +131,71 @@ export class PlantController {
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
 
     const Plant = (await import('./Plant.model')).default;
+    const { ModelStatus } = await import('./Plant.model');
     const plant = await Plant.findById(id);
     if (!plant || plant.isDeleted) throw new AppError('Plant not found', 404, 'NOT_FOUND');
 
     const { assertCanModifyContent } = await import('../../core/policies/contentOwnership');
     assertCanModifyContent(plant, req.user!.sub, req.user!.role, 'upload');
 
-    const { uploadToR2 } = await import('../../lib/r2Client');
+    const file = files?.['model']?.[0];
+    if (file) {
+      // Validate glTF binary magic bytes: 'glTF'
+      if (file.buffer.length < 4 || file.buffer.subarray(0, 4).toString('ascii') !== 'glTF') {
+        throw new AppError('Invalid GLB file format: missing binary glTF magic bytes', 400);
+      }
+      if (file.size > 25 * 1024 * 1024) {
+        throw new AppError('Model file exceeds maximum limit of 25 MB', 400);
+      }
 
-    if (files?.['model']?.[0]) {
+      const { uploadToR2 } = await import('../../lib/r2Client');
       const url = await uploadToR2(
-        files['model'][0].buffer,
+        file.buffer,
         `assets-for-r2/models/plants/${plant.slug}-lod0.glb`,
         'model/gltf-binary',
       );
       plant.modelUrl = url;
+      plant.modelVersion = Date.now();
+      plant.modelStatus = ModelStatus.READY;
+      plant.lastModelError = undefined;
+
+      // Handle optional modelTransform in body
+      if (req.body.modelTransform) {
+        try {
+          const transform =
+            typeof req.body.modelTransform === 'string'
+              ? JSON.parse(req.body.modelTransform)
+              : req.body.modelTransform;
+          plant.modelTransform = { ...plant.modelTransform, ...transform };
+        } catch {
+          // ignore parsing error if already handled
+        }
+      }
+      if (req.body.targetHeightM !== undefined) {
+        plant.modelTransform = plant.modelTransform || {};
+        plant.modelTransform.targetHeightM = parseFloat(req.body.targetHeightM);
+      }
+      if (req.body.rotationY !== undefined) {
+        plant.modelTransform = plant.modelTransform || {};
+        plant.modelTransform.rotationY = parseFloat(req.body.rotationY);
+      }
+      if (req.body.offsetY !== undefined) {
+        plant.modelTransform = plant.modelTransform || {};
+        plant.modelTransform.offsetY = parseFloat(req.body.offsetY);
+      }
+      if (req.body.scale !== undefined) {
+        plant.modelTransform = plant.modelTransform || {};
+        plant.modelTransform.scale = parseFloat(req.body.scale);
+      }
     }
 
     plant.uploadedBy = req.user!.sub as unknown as import('mongoose').Types.ObjectId;
     plant.uploadedAt = new Date();
     await plant.save();
+
+    const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+    gardenShowcaseService.resetModelReports(id);
+    gardenShowcaseService.emitGardenPlantChange('UPDATED', plant);
 
     req.app.get('io')?.emit('plantModelUpdated', { plantId: id, plantName: plant.commonName });
     sendSuccess(res, plant);
@@ -157,8 +212,12 @@ export class PlantController {
     const { uploadToR2 } = await import('../../lib/r2Client');
 
     if (files?.['model_lod1']?.[0]) {
+      const f1 = files['model_lod1'][0];
+      if (f1.buffer.length < 4 || f1.buffer.subarray(0, 4).toString('ascii') !== 'glTF') {
+        throw new AppError('Invalid GLB file format: missing binary glTF magic bytes for lod1', 400);
+      }
       const url = await uploadToR2(
-        files['model_lod1'][0].buffer,
+        f1.buffer,
         `assets-for-r2/models/plants/${plant.slug}-lod1.glb`,
         'model/gltf-binary',
       );
@@ -166,8 +225,12 @@ export class PlantController {
     }
 
     if (files?.['model_lod2']?.[0]) {
+      const f2 = files['model_lod2'][0];
+      if (f2.buffer.length < 4 || f2.buffer.subarray(0, 4).toString('ascii') !== 'glTF') {
+        throw new AppError('Invalid GLB file format: missing binary glTF magic bytes for lod2', 400);
+      }
       const url = await uploadToR2(
-        files['model_lod2'][0].buffer,
+        f2.buffer,
         `assets-for-r2/models/plants/${plant.slug}-lod2.glb`,
         'model/gltf-binary',
       );
@@ -176,7 +239,11 @@ export class PlantController {
 
     plant.uploadedBy = req.user!.sub as unknown as import('mongoose').Types.ObjectId;
     plant.uploadedAt = new Date();
+    plant.modelVersion = Date.now();
     await plant.save();
+
+    const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+    gardenShowcaseService.emitGardenPlantChange('UPDATED', plant);
 
     sendSuccess(res, plant);
   }
@@ -195,6 +262,9 @@ export class PlantController {
 
     await plant.save();
 
+    const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+    gardenShowcaseService.emitGardenPlantChange('UPDATED', plant);
+
     req.app.get('io')?.emit('plantPositionUpdated', {
       plantId: id,
       position: plant.globalPosition3D,
@@ -208,6 +278,7 @@ export class PlantController {
     const { id } = req.params;
 
     const Plant = (await import('./Plant.model')).default;
+    const { ModelStatus } = await import('./Plant.model');
     const plant = await Plant.findById(id);
     if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
 
@@ -227,7 +298,12 @@ export class PlantController {
       plant.modelUrl_lod2 = null;
     }
 
+    plant.modelVersion = Date.now();
+    plant.modelStatus = ModelStatus.NONE;
     await plant.save();
+
+    const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
+    gardenShowcaseService.emitGardenPlantChange('UPDATED', plant);
 
     req.app.get('io')?.emit('plantModelUpdated', { plantId: id, plantName: plant.commonName });
     sendSuccess(res, { message: '3D models deleted successfully' });
@@ -241,6 +317,167 @@ export class PlantController {
       )
       .lean();
     sendSuccess(res, plants);
+  }
+
+  async reportMissingPlantSearch(req: Request, res: Response) {
+    const { query, scientificName, family } = req.body || {};
+    const key = (scientificName || query || '').trim().toLowerCase();
+    const now = Date.now();
+    const lastAlert = missingPlantAlertCache.get(key);
+
+    if (lastAlert && now - lastAlert < 3600000) {
+      return res.status(200).json({
+        success: true,
+        deduplicated: true,
+        message: 'Botanical team has already been alerted for this plant recently.',
+      });
+    }
+
+    if (key) {
+      missingPlantAlertCache.set(key, now);
+    }
+
+    const plantName = query || scientificName || 'Unknown species';
+    const subtitle = scientificName && scientificName !== plantName ? ` (${scientificName})` : '';
+    const familyStr = family ? ` [Family: ${family}]` : '';
+
+    await notificationService.notifyBotanistsAndAdmins(
+      NotificationType.SYSTEM,
+      `Plant Not in Dataset: ${plantName}`,
+      `A visitor searched for "${plantName}"${subtitle}${familyStr}, which is not currently available in our herbal dataset. Please conduct botanical research and apply for new plant registration.`,
+      `/dashboard/moderation?type=requests`,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: 'Botanists and administrators have been alerted to research and register this plant.',
+    });
+  }
+
+  async submitPlantRegistrationRequest(req: Request, res: Response) {
+    const { commonName, scientificName, family, description, medicinalUses, notes, imageUrl } = req.body || {};
+    if (!commonName) {
+      throw new AppError('Common name is required for plant registration request', 400, 'VALIDATION_ERROR');
+    }
+
+    let senderName = 'A dedicated visitor';
+    let requesterEmail = '';
+    const userId = (req.user as any)?.sub || (req.user as any)?._id;
+    if (userId) {
+      const user = await User.findById(userId).select('displayName email').lean();
+      if (user) {
+        senderName = user.displayName || user.email || senderName;
+        requesterEmail = user.email || '';
+      }
+    }
+
+    const createdRequest = await PlantRegistrationRequest.create({
+      commonName: commonName.trim(),
+      scientificName: scientificName ? scientificName.trim() : '',
+      family: family ? family.trim() : '',
+      description: description ? description.trim() : '',
+      medicinalUses: Array.isArray(medicinalUses) ? medicinalUses : (medicinalUses ? [medicinalUses] : []),
+      imageUrl: imageUrl || '',
+      notes: notes ? notes.trim() : '',
+      requestedBy: userId || null,
+      requesterName: senderName,
+      requesterEmail,
+      status: 'PENDING',
+    });
+
+    const usesStr = Array.isArray(medicinalUses)
+      ? medicinalUses.join(', ')
+      : (medicinalUses || 'General wellness / traditional herb');
+    const noteStr = notes ? ` Notes: ${notes}` : '';
+    const familyStr = family ? ` [Family: ${family}]` : '';
+
+    await notificationService.notifyBotanistsAndAdmins(
+      NotificationType.SYSTEM,
+      `New Plant Registration Request: ${commonName}`,
+      `${senderName} requested registration for "${commonName}"${scientificName ? ` (${scientificName})` : ''}${familyStr}.${noteStr} Description: ${description || 'N/A'}. Uses: ${usesStr}. Please review and register in herbal catalog.`,
+      `/dashboard/moderation?type=requests`,
+    );
+
+    const motivationText = `I noticed ${commonName}${scientificName ? ` (${scientificName})` : ''} was missing from the Virtual Herbal Garden catalog and requested its registration. I would love to contribute verified botanical knowledge, research, and medicinal documentation as an official botanist contributor.`;
+    const qualificationsText = `Botanical enthusiast and contributor experienced with medicinal plant documentation, including ${commonName}.`;
+
+    const responsePayload = {
+      success: true,
+      message: 'Thank you for contributing to the Virtual Herbal Garden! Our botanical team and administrators have been notified to review and register this plant.',
+      requestId: createdRequest._id,
+      request: createdRequest,
+      redirect: {
+        url: '/dashboard/become-contributor',
+        prefill: {
+          motivation: motivationText,
+          qualifications: qualificationsText,
+        },
+      },
+    };
+
+    return res.status(201).json({
+      ...responsePayload,
+      data: responsePayload,
+    });
+  }
+
+  async getPlantRegistrationRequests(req: Request, res: Response) {
+    const status = (req.query.status as string) || undefined;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+    const q = (req.query.q as string) || '';
+
+    const filter: Record<string, unknown> = {};
+    if (status) {
+      filter.status = status;
+    }
+    if (q.trim()) {
+      filter.$or = [
+        { commonName: { $regex: q.trim(), $options: 'i' } },
+        { scientificName: { $regex: q.trim(), $options: 'i' } },
+        { requesterName: { $regex: q.trim(), $options: 'i' } },
+      ];
+    }
+
+    const [requests, total] = await Promise.all([
+      PlantRegistrationRequest.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('requestedBy', 'displayName email avatarUrl')
+        .lean(),
+      PlantRegistrationRequest.countDocuments(filter),
+    ]);
+
+    const totalPages = Math.ceil(total / limit) || 1;
+    sendSuccess(res, requests, 200, { page, limit, total, totalPages });
+  }
+
+  async updatePlantRegistrationRequestStatus(req: Request, res: Response) {
+    const { id } = req.params;
+    const { status, adminNotes } = req.body || {};
+    const userId = (req.user as any)?.sub || (req.user as any)?._id;
+
+    if (!['PENDING', 'RESEARCHING', 'CATALOGED', 'DISMISSED'].includes(status)) {
+      throw new AppError('Invalid status value', 400, 'VALIDATION_ERROR');
+    }
+
+    const updated = await PlantRegistrationRequest.findByIdAndUpdate(
+      id,
+      {
+        status,
+        ...(adminNotes !== undefined && { adminNotes }),
+        reviewedBy: userId,
+      },
+      { new: true },
+    );
+
+    if (!updated) {
+      throw new AppError('Registration request not found', 404, 'NOT_FOUND');
+    }
+
+    sendSuccess(res, updated);
   }
 }
 
