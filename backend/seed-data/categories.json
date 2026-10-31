@@ -1,0 +1,45 @@
+[
+  {
+    "_id": "672400000000000000000001",
+    "name": "Ayurvedic Herbs",
+    "slug": "ayurvedic-herbs",
+    "description": "Classical herbs from the Ayurvedic pharmacopoeia (Dravyaguna Vigyana).",
+    "sortOrder": 1
+  },
+  {
+    "_id": "672400000000000000000002",
+    "name": "Digestive Health",
+    "slug": "digestive-health",
+    "description": "Plants used for GI tract remedies in traditional medicine.",
+    "sortOrder": 2
+  },
+  {
+    "_id": "672400000000000000000003",
+    "name": "Skin & Beauty",
+    "slug": "skin-beauty",
+    "description": "Plants used in dermatological and cosmetic preparations.",
+    "sortOrder": 3
+  },
+  {
+    "_id": "672400000000000000000004",
+    "name": "Immunity Boosters",
+    "slug": "immunity-boosters",
+    "description": "Rasayana herbs that strengthen the immune system.",
+    "sortOrder": 4
+  },
+  {
+    "_id": "672400000000000000000005",
+    "name": "Stress & Adaptogen",
+    "slug": "stress-adaptogen",
+    "description": "Adaptogenic herbs that help the body resist biological and mental stressors.",
+    "sortOrder": 5
+  },
+  {
+    "_id": "672400000000000000000006",
+    "name": "Respiratory Health",
+    "slug": "respiratory-health",
+    "description": "Plants traditionally used for soothing cough, cold and lung ailments.",
+    "sortOrder": 6
+  }
+]
+

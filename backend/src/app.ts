@@ -12,6 +12,7 @@ import { sanitizeInput } from './core/middleware/sanitize';
 import { globalLimiter } from './core/middleware/rateLimiter';
 import { errorHandler } from './core/middleware/errorHandler';
 import routes from './routes';
+import databaseRoutes from './modules/database-manager/routes';
 import { logger } from './core/utils/logger';
 
 const app = express();
@@ -36,12 +37,12 @@ app.use(cors({
   origin: env.CLIENT_URL,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Device-Type'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Device-Type', 'X-Reauth-Token'],
 }));
 
-// Body parsing
-app.use(express.json({ limit: '100kb' }));
-app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+// Body parsing — 15mb to allow database bundle imports
+app.use(express.json({ limit: '15mb' }));
+app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 app.use(cookieParser());
 app.use(compression());
 
@@ -62,6 +63,7 @@ app.use(morgan(morganFormat, {
 
 // API routes
 app.use(`/api/${env.API_VERSION}`, routes);
+app.use('/api/admin/database', databaseRoutes);
 
 // Static uploads fallback
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));

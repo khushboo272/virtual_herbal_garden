@@ -340,6 +340,14 @@ export const DASHBOARD_ROUTES: DashboardRouteConfig[] = [
       { label: 'System', path: '/dashboard/system' },
     ],
   },
+  {
+    path: '/dashboard/database',
+    pattern: /^\/dashboard\/database(?:\/.*)?$/,
+    label: 'Database Manager',
+    title: 'Database Manager — Virtual Herbal Garden',
+    minRole: 'ADMIN',
+    parents: [{ label: 'Dashboard', path: '/dashboard' }],
+  },
 ];
 
 /**

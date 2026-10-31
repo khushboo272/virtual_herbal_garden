@@ -1,0 +1,29 @@
+[
+  {
+    "_id": "672400000000000000000031",
+    "slug": "ayurvedic-immunity-garden",
+    "title": "Ayurvedic Immunity Garden",
+    "difficulty": "EASY",
+    "estimatedDuration": 15,
+    "description": "Walk through the most potent immunity-boosting herbs documented in classical Ayurveda.",
+    "coverImageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Ocimum_tenuiflorum_2.jpg/800px-Ocimum_tenuiflorum_2.jpg",
+    "stops": [
+      {
+        "order": 1,
+        "plant": "tulsi",
+        "title": "Tulsi — The Sacred Shield",
+        "description": "Begin your journey with the queen of herbs, revered as an immune modulator.",
+        "coordinates3d": { "x": 0, "y": 0, "z": 5 }
+      },
+      {
+        "order": 2,
+        "plant": "turmeric",
+        "title": "Turmeric — Golden Root",
+        "description": "Discover the golden root with thousands of years of traditional medicinal use.",
+        "coordinates3d": { "x": 5, "y": 0, "z": 0 }
+      }
+    ],
+    "isPublished": true
+  }
+]
+

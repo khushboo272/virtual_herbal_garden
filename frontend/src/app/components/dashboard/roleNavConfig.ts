@@ -7,7 +7,7 @@ import {
   Home, BookmarkIcon, Leaf, Sparkles, BookOpen, MapPin,
   Settings, HelpCircle, FileText, MessageSquare,
   ClipboardList, Map, BarChart3, Star, Users, Wrench,
-  Shield, ScrollText, Cpu,
+  Shield, ScrollText, Cpu, Database,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -140,6 +140,13 @@ const adminNav: NavSection[] = [
     ],
   },
   {
+    title: 'SYSTEM',
+    accentClass: 'text-emerald-600',
+    items: [
+      { label: 'Database Manager', icon: Database, path: '/dashboard/database' },
+    ],
+  },
+  {
     title: '',
     items: [
       { label: 'Settings & Profile', icon: Settings, path: '/dashboard/profile' },
@@ -151,12 +158,13 @@ const adminNav: NavSection[] = [
 // ── SUPER_ADMIN Sidebar (PRD §4.5.1) ─────────────────────
 
 const superAdminNav: NavSection[] = [
-  ...adminNav.slice(0, -1), // all admin sections except the footer
+  adminNav[0],
   {
     title: 'SYSTEM',
     accentClass: 'text-amber-600',
     items: [
       { label: 'System Overview', icon: Wrench, path: '/dashboard/system' },
+      { label: 'Database Manager', icon: Database, path: '/dashboard/database' },
       { label: 'Feature Flags', icon: Shield, path: '/dashboard/system/feature-flags' },
       { label: 'Role Management', icon: Users, path: '/dashboard/system/role-management' },
       { label: 'Audit Log', icon: ScrollText, path: '/dashboard/system/audit-log' },

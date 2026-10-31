@@ -1,0 +1,168 @@
+[
+  {
+    "_id": "672400000000000000000011",
+    "commonName": "Tulsi",
+    "scientificName": "Ocimum tenuiflorum",
+    "slug": "tulsi",
+    "family": "Lamiaceae",
+    "description": "Tulsi (Holy Basil) is one of the most sacred plants in Hinduism and a cornerstone of Ayurvedic medicine. Rich in eugenol, rosmarinic acid, and ursolic acid, it acts as an adaptogen.",
+    "shortDescription": "Sacred adaptogenic herb used for immunity, respiratory health, and stress relief.",
+    "medicinalUses": ["Respiratory infections", "Stress relief", "Immune support", "Anti-inflammatory"],
+    "partsUsed": ["leaves", "seeds", "flowers"],
+    "toxicityLevel": "NONE",
+    "ayurvedicNames": ["Tulasi", "Vishnu Priya"],
+    "regionNative": ["Indian subcontinent", "Southeast Asia"],
+    "growingConditions": {
+      "soil": "Well-drained loamy soil",
+      "water": "Moderate",
+      "sunlight": "Full sun",
+      "climate": "Tropical and subtropical"
+    },
+    "images": [
+      {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Ocimum_tenuiflorum_2.jpg/800px-Ocimum_tenuiflorum_2.jpg",
+        "alt": "Tulsi plant",
+        "isPrimary": true,
+        "type": "MAIN"
+      }
+    ],
+    "categories": ["ayurvedic-herbs", "immunity-boosters", "respiratory-health"],
+    "tags": ["holy basil", "adaptogen", "rasayana", "ayurveda"],
+    "isFeatured": true,
+    "isPublished": true,
+    "placement3d": { "position": { "x": 0, "y": 0, "z": 5 }, "scale": 1.0 }
+  },
+  {
+    "_id": "672400000000000000000012",
+    "commonName": "Ashwagandha",
+    "scientificName": "Withania somnifera",
+    "slug": "ashwagandha",
+    "family": "Solanaceae",
+    "description": "Ashwagandha is one of the most important rasayana herbs in Ayurveda, used for vitality and reducing cortisol.",
+    "shortDescription": "Premier Ayurvedic adaptogen for stress relief, vitality, and cognitive function.",
+    "medicinalUses": ["Stress and anxiety relief", "Vitality", "Cognitive enhancement"],
+    "partsUsed": ["roots", "leaves"],
+    "toxicityLevel": "LOW",
+    "ayurvedicNames": ["Ashwagandha", "Varahakarni"],
+    "regionNative": ["India", "North Africa"],
+    "growingConditions": {
+      "soil": "Sandy loam",
+      "water": "Low",
+      "sunlight": "Full sun",
+      "climate": "Arid to semi-arid"
+    },
+    "images": [
+      {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Withania_somnifera_at_Talakona_forest%2C_in_Chittoor_district_of_Andhra_Pradesh.jpg/800px-Withania_somnifera_at_Talakona_forest%2C_in_Chittoor_district_of_Andhra_Pradesh.jpg",
+        "alt": "Ashwagandha plant",
+        "isPrimary": true,
+        "type": "MAIN"
+      }
+    ],
+    "categories": ["ayurvedic-herbs", "stress-adaptogen"],
+    "tags": ["adaptogen", "stress relief", "rasayana"],
+    "isFeatured": true,
+    "isPublished": true,
+    "placement3d": { "position": { "x": 8, "y": 0, "z": -3 }, "scale": 1.2 }
+  },
+  {
+    "_id": "672400000000000000000013",
+    "commonName": "Aloe Vera",
+    "scientificName": "Aloe barbadensis miller",
+    "slug": "aloe-vera",
+    "family": "Asphodelaceae",
+    "description": "Known as Kumari in Sanskrit, Aloe Vera contains polysaccharide gel used for skin regeneration and digestion.",
+    "shortDescription": "The plant of immortality — used for burns, skin care, and digestive health.",
+    "medicinalUses": ["Burn treatment", "Wound healing", "Skin hydration", "Digestive aid"],
+    "partsUsed": ["leaves"],
+    "toxicityLevel": "LOW",
+    "ayurvedicNames": ["Kumari", "Ghritkumari"],
+    "regionNative": ["Arabian Peninsula"],
+    "growingConditions": {
+      "soil": "Sandy cactus mix",
+      "water": "Very low",
+      "sunlight": "Bright indirect",
+      "climate": "Arid"
+    },
+    "images": [
+      {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Aloe_vera_flower_inridge.jpg/800px-Aloe_vera_flower_inridge.jpg",
+        "alt": "Aloe Vera",
+        "isPrimary": true,
+        "type": "MAIN"
+      }
+    ],
+    "categories": ["skin-beauty", "digestive-health"],
+    "tags": ["succulent", "skin care", "gel"],
+    "isFeatured": true,
+    "isPublished": true,
+    "placement3d": { "position": { "x": -7, "y": 0, "z": 2 }, "scale": 0.9 }
+  },
+  {
+    "_id": "672400000000000000000014",
+    "commonName": "Turmeric",
+    "scientificName": "Curcuma longa",
+    "slug": "turmeric",
+    "family": "Zingiberaceae",
+    "description": "Turmeric is the golden spice of India with powerful curcuminoid bioactives that reduce inflammatory pathways.",
+    "shortDescription": "The golden spice with powerful anti-inflammatory curcumin compounds.",
+    "medicinalUses": ["Anti-inflammatory", "Antioxidant", "Joint pain relief"],
+    "partsUsed": ["roots"],
+    "toxicityLevel": "NONE",
+    "ayurvedicNames": ["Haridra", "Kanchani"],
+    "regionNative": ["Indian subcontinent"],
+    "growingConditions": {
+      "soil": "Rich loamy soil",
+      "water": "Regular",
+      "sunlight": "Partial shade",
+      "climate": "Tropical"
+    },
+    "images": [
+      {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Curcuma_longa_-_Ko%C3%B6hler%E2%80%93s_Medizinal-Pflanzen-199.jpg/409px-Curcuma_longa_-_Ko%C3%B6hler%E2%80%93s_Medizinal-Pflanzen-199.jpg",
+        "alt": "Turmeric rhizome",
+        "isPrimary": true,
+        "type": "MAIN"
+      }
+    ],
+    "categories": ["ayurvedic-herbs", "digestive-health"],
+    "tags": ["curcumin", "haldi", "anti-inflammatory"],
+    "isFeatured": true,
+    "isPublished": true,
+    "placement3d": { "position": { "x": 5, "y": 0, "z": -10 }, "scale": 1.1 }
+  },
+  {
+    "_id": "672400000000000000000015",
+    "commonName": "Neem",
+    "scientificName": "Azadirachta indica",
+    "slug": "neem",
+    "family": "Meliaceae",
+    "description": "Known as the village pharmacy, neem provides antibacterial, antifungal and blood purification properties.",
+    "shortDescription": "India's village pharmacy — antiseptic, antifungal, and blood-purifying tree.",
+    "medicinalUses": ["Skin diseases", "Blood purification", "Dental hygiene"],
+    "partsUsed": ["leaves", "bark", "seeds"],
+    "toxicityLevel": "MODERATE",
+    "ayurvedicNames": ["Nimba", "Arishta"],
+    "regionNative": ["Indian subcontinent"],
+    "growingConditions": {
+      "soil": "Well-drained soil",
+      "water": "Low",
+      "sunlight": "Full sun",
+      "climate": "Tropical"
+    },
+    "images": [
+      {
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/eb/Neem_%28Azadirachta_indica%29_in_Hyderabad_W_IMG_6976.jpg/800px-Neem_%28Azadirachta_indica%29_in_Hyderabad_W_IMG_6976.jpg",
+        "alt": "Neem tree",
+        "isPrimary": true,
+        "type": "MAIN"
+      }
+    ],
+    "categories": ["ayurvedic-herbs", "skin-beauty"],
+    "tags": ["antiseptic", "neem oil", "blood purifier"],
+    "isFeatured": false,
+    "isPublished": true,
+    "placement3d": { "position": { "x": -10, "y": 0, "z": -6 }, "scale": 1.3 }
+  }
+]
+

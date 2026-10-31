@@ -13,6 +13,7 @@ import contributionRoutes from '../modules/contributions/contribution.routes';
 import supportRoutes from '../modules/support/support.routes';
 import roleApplicationRoutes from '../modules/admin/roleApplications.routes';
 import systemRoutes from '../modules/system/system.routes';
+import databaseRoutes from '../modules/database-manager/routes';
 
 const router = Router();
 
@@ -23,7 +24,9 @@ router.use('/garden', gardenShowcaseRoutes);
 router.use('/users/me/garden', gardenRoutes);
 router.use('/ai', aiRoutes);
 router.use('/users', userRoutes);
+router.use('/admin/database', databaseRoutes);
 router.use('/admin', adminRoutes);
+router.use('/database', databaseRoutes);
 router.use('/system', systemRoutes);
 router.use('/tours', tourRoutes);
 router.use('/home', homeRoutes);

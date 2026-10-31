@@ -9,7 +9,7 @@ import { logger } from './core/utils/logger';
 // Import workers to start them
 import './modules/notifications/email.worker';
 
-// Trigger tsx watch reload: guest access for ai_scanner & guided_tours, optional auth error pass-through
+// Trigger tsx watch reload: load database-manager routes and modules
 
 async function bootstrap(): Promise<void> {
   // Connect to MongoDB

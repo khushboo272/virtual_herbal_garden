@@ -6,6 +6,11 @@ import sanitize from 'mongo-sanitize';
  * Strips $ and . prefixed keys from body, query, and params.
  */
 export function sanitizeInput(req: Request, _res: Response, next: NextFunction): void {
+  // Allow database query console to receive raw aggregation pipeline operators
+  if (req.path?.includes('/database/query') || req.url?.includes('/database/query') || req.originalUrl?.includes('/database/query')) {
+    return next();
+  }
+
   if (req.body) {
     req.body = sanitize(req.body);
   }

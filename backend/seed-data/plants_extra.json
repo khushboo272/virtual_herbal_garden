@@ -1,0 +1,79 @@
+[
+  {
+    "slug": "tulsi",
+    "aliases": ["Holy Basil", "Sacred Basil", "Kaphaghni"],
+    "precautions": ["Avoid during pregnancy in therapeutic doses", "Consult doctor if taking anti-coagulants"],
+    "references": [
+      { "title": "Charaka Samhita Sutrasthana 27", "url": "https://www.ayush.gov.in" },
+      { "title": "Clinical Efficacy of Ocimum sanctum", "url": "https://ncbi.nlm.nih.gov" }
+    ],
+    "visual": {
+      "habit": "HERB",
+      "foliageShape": "OVATE",
+      "heightM": 0.6,
+      "spreadM": 0.5,
+      "floweringSeason": "SPRING_SUMMER"
+    }
+  },
+  {
+    "slug": "ashwagandha",
+    "aliases": ["Indian Ginseng", "Winter Cherry"],
+    "precautions": ["May increase thyroid hormone levels", "Not recommended in acute hyperthyroidism"],
+    "references": [
+      { "title": "Bhavaprakasha Nighantu Guduchyadi Varga", "url": "https://www.ayush.gov.in" }
+    ],
+    "visual": {
+      "habit": "SHRUB",
+      "foliageShape": "ROUND",
+      "heightM": 1.2,
+      "spreadM": 1.0,
+      "floweringSeason": "AUTUMN"
+    }
+  },
+  {
+    "slug": "aloe-vera",
+    "aliases": ["Burn Plant", "First Aid Plant"],
+    "precautions": ["Avoid ingestion of outer latex rind during pregnancy"],
+    "references": [
+      { "title": "Dravyaguna Vijnana Part II", "url": "https://www.ayush.gov.in" }
+    ],
+    "visual": {
+      "habit": "SUCCULENT",
+      "foliageShape": "SPIKY",
+      "heightM": 0.5,
+      "spreadM": 0.6,
+      "floweringSeason": "SUMMER"
+    }
+  },
+  {
+    "slug": "turmeric",
+    "aliases": ["Curcuma", "Haldi", "Indian Saffron"],
+    "precautions": ["High doses may aggravate bile duct obstructions"],
+    "references": [
+      { "title": "Sushruta Samhita Chikitsasthana", "url": "https://www.ayush.gov.in" }
+    ],
+    "visual": {
+      "habit": "HERB",
+      "foliageShape": "LANCEOLATE",
+      "heightM": 1.0,
+      "spreadM": 0.8,
+      "floweringSeason": "MONSOON"
+    }
+  },
+  {
+    "slug": "neem",
+    "aliases": ["Margosa", "Indian Lilac", "Nimb"],
+    "precautions": ["Internal seed oil is not for infants or long-term high doses"],
+    "references": [
+      { "title": "WHO Monographs on Selected Medicinal Plants", "url": "https://who.int" }
+    ],
+    "visual": {
+      "habit": "TREE",
+      "foliageShape": "PINNATE",
+      "heightM": 6.0,
+      "spreadM": 4.5,
+      "floweringSeason": "SPRING"
+    }
+  }
+]
+

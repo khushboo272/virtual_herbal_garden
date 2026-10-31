@@ -47,6 +47,7 @@ import {
   RequireFeature,
 } from "./features/system";
 import { FeatureFlagsProvider } from "./contexts/FeatureFlagsContext";
+import { DatabaseManagerApp } from "./features/database-manager";
 
 
 // Admin feature pages (Part A)
@@ -219,6 +220,16 @@ export default function App() {
             <Route path="system/role-management" element={<RequireRole minimumRole="SUPER_ADMIN" forbiddenRedirect="/dashboard"><RoleManagementPage /></RequireRole>} />
             <Route path="system/audit-log" element={<RequireRole minimumRole="SUPER_ADMIN" forbiddenRedirect="/dashboard"><AuditLogPage /></RequireRole>} />
             <Route path="system/ai-model-config" element={<RequireRole minimumRole="SUPER_ADMIN" forbiddenRedirect="/dashboard"><AIModelConfigPage /></RequireRole>} />
+
+            {/* Database Manager (ADMIN and SUPER_ADMIN) */}
+            <Route
+              path="database/*"
+              element={
+                <RequireRole minimumRole="ADMIN" forbiddenRedirect="/dashboard">
+                  <DatabaseManagerApp />
+                </RequireRole>
+              }
+            />
 
             {/* Admin redirect aliases (prevents 404 on legacy or catalog links) */}
             <Route path="admin/users" element={<Navigate to="/dashboard/users" replace />} />

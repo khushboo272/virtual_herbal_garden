@@ -1,0 +1,72 @@
+[
+  {
+    "_id": "672400000000000000000021",
+    "title": "Golden Milk (Haldi Doodh)",
+    "slug": "golden-milk-haldi-doodh",
+    "description": "A traditional Ayurvedic bedtime tonic combining turmeric with warm milk and black pepper to maximize curcuminoid bio-availability.",
+    "plants": ["turmeric"],
+    "dosage": "One cup (200ml) before bed daily",
+    "ingredients": [
+      {
+        "plantId": "turmeric",
+        "partUsed": "roots",
+        "quantity": "1",
+        "unit": "teaspoon",
+        "notes": "Pure turmeric root powder"
+      }
+    ],
+    "preparationSteps": [
+      {
+        "step": 1,
+        "instruction": "Warm 200ml milk on gentle medium heat.",
+        "durationMinutes": 3
+      },
+      {
+        "step": 2,
+        "instruction": "Whisk in 1 tsp turmeric powder and a pinch of black pepper.",
+        "durationMinutes": 2
+      }
+    ],
+    "contraindications": [
+      "Pregnancy in large doses",
+      "Gallstones or bile obstruction",
+      "Bleeding disorders"
+    ],
+    "difficultyLevel": "EASY",
+    "preparationTime": 8,
+    "tags": ["golden milk", "anti-inflammatory", "immunity"],
+    "isPublished": true
+  },
+  {
+    "_id": "672400000000000000000022",
+    "title": "Tulsi Respiratory Kadha",
+    "slug": "tulsi-respiratory-kadha",
+    "description": "Rejuvenating decoction of fresh Tulsi leaves boiled with ginger to soothe sore throat and ease respiratory congestion.",
+    "plants": ["tulsi"],
+    "dosage": "50ml twice daily before meals",
+    "ingredients": [
+      {
+        "plantId": "tulsi",
+        "partUsed": "leaves",
+        "quantity": "10-12",
+        "unit": "fresh leaves",
+        "notes": "Freshly harvested leaves"
+      }
+    ],
+    "preparationSteps": [
+      {
+        "step": 1,
+        "instruction": "Boil crushed leaves in 2 cups of clean water until reduced to 1 cup.",
+        "durationMinutes": 10
+      }
+    ],
+    "contraindications": [
+      "Consult physician before combined use with blood-thinners"
+    ],
+    "difficultyLevel": "EASY",
+    "preparationTime": 12,
+    "tags": ["kadha", "tulsi", "cough", "immunity"],
+    "isPublished": true
+  }
+]
+

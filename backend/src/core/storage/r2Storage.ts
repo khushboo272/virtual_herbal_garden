@@ -153,6 +153,24 @@ export async function headObject(key: string): Promise<boolean> {
   }
 }
 
+/**
+ * Retrieves the raw Buffer of an object from storage.
+ */
+export async function getObjectBuffer(key: string): Promise<Buffer> {
+  const client = getR2Client();
+  const bucket = env.R2_BUCKET_NAME || env.AWS_S3_BUCKET;
+  if (!bucket) throw new Error('No storage bucket configured');
+
+  const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+  const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const stream = response.Body as any;
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
+
 export interface R2HealthStatus {
   configured: boolean;
   reachable: boolean;
