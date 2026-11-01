@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Grid3x3, List, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { SearchBar } from '../components/SearchBar';
@@ -8,8 +8,11 @@ import { LibrarySkeleton, EmptyResults, LibraryError } from '../components/Libra
 import { usePlantSearch } from '../hooks/usePlantSearch';
 import { useDebounce } from '../hooks/useDebounce';
 import { reportMissingPlantSearch } from '../api/libraryApi';
-import { PlantViewer3DModal } from '../../../app/components/PlantViewer3DModal';
 import type { LibraryPlant } from '../types/library.types';
+
+const PlantViewerModal = lazy(() =>
+  import('../../../modules/plant-viewer').then((m) => ({ default: m.PlantViewerModal }))
+);
 
 export function LibraryPage() {
   const location = useLocation();
@@ -261,12 +264,13 @@ export function LibraryPage() {
 
       {/* 3D Plant Viewer Modal */}
       {selected3DPlant && (
-        <PlantViewer3DModal
-          isOpen={!!selected3DPlant}
-          onClose={() => setSelected3DPlant(null)}
-          plantName={selected3DPlant.commonName}
-          botanicalName={selected3DPlant.scientificName}
-        />
+        <Suspense fallback={null}>
+          <PlantViewerModal
+            isOpen={!!selected3DPlant}
+            onClose={() => setSelected3DPlant(null)}
+            plant={selected3DPlant}
+          />
+        </Suspense>
       )}
     </div>
   );

@@ -64,6 +64,7 @@ export async function getModerationQueue(params: {
     ? raw.items
     : [];
   const rawPagination =
+    (res as any)?.meta ||
     raw?.meta ||
     dataObj?.pagination ||
     raw?.pagination || { total: rawItems.length, page: params.page || 1, limit: params.limit || 20, totalPages: 1 };
@@ -138,6 +139,7 @@ export async function getContentList(
     ? dataObj.items
     : [];
   const rawPagination =
+    (res as any)?.meta ||
     raw?.meta ||
     dataObj?.pagination ||
     raw?.pagination || { total: rawItems.length, page: params.page || 1, limit: params.limit || 20, totalPages: 1 };
@@ -318,6 +320,7 @@ export async function getRoleApplications(params: {
     ? dataObj.items
     : [];
   const rawPagination =
+    (res as any)?.meta ||
     raw?.meta ||
     dataObj?.pagination ||
     raw?.pagination || { total: rawItems.length, page: params.page || 1, limit: params.limit || 20, totalPages: 1 };

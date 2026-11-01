@@ -1,4 +1,6 @@
 import mongoose from 'mongoose';
+import request from 'supertest';
+import app from '../src/app';
 import Plant from '../src/modules/library/Plant.model';
 import Review from '../src/modules/library/Review.model';
 import User from '../src/modules/users/User.model';
@@ -86,6 +88,67 @@ describe('Plant API', () => {
 
       const updated = await Plant.findById(plant._id);
       expect(updated!.viewCount).toBe(2);
+    });
+
+    it('should save and validate plants with uppercase image type like "MAIN"', async () => {
+      // Direct raw insert simulating existing DB state or tool linking
+      await Plant.collection.insertOne({
+        commonName: 'Gotu Kola',
+        scientificName: 'Centella asiatica',
+        slug: 'gotu-kola',
+        family: 'Apiaceae',
+        description: 'Brain tonic herb',
+        medicinalUses: ['memory', 'nervous system'],
+        toxicityLevel: 'NONE',
+        regionNative: ['Asia'],
+        createdBy: userId,
+        status: 'PUBLISHED',
+        isPublished: true,
+        images: [
+          {
+            url: 'https://cdn.example.com/plants/gotu-kola/hero.webp',
+            alt: 'Gotu Kola hero botanical photo',
+            isPrimary: true,
+            type: 'MAIN',
+          },
+        ],
+      } as any);
+
+      // Query via Plant model and call plant.save() as getBySlug does
+      const plant = await Plant.findOne({ slug: 'gotu-kola' });
+      expect(plant).toBeDefined();
+
+      plant!.viewCount = (plant!.viewCount || 0) + 1;
+      await expect(plant!.save()).resolves.toBeDefined();
+    });
+
+    it('GET /api/v1/plants/:slug loads published plant without validation error when image type is "MAIN"', async () => {
+      await Plant.collection.insertOne({
+        commonName: 'Gotu Kola Specimen',
+        scientificName: 'Centella asiatica var test',
+        slug: 'gotu-kola-specimen',
+        family: 'Apiaceae',
+        description: 'Brain tonic herb',
+        medicinalUses: ['memory'],
+        toxicityLevel: 'NONE',
+        regionNative: ['Asia'],
+        createdBy: userId,
+        status: 'PUBLISHED',
+        isPublished: true,
+        isDeleted: false,
+        images: [
+          {
+            url: 'https://cdn.example.com/plants/gotu-kola/hero.webp',
+            isPrimary: true,
+            type: 'MAIN',
+          },
+        ],
+      } as any);
+
+      const res = await request(app).get('/api/v1/plants/gotu-kola-specimen');
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.slug).toBe('gotu-kola-specimen');
     });
   });
 

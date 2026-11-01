@@ -7,7 +7,7 @@ import ActivityLog from '../notifications/ActivityLog.model';
 import { notificationService } from '../notifications/notification.service';
 import { validateObjectContentSafety } from '../../core/validators/contentSafety';
 import { AppError } from '../../core/utils/apiResponse';
-import { ContentStatus, NotificationType, ActivityType } from '../../types';
+import { ContentStatus, NotificationType, ActivityType, UserRole, ROLE_HIERARCHY } from '../../types';
 import {
   ContributionSummary,
   ContributionListItem,
@@ -216,14 +216,25 @@ export class ContributionService {
   }
 
   /**
-   * Retrieves single contribution item with its full review notes timeline.
+   * Helper to build a resilient ObjectId or slug query (normalizing hyphens and underscores).
    */
-  async getOne(userId: string, type: 'plant' | 'remedy', id: string): Promise<ContributionDetailItem> {
+  private buildSlugOrIdQuery(id: string): Record<string, unknown> {
     const isObjectId = mongoose.Types.ObjectId.isValid(id);
-    const query: Record<string, unknown> = {
-      $or: isObjectId ? [{ _id: id }, { slug: id }] : [{ slug: id }],
+    const normalizedSlug = id.toLowerCase().replace(/_/g, '-');
+    const slugVariants = Array.from(new Set([id, normalizedSlug, id.replace(/-/g, '_')]));
+    return {
+      $or: isObjectId
+        ? [{ _id: id }, ...slugVariants.map((s) => ({ slug: s }))]
+        : slugVariants.map((s) => ({ slug: s })),
       isDeleted: false,
     };
+  }
+
+  /**
+   * Retrieves single contribution item with its full review notes timeline.
+   */
+  async getOne(userId: string, type: 'plant' | 'remedy', id: string, userRole?: string): Promise<ContributionDetailItem> {
+    const query = this.buildSlugOrIdQuery(id);
 
     let item: any;
     let title = '';
@@ -238,8 +249,11 @@ export class ContributionService {
       title = item.title;
     }
 
+    const roleHierarchy = ROLE_HIERARCHY[userRole as UserRole] ?? 0;
+    const isEditorialAdmin = roleHierarchy >= ROLE_HIERARCHY[UserRole.ADMIN];
+
     const ownerId = item.owner?.toString() || item.createdBy?.toString();
-    if (ownerId !== userId) {
+    if (!isEditorialAdmin && ownerId !== userId) {
       throw new AppError('You can only view your own contributions', 403, 'FORBIDDEN');
     }
 
@@ -261,12 +275,12 @@ export class ContributionService {
     userId: string,
     type: 'plant' | 'remedy',
     id: string,
+    userRole?: string,
   ): Promise<{ message: string; status: ContentStatus }> {
-    const isObjectId = mongoose.Types.ObjectId.isValid(id);
-    const query: Record<string, unknown> = {
-      $or: isObjectId ? [{ _id: id }, { slug: id }] : [{ slug: id }],
-      isDeleted: false,
-    };
+    const query = this.buildSlugOrIdQuery(id);
+
+    const roleHierarchy = ROLE_HIERARCHY[userRole as UserRole] ?? 0;
+    const isEditorialAdmin = roleHierarchy >= ROLE_HIERARCHY[UserRole.ADMIN];
 
     const fieldErrors: { field: string; message: string }[] = [];
 
@@ -275,7 +289,7 @@ export class ContributionService {
       if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
 
       const ownerId = plant.owner?.toString() || plant.createdBy?.toString();
-      if (ownerId !== userId) {
+      if (!isEditorialAdmin && ownerId !== userId) {
         throw new AppError('You can only submit your own contributions', 403, 'FORBIDDEN');
       }
 
@@ -376,7 +390,7 @@ export class ContributionService {
       if (!remedy) throw new AppError('Remedy not found', 404, 'NOT_FOUND');
 
       const ownerId = remedy.owner?.toString() || remedy.createdBy?.toString();
-      if (ownerId !== userId) {
+      if (!isEditorialAdmin && ownerId !== userId) {
         throw new AppError('You can only submit your own contributions', 403, 'FORBIDDEN');
       }
 
@@ -460,18 +474,17 @@ export class ContributionService {
   /**
    * Withdraws a pending submission back to DRAFT status.
    */
-  async withdraw(userId: string, type: 'plant' | 'remedy', id: string): Promise<{ message: string; status: ContentStatus }> {
-    const isObjectId = mongoose.Types.ObjectId.isValid(id);
-    const query: Record<string, unknown> = {
-      $or: isObjectId ? [{ _id: id }, { slug: id }] : [{ slug: id }],
-      isDeleted: false,
-    };
+  async withdraw(userId: string, type: 'plant' | 'remedy', id: string, userRole?: string): Promise<{ message: string; status: ContentStatus }> {
+    const query = this.buildSlugOrIdQuery(id);
+
+    const roleHierarchy = ROLE_HIERARCHY[userRole as UserRole] ?? 0;
+    const isEditorialAdmin = roleHierarchy >= ROLE_HIERARCHY[UserRole.ADMIN];
 
     const item = type === 'plant' ? await Plant.findOne(query) : await Remedy.findOne(query);
     if (!item) throw new AppError(`${type === 'plant' ? 'Plant' : 'Remedy'} not found`, 404, 'NOT_FOUND');
 
     const ownerId = item.owner?.toString() || item.createdBy?.toString();
-    if (ownerId !== userId) {
+    if (!isEditorialAdmin && ownerId !== userId) {
       throw new AppError('You can only withdraw your own contributions', 403, 'FORBIDDEN');
     }
 
@@ -494,18 +507,17 @@ export class ContributionService {
   /**
    * Soft-deletes a draft, changes-requested, or rejected item.
    */
-  async delete(userId: string, type: 'plant' | 'remedy', id: string): Promise<void> {
-    const isObjectId = mongoose.Types.ObjectId.isValid(id);
-    const query: Record<string, unknown> = {
-      $or: isObjectId ? [{ _id: id }, { slug: id }] : [{ slug: id }],
-      isDeleted: false,
-    };
+  async delete(userId: string, type: 'plant' | 'remedy', id: string, userRole?: string): Promise<void> {
+    const query = this.buildSlugOrIdQuery(id);
+
+    const roleHierarchy = ROLE_HIERARCHY[userRole as UserRole] ?? 0;
+    const isEditorialAdmin = roleHierarchy >= ROLE_HIERARCHY[UserRole.ADMIN];
 
     const item = type === 'plant' ? await Plant.findOne(query) : await Remedy.findOne(query);
     if (!item) throw new AppError(`${type === 'plant' ? 'Plant' : 'Remedy'} not found`, 404, 'NOT_FOUND');
 
     const ownerId = item.owner?.toString() || item.createdBy?.toString();
-    if (ownerId !== userId) {
+    if (!isEditorialAdmin && ownerId !== userId) {
       throw new AppError('You can only delete your own contributions', 403, 'FORBIDDEN');
     }
 
@@ -533,11 +545,7 @@ export class ContributionService {
     id: string,
     note: string,
   ): Promise<{ message: string }> {
-    const isObjectId = mongoose.Types.ObjectId.isValid(id);
-    const query: Record<string, unknown> = {
-      $or: isObjectId ? [{ _id: id }, { slug: id }] : [{ slug: id }],
-      isDeleted: false,
-    };
+    const query = this.buildSlugOrIdQuery(id);
 
     const item = type === 'plant' ? await Plant.findOne(query) : await Remedy.findOne(query);
     if (!item) throw new AppError(`${type === 'plant' ? 'Plant' : 'Remedy'} not found`, 404, 'NOT_FOUND');

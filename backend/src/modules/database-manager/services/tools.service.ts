@@ -34,7 +34,7 @@ export class ToolsService {
           url: heroUrl,
           alt: `${p.commonName} hero botanical photo`,
           isPrimary: true,
-          type: 'MAIN',
+          type: 'main',
         };
         updated = true;
       }

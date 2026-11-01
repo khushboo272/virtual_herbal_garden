@@ -4,6 +4,7 @@ import { databaseApi } from '../api/databaseApi';
 import type { CollectionKey, CollectionMeta, BuiltInQuery } from '../types';
 import { CollectionPicker } from '../components/CollectionPicker';
 import { JsonEditor } from '../components/JsonEditor';
+import { AiDebugger } from '../components/AiDebugger';
 
 export const DatabaseQueryPage: React.FC = () => {
   const [collections, setCollections] = useState<CollectionMeta[]>([]);
@@ -227,11 +228,25 @@ export const DatabaseQueryPage: React.FC = () => {
         </div>
       )}
 
-      {/* Error alert */}
+      {/* Error alert with AI Debugger */}
       {errorMsg && (
-        <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-2xl flex items-center space-x-2 text-xs text-red-700 dark:text-red-300">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
-          <span>{errorMsg}</span>
+        <div className="space-y-3">
+          <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-red-700 dark:text-red-300">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-600 dark:text-red-400" />
+              <span className="font-medium">{errorMsg}</span>
+            </div>
+            <div className="flex-shrink-0 self-end sm:self-center">
+              <AiDebugger
+                errorMessage={errorMsg}
+                context={{
+                  collection: selectedCol,
+                  operation: queryType === 'find' ? 'query.find' : 'query.aggregate',
+                  payloadSnippet: queryType === 'find' ? filterText : pipelineText,
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
 

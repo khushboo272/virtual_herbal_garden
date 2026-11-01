@@ -235,7 +235,11 @@ const PlantImageSchema = new Schema<IPlantImage>(
     url: { type: String, required: true },
     alt: String,
     isPrimary: { type: Boolean, default: false },
-    type: { type: String, enum: Object.values(ImageType) },
+    type: {
+      type: String,
+      enum: [...Object.values(ImageType), 'MAIN', 'DETAIL', 'INFOGRAPHIC'],
+      set: (val: string) => (typeof val === 'string' ? val.toLowerCase() : val),
+    },
     width: Number,
     height: Number,
     thumbnailUrl: String,
@@ -370,6 +374,18 @@ PlantSchema.pre('save', function (next) {
   }
   if (!this.owner && this.createdBy) {
     this.owner = this.createdBy;
+  }
+  next();
+});
+
+// Normalize image types before validation
+PlantSchema.pre('validate', function (next) {
+  if (this.images && Array.isArray(this.images)) {
+    for (const img of this.images) {
+      if (img && typeof img.type === 'string') {
+        img.type = (img.type as string).toLowerCase() as any;
+      }
+    }
   }
   next();
 });

@@ -111,6 +111,7 @@ export const COLLECTION_REGISTRY: Record<CollectionKey, CollectionRegistryItem> 
     label: 'Medicinal Plants',
     model: Plant as any,
     uniqueKey: 'slug',
+    alternateUniqueKeys: ['scientificName'],
     importable: true,
     exportable: true,
     editable: true,

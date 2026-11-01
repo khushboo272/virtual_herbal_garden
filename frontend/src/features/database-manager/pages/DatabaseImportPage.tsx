@@ -19,13 +19,14 @@ import { CollectionPicker } from '../components/CollectionPicker';
 import { JsonEditor } from '../components/JsonEditor';
 import { DryRunTable } from '../components/DryRunTable';
 import { ConfirmDangerDialog } from '../components/ConfirmDangerDialog';
+import { AiDebugger } from '../components/AiDebugger';
 
 export const DatabaseImportPage: React.FC = () => {
   const [collections, setCollections] = useState<CollectionMeta[]>([]);
   const [targetCollection, setTargetCollection] = useState<CollectionKey | 'bundle'>('bundle');
   const [jsonText, setJsonText] = useState('');
   const [format, setFormat] = useState<'seed_v1' | 'raw'>('seed_v1');
-  const [mode, setMode] = useState<'insert_only' | 'upsert' | 'update_merge' | 'replace'>('insert_only');
+  const [mode, setMode] = useState<'insert_only' | 'upsert' | 'update_merge' | 'replace'>('upsert');
   const [statusOverride, setStatusOverride] = useState<'keep' | 'DRAFT' | 'PENDING_REVIEW' | 'PUBLISHED'>('keep');
 
   const [dryRunResult, setDryRunResult] = useState<DryRunResult | null>(null);
@@ -322,11 +323,26 @@ export const DatabaseImportPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Error alert */}
+      {/* Error alert with AI Debugger */}
       {errorMsg && (
-        <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-2xl flex items-center space-x-3 text-red-700 dark:text-red-300 text-xs">
-          <AlertCircle className="w-5 h-5 flex-shrink-0" />
-          <span>{errorMsg}</span>
+        <div className="space-y-3">
+          <div className="p-4 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-red-700 dark:text-red-300 text-xs">
+            <div className="flex items-center space-x-3">
+              <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600 dark:text-red-400" />
+              <span className="font-medium break-words">{errorMsg}</span>
+            </div>
+            <div className="flex-shrink-0 self-end sm:self-center">
+              <AiDebugger
+                errorMessage={errorMsg}
+                context={{
+                  collection: targetCollection,
+                  mode,
+                  operation: 'import',
+                  payloadSnippet: jsonText ? jsonText.slice(0, 1000) : undefined,
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
 

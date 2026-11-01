@@ -4,7 +4,10 @@ const imageSchema = z.object({
   url: z.string().url(),
   alt: z.string().optional(),
   isPrimary: z.boolean().optional(),
-  type: z.enum(['main', 'detail', 'infographic']).optional(),
+  type: z
+    .enum(['main', 'detail', 'infographic', 'MAIN', 'DETAIL', 'INFOGRAPHIC'])
+    .optional()
+    .transform((v) => (v ? (v.toLowerCase() as 'main' | 'detail' | 'infographic') : undefined)),
   width: z.number().positive().optional(),
   height: z.number().positive().optional(),
 });

@@ -90,4 +90,7 @@ router.post(
   databaseController.syncIndexes
 );
 
+// ── AI Debugger ──
+router.post('/ai-debug', databaseController.aiDebug);
+
 export default router;

@@ -35,6 +35,7 @@ export interface CollectionRegistryItem<T = any> {
   label: string;
   model: Model<T>;
   uniqueKey: string; // 'slug' | '_id' | 'email' | 'key'
+  alternateUniqueKeys?: string[]; // e.g. ['scientificName'] for plants
   importable: boolean;
   exportable: boolean;
   editable: boolean;

@@ -131,23 +131,29 @@ export const contentItemSchema = z
     tags: z.array(z.string()).nullish(),
     images: z.array(z.object({ url: z.string(), isPrimary: z.boolean().optional() })).optional().default([]),
     owner: z
-      .object({
-        _id: z.string().optional(),
-        displayName: z.string().optional(),
-        name: z.string().optional(),
-        email: z.string().optional(),
-      })
-      .optional(),
+      .union([
+        z.object({
+          _id: z.string().optional(),
+          displayName: z.string().optional(),
+          name: z.string().optional(),
+          email: z.string().optional(),
+        }),
+        z.string(),
+      ])
+      .nullish(),
     createdBy: z
-      .object({
-        _id: z.string().optional(),
-        displayName: z.string().optional(),
-        name: z.string().optional(),
-        email: z.string().optional(),
-      })
-      .optional(),
-    updatedAt: z.string().default(''),
-    createdAt: z.string().default(''),
+      .union([
+        z.object({
+          _id: z.string().optional(),
+          displayName: z.string().optional(),
+          name: z.string().optional(),
+          email: z.string().optional(),
+        }),
+        z.string(),
+      ])
+      .nullish(),
+    updatedAt: z.string().nullish().default(''),
+    createdAt: z.string().nullish().default(''),
   })
   .passthrough();
 

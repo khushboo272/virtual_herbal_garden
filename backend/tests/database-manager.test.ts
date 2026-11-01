@@ -1,4 +1,5 @@
 import request from 'supertest';
+import mongoose from 'mongoose';
 import app from '../src/app';
 import User from '../src/modules/users/User.model';
 import AuditLog from '../src/modules/admin/AuditLog.model';
@@ -209,6 +210,159 @@ describe('Database Manager Module Integration Tests', () => {
       const postCount = await Plant.countDocuments();
       expect(postCount).toBe(initialCount);
     });
+
+    it('detects existing plants by alternate unique key (scientificName) even if slug differs', async () => {
+      // Create a draft plant with different slug but same scientificName
+      await Plant.create({
+        commonName: 'Untitled Plant Draft',
+        scientificName: 'Ocimum tenuiflorum',
+        slug: 'untitled-plant-draft',
+        family: 'Lamiaceae',
+        description: 'Sacred adaptogen herb',
+        createdBy: adminUser._id,
+      });
+
+      // Try dry run with slug "tulsi" and same scientificName in insert_only mode
+      const payload = {
+        plants: [
+          {
+            commonName: 'Tulsi',
+            scientificName: 'Ocimum tenuiflorum',
+            slug: 'tulsi',
+            family: 'Lamiaceae',
+            description: 'Holy basil adaptogen',
+          },
+        ],
+      };
+
+      const dryRunRes = await request(app)
+        .post('/api/v1/admin/database/import/dry-run')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ bundle: payload, mode: 'insert_only' });
+
+      expect(dryRunRes.status).toBe(200);
+      expect(dryRunRes.body.data.willSkip).toBe(1);
+      expect(dryRunRes.body.data.willInsert).toBe(0);
+
+      // And commit does not crash with E11000 duplicate key error
+      const commitRes = await request(app)
+        .post('/api/v1/admin/database/import/commit')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ bundle: payload, mode: 'insert_only' });
+
+      expect(commitRes.status).toBe(200);
+      expect(commitRes.body.data.counts.skipped).toBe(1);
+    });
+
+    it('automatically updates the existing record when duplicate key collision occurs during insert', async () => {
+      // 1. Create existing Mulethi in DB
+      const existing = await Plant.create({
+        commonName: 'Mulethi',
+        scientificName: 'Glycyrrhiza glabra',
+        slug: 'mulethi',
+        family: 'Fabaceae',
+        description: 'Traditional soothing sweet root',
+        createdBy: adminUser._id,
+      });
+
+      // 2. Synthesize an import payload where the row action was marked 'insert' (e.g. different slug or new draft)
+      const dryRunResult = {
+        batchId: 'test-dup-update-batch',
+        isBundle: false,
+        collections: ['plants'],
+        summary: { willInsert: 1, willUpdate: 0, willSkip: 0, errorsCount: 0, total: 1 },
+        rows: [
+          {
+            row: 1,
+            collectionName: 'plants',
+            uniqueValue: 'licorice',
+            action: 'insert',
+            warnings: [],
+            errors: [],
+            docData: {
+              commonName: 'Licorice Root Updated',
+              scientificName: 'Glycyrrhiza glabra',
+              slug: 'licorice',
+              family: 'Fabaceae',
+              description: 'Updated description for licorice',
+              createdBy: adminUser._id,
+            },
+          },
+        ],
+      };
+
+      // 3. Commit this batch
+      const commitRes = await request(app)
+        .post('/api/v1/admin/database/import/commit')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ dryRunResult, options: { mode: 'insert_only' } });
+
+      // Should succeed without 409 DUPLICATE_KEY or E11000 rollback
+      expect(commitRes.status).toBe(200);
+      expect(commitRes.body.data.counts.updated).toBe(1);
+
+      // Verify that the existing DB document was updated with the new details
+      const updated = await Plant.findById(existing._id);
+      expect(updated).toBeDefined();
+      expect(updated?.commonName).toBe('Licorice Root Updated');
+      expect(updated?.description).toBe('Updated description for licorice');
+    });
+
+    it('updates an existing document during upsert mode even when imported docData contains a different _id', async () => {
+      // 1. Create existing Tulsi in DB with generated ObjectId
+      const existing = await Plant.create({
+        commonName: 'Tulsi Initial',
+        scientificName: 'Ocimum tenuiflorum',
+        slug: 'tulsi',
+        family: 'Lamiaceae',
+        description: 'Initial description',
+        createdBy: adminUser._id,
+      });
+
+      // 2. Synthesize import payload with a DIFFERENT _id (e.g. from seed file) and mode upsert
+      const differentSeedId = new mongoose.Types.ObjectId().toString();
+      const dryRunResult = {
+        batchId: 'test-upsert-id-batch',
+        isBundle: false,
+        collections: ['plants'],
+        summary: { willInsert: 0, willUpdate: 1, willSkip: 0, errorsCount: 0, total: 1 },
+        rows: [
+          {
+            row: 1,
+            collectionName: 'plants',
+            uniqueValue: 'tulsi',
+            action: 'update',
+            warnings: [],
+            errors: [],
+            docData: {
+              _id: differentSeedId,
+              commonName: 'Tulsi Updated',
+              scientificName: 'Ocimum tenuiflorum',
+              slug: 'tulsi',
+              family: 'Lamiaceae',
+              description: 'Updated adaptogen description',
+              createdBy: adminUser._id,
+            },
+          },
+        ],
+      };
+
+      // 3. Commit this batch in upsert mode
+      const commitRes = await request(app)
+        .post('/api/v1/admin/database/import/commit')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ dryRunResult, options: { mode: 'upsert' } });
+
+      // Should succeed without "Performing an update on the path '_id' would modify the immutable field '_id'"
+      expect(commitRes.status).toBe(200);
+      expect(commitRes.body.data.counts.updated).toBe(1);
+
+      // Verify that the existing DB document preserved its _id and updated its fields
+      const updated = await Plant.findById(existing._id);
+      expect(updated).toBeDefined();
+      expect(updated?.commonName).toBe('Tulsi Updated');
+      expect(updated?.description).toBe('Updated adaptogen description');
+    });
   });
 
   describe('Data Browser & Concurrency', () => {
@@ -362,6 +516,51 @@ describe('Database Manager Module Integration Tests', () => {
 
       // 3. Document should be removed
       expect(await Category.countDocuments({ slug: 'to-be-undone' })).toBe(0);
+    });
+  });
+
+  describe('AI Debugger (Gemini Error Diagnostics)', () => {
+    it('rejects unauthenticated requests to ai-debug with 401', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/database/ai-debug')
+        .send({ errorMessage: 'Test error' });
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects regular USER with 403 FORBIDDEN', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/database/ai-debug')
+        .set('Authorization', `Bearer ${regularToken}`)
+        .send({ errorMessage: 'Test error' });
+      expect(res.status).toBe(403);
+    });
+
+    it('validates errorMessage presence', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/database/ai-debug')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({});
+      expect(res.status).toBe(400);
+    });
+
+    it('successfully diagnoses a duplicate key error and returns structured explanation', async () => {
+      const res = await request(app)
+        .post('/api/v1/admin/database/ai-debug')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          errorMessage: 'E11000 duplicate key error collection: herbal_garden_dev.plants index: scientificName_1 dup key: { scientificName: "Glycyrrhiza glabra" }',
+          context: {
+            collection: 'plants',
+            operation: 'import',
+            mode: 'insert_only',
+          },
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.analysis).toBeDefined();
+      expect(typeof res.body.data.analysis).toBe('string');
+      expect(res.body.data.model).toBeDefined();
     });
   });
 });

@@ -91,7 +91,7 @@ export class StorageService {
 
   async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
     const command = new GetObjectCommand({ Bucket: S3_BUCKET, Key: key });
-    return getSignedUrl(s3Client, command, { expiresIn });
+    return getSignedUrl(s3Client as any, command, { expiresIn });
   }
 
   private async putObject(key: string, body: Buffer, contentType: string): Promise<string> {

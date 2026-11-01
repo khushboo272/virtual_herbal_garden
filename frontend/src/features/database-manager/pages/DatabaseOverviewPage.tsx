@@ -131,6 +131,33 @@ export const DatabaseOverviewPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Cloudflare R2 Storage Banner */}
+      <div className="p-5 rounded-2xl border border-emerald-200/80 dark:border-emerald-900/50 bg-gradient-to-r from-emerald-50/60 via-teal-50/30 to-white dark:from-emerald-950/20 dark:via-slate-900 dark:to-slate-900 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center space-x-4">
+          <div className="p-3 bg-emerald-600 text-white rounded-2xl shadow-sm">
+            <HardDrive className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-gray-900 dark:text-gray-100">Cloudflare R2 Storage Manager</h2>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                ACTIVE
+              </span>
+            </div>
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+              Botanical photography, 3D GLB models, remedies, audio tours, and system disaster recovery backups.
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/dashboard/database/storage"
+          className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition shrink-0"
+        >
+          <span>Open Storage (R2)</span>
+          <ArrowRight className="w-4 h-4" />
+        </Link>
+      </div>
+
       {/* Active Jobs Alert */}
       {(stats.recentJobs ?? []).filter((j) => j.status === 'running' || j.status === 'queued').length > 0 && (
         <div className="space-y-3">

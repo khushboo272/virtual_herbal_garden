@@ -24,6 +24,15 @@ function normalizeContentType(type: string): 'plants' | 'remedies' {
   return lower === 'plant' || lower === 'plants' ? 'plants' : 'remedies';
 }
 
+function buildContentQuery(id: string) {
+  const isObjectId = Types.ObjectId.isValid(id);
+  const normalizedSlug = id.toLowerCase().replace(/_/g, '-');
+  const slugVariants = Array.from(new Set([id, normalizedSlug, id.replace(/-/g, '_')]));
+  return isObjectId
+    ? { $or: [{ _id: id }, ...slugVariants.map((s) => ({ slug: s }))], isDeleted: { $ne: true } }
+    : { $or: slugVariants.map((s) => ({ slug: s })), isDeleted: { $ne: true } };
+}
+
 export class AdminContentService {
   /**
    * List all content (plants or remedies) across all statuses with filtering and search
@@ -117,11 +126,9 @@ export class AdminContentService {
    * Publish an item
    */
   async publish(type: 'plants' | 'remedies' | string, id: string, adminUser: any, req?: any) {
-    if (!Types.ObjectId.isValid(id)) throw new AppError('Invalid ID', 400);
-
     const targetType = normalizeContentType(type);
     const Model = targetType === 'plants' ? Plant : (Remedy as any);
-    const item = await Model.findOne({ _id: id, isDeleted: { $ne: true } });
+    const item = await Model.findOne(buildContentQuery(id));
     if (!item) throw new AppError(`${targetType === 'plants' ? 'Plant' : 'Remedy'} not found`, 404);
 
     const prevPublished = item.isPublished;
@@ -160,11 +167,9 @@ export class AdminContentService {
    * Unpublish an item
    */
   async unpublish(type: 'plants' | 'remedies' | string, id: string, adminUser: any, req?: any) {
-    if (!Types.ObjectId.isValid(id)) throw new AppError('Invalid ID', 400);
-
     const targetType = normalizeContentType(type);
     const Model = targetType === 'plants' ? Plant : (Remedy as any);
-    const item = await Model.findOne({ _id: id, isDeleted: { $ne: true } });
+    const item = await Model.findOne(buildContentQuery(id));
     if (!item) throw new AppError(`${targetType === 'plants' ? 'Plant' : 'Remedy'} not found`, 404);
 
     const prevPublished = item.isPublished;
@@ -200,11 +205,9 @@ export class AdminContentService {
    * Toggle featured status
    */
   async toggleFeature(type: 'plants' | 'remedies' | string, id: string, adminUser: any, req?: any) {
-    if (!Types.ObjectId.isValid(id)) throw new AppError('Invalid ID', 400);
-
     const targetType = normalizeContentType(type);
     const Model = targetType === 'plants' ? Plant : (Remedy as any);
-    const item = await Model.findOne({ _id: id, isDeleted: { $ne: true } });
+    const item = await Model.findOne(buildContentQuery(id));
     if (!item) throw new AppError(`${targetType === 'plants' ? 'Plant' : 'Remedy'} not found`, 404);
 
     const prevFeatured = !!item.isFeatured;

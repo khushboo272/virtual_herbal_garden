@@ -10,6 +10,7 @@ import { queryService } from '../services/query.service';
 import { integrityService } from '../services/integrity.service';
 import { toolsService } from '../services/tools.service';
 import { overviewService } from '../services/overview.service';
+import { aiDebugService } from '../services/aiDebug.service';
 import { dbWriteService, DbWriteContext } from '../services/dbWrite.service';
 import DbJob from '../models/DbJob.model';
 
@@ -372,6 +373,16 @@ Ensure all enum fields adhere strictly to:
   async syncIndexes(req: Request, res: Response) {
     const ctx = getWriteContext(req);
     const result = await toolsService.syncIndexes(ctx);
+    sendSuccess(res, result);
+  }
+
+  // ── AI Debugger ──
+  async aiDebug(req: Request, res: Response) {
+    const { errorMessage, context } = req.body;
+    if (!errorMessage || typeof errorMessage !== 'string') {
+      throw new AppError('errorMessage is required', 400, 'VALIDATION_ERROR');
+    }
+    const result = await aiDebugService.diagnose(errorMessage, context);
     sendSuccess(res, result);
   }
 }

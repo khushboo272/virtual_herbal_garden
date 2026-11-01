@@ -13,6 +13,7 @@ import { globalLimiter } from './core/middleware/rateLimiter';
 import { errorHandler } from './core/middleware/errorHandler';
 import routes from './routes';
 import databaseRoutes from './modules/database-manager/routes';
+import storageRoutes from './modules/storage-manager/storage.routes';
 import { logger } from './core/utils/logger';
 
 const app = express();
@@ -64,6 +65,8 @@ app.use(morgan(morganFormat, {
 // API routes
 app.use(`/api/${env.API_VERSION}`, routes);
 app.use('/api/admin/database', databaseRoutes);
+app.use('/api/admin/storage', storageRoutes);
+app.use(`/api/${env.API_VERSION}/admin/storage`, storageRoutes);
 
 // Static uploads fallback
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));

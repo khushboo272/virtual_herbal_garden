@@ -9,7 +9,7 @@ import { logger } from './core/utils/logger';
 // Import workers to start them
 import './modules/notifications/email.worker';
 
-// Trigger tsx watch reload: load database-manager routes and modules
+// Trigger tsx watch reload: load resilient slug resolution and identifier query handlers
 
 async function bootstrap(): Promise<void> {
   // Connect to MongoDB
@@ -59,3 +59,5 @@ bootstrap().catch((err) => {
   process.exit(1);
 });
 // Plant registration request routes synced: 2026-10-31 22:06:00
+
+// Reload: 1793518200000 - allow admin contribution edit

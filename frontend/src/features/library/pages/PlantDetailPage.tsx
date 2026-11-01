@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Heart, Share2, Leaf, MapPin, Star, Sparkles,
@@ -8,13 +8,16 @@ import { PlantImage } from '../components/PlantImage';
 import { usePlant, usePlantReviews } from '../hooks/usePlant';
 import { useFavorite, useShare } from '../hooks/useFavorite';
 import { useAuth } from '../../../contexts/AuthContext';
-import { PlantViewer3DModal } from '../../../app/components/PlantViewer3DModal';
 import { getRelated } from '../api/libraryApi';
 import type { LibraryPlant, PlantReview } from '../types/library.types';
 import { getRemediesByPlant, RemedyCard, type Remedy } from '../../remedies';
 import { getToursByPlant, TourCard, type TourSummary } from '../../tours';
 import { toast } from 'sonner';
 import { getGarden, addPlantToGarden } from '../../dashboard/shared';
+
+const PlantViewerModal = lazy(() =>
+  import('../../../modules/plant-viewer').then((m) => ({ default: m.PlantViewerModal }))
+);
 
 // ── Star rating input ──────────────────────────────────────────────────────
 
@@ -666,12 +669,15 @@ export function PlantDetailPage() {
       </div>
 
       {/* 3D Modal */}
-      <PlantViewer3DModal
-        isOpen={show3D}
-        onClose={() => setShow3D(false)}
-        plantName={plant.commonName}
-        botanicalName={plant.scientificName}
-      />
+      {show3D && (
+        <Suspense fallback={null}>
+          <PlantViewerModal
+            isOpen={show3D}
+            onClose={() => setShow3D(false)}
+            plant={plant as unknown as LibraryPlant}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

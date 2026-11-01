@@ -91,7 +91,21 @@ router.put(
   uploadGLB.fields([{ name: 'model', maxCount: 1 }]),
   plantController.uploadModel,
 );
+router.post(
+  '/:id/model',
+  authenticate(),
+  requireRole(UserRole.BOTANIST),
+  uploadGLB.fields([{ name: 'model', maxCount: 1 }]),
+  plantController.uploadModel,
+);
 router.put(
+  '/:id/model-lod',
+  authenticate(),
+  requireRole(UserRole.BOTANIST),
+  uploadGLB.fields([{ name: 'model_lod1', maxCount: 1 }, { name: 'model_lod2', maxCount: 1 }]),
+  plantController.uploadModelLod,
+);
+router.post(
   '/:id/model-lod',
   authenticate(),
   requireRole(UserRole.BOTANIST),

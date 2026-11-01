@@ -164,3 +164,16 @@ export async function submitPlantRegistrationRequest(
     redirect: payload?.redirect || res?.redirect,
   };
 }
+
+export const libraryApi = {
+  searchPlants,
+  getPlant,
+  getPlantBySlug: getPlant,
+  getAutocomplete,
+  getRelated,
+  getReviews,
+  postReview,
+  submitReview: postReview,
+  reportMissingPlantSearch,
+  submitPlantRegistrationRequest,
+};

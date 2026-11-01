@@ -23,7 +23,7 @@ import { TourEducationalBanner } from '../components/TourStates';
 export function TourOverviewPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
   // Support preview mode for draft tours

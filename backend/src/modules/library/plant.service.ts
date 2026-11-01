@@ -282,14 +282,27 @@ export class PlantService {
     return results as unknown as Partial<IPlant>[];
   }
 
+  private buildPlantIdOrSlugQuery(idOrSlug: string, extraConditions: Record<string, unknown> = {}): Record<string, unknown> {
+    const isId = mongoose.Types.ObjectId.isValid(idOrSlug);
+    const normalizedSlug = idOrSlug.toLowerCase().replace(/_/g, '-');
+    const slugVariants = Array.from(new Set([idOrSlug, normalizedSlug, idOrSlug.replace(/-/g, '_')]));
+    const idSlugConditions = isId
+      ? [{ _id: idOrSlug }, ...slugVariants.map((s) => ({ slug: s }))]
+      : slugVariants.map((s) => ({ slug: s }));
+
+    return {
+      $or: idSlugConditions,
+      ...extraConditions,
+    };
+  }
+
   async getBySlug(
     slugOrId: string,
     userId?: string,
     userRole?: string,
     isPreview = false,
   ): Promise<IPlant> {
-    const isId = mongoose.Types.ObjectId.isValid(slugOrId);
-    const query = isId ? { _id: slugOrId, isDeleted: false } : { slug: slugOrId, isDeleted: false };
+    const query = this.buildPlantIdOrSlugQuery(slugOrId, { isDeleted: false });
 
     const plant = await Plant.findOne(query)
       .populate('categories', 'name slug')
@@ -372,7 +385,8 @@ export class PlantService {
     userId: string,
     userRole: string,
   ): Promise<IPlant> {
-    const plant = await Plant.findById(plantId);
+    const query = this.buildPlantIdOrSlugQuery(plantId, { isDeleted: { $ne: true } });
+    const plant = await Plant.findOne(query);
     if (!plant || plant.isDeleted) {
       throw new AppError('Plant not found', 404, 'NOT_FOUND');
     }
@@ -387,8 +401,9 @@ export class PlantService {
   }
 
   async publish(plantId: string): Promise<IPlant> {
-    const plant = await Plant.findByIdAndUpdate(
-      plantId,
+    const query = this.buildPlantIdOrSlugQuery(plantId, { isDeleted: { $ne: true } });
+    const plant = await Plant.findOneAndUpdate(
+      query,
       { $set: { isPublished: true } },
       { new: true },
     );
@@ -398,7 +413,8 @@ export class PlantService {
   }
 
   async feature(plantId: string): Promise<IPlant> {
-    const plant = await Plant.findById(plantId);
+    const query = this.buildPlantIdOrSlugQuery(plantId, { isDeleted: { $ne: true } });
+    const plant = await Plant.findOne(query);
     if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
     plant.isFeatured = !plant.isFeatured;
     await plant.save();
@@ -407,7 +423,8 @@ export class PlantService {
   }
 
   async softDelete(plantId: string): Promise<void> {
-    const result = await Plant.findByIdAndUpdate(plantId, { isDeleted: true });
+    const query = this.buildPlantIdOrSlugQuery(plantId);
+    const result = await Plant.findOneAndUpdate(query, { isDeleted: true });
     if (!result) throw new AppError('Plant not found', 404, 'NOT_FOUND');
     await redis.del('plants:featured');
   }

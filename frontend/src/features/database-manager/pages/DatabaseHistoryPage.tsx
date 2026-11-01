@@ -33,12 +33,14 @@ export const DatabaseHistoryPage: React.FC = () => {
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const res = await databaseApi.getJobs(page, 20);
-      setJobs(res.jobs);
-      setTotalPages(res.totalPages);
-      setTotalJobs(res.total);
+      const res: any = await databaseApi.getJobs(page, 20);
+      const jobsList = Array.isArray(res?.jobs) ? res.jobs : (Array.isArray(res) ? res : []);
+      setJobs(jobsList);
+      setTotalPages(res?.totalPages ?? 1);
+      setTotalJobs(res?.total ?? jobsList.length);
     } catch (err: any) {
       setFeedback({ type: 'error', text: err.message || 'Failed to load job history' });
+      setJobs([]);
     } finally {
       setLoading(false);
     }
@@ -154,7 +156,7 @@ export const DatabaseHistoryPage: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-            {jobs.map((j) => (
+            {(jobs || []).map((j) => (
               <tr key={j._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-750">
                 <td className="px-4 py-3 font-semibold uppercase text-gray-800 dark:text-gray-200">
                   {j.type} {j.collectionName && <span className="text-[11px] font-mono text-gray-400">({j.collectionName})</span>}
@@ -255,7 +257,7 @@ export const DatabaseHistoryPage: React.FC = () => {
               </button>
             </div>
             <div className="space-y-2">
-              {inspectJob.errors.map((e, idx) => (
+              {(inspectJob?.errors || []).map((e, idx) => (
                 <div key={idx} className="p-3 bg-red-50 dark:bg-red-950/40 rounded-xl text-xs font-mono text-red-800 dark:text-red-300">
                   <div>{e.row ? `Row #${e.row}` : ''} {e.collectionName ? `[${e.collectionName}]` : ''} {e.slug ? `(${e.slug})` : ''}</div>
                   <div className="mt-1 font-sans">{e.message}</div>

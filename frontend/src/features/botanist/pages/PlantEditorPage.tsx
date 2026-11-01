@@ -150,6 +150,12 @@ export function PlantEditorPage() {
         setCurrentId(res.id);
         setCurrentSlug(res.slug);
 
+        // If the URL slug was different from the canonical slug (e.g. gotu_kola vs gotu-kola),
+        // update the URL seamlessly without reloading
+        if (res.slug && res.slug !== id && !window.location.pathname.endsWith(`/${res.slug}`)) {
+          navigate(`/dashboard/contributions/plant/${res.slug}${location.search}`, { replace: true });
+        }
+
         const doc = (res.data || res.rawDoc || res) as any;
         if (doc) {
           setCommonName(doc.commonName || '');
@@ -205,7 +211,7 @@ export function PlantEditorPage() {
           if (doc.modelStatus) setModelStatus(doc.modelStatus);
         }
       } catch (err: any) {
-        toast.error('Failed to load plant draft');
+        toast.error(err?.message || 'Failed to load plant draft');
       } finally {
         setLoading(false);
       }
@@ -559,7 +565,8 @@ export function PlantEditorPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!currentId) {
+    const uploadTarget = currentId || id;
+    if (!uploadTarget) {
       toast.error('Please save the draft before uploading a 3D model');
       return;
     }
@@ -576,13 +583,14 @@ export function PlantEditorPage() {
 
     try {
       setUploadingModel(true);
-      await uploadPlantModel(currentId, file, 'lod0', {
+      const res = await uploadPlantModel(uploadTarget, file, 'lod0', {
         targetHeightM: Number(targetHeightM),
         rotationY: Number(rotationY),
         offsetY: Number(offsetY),
       });
+      const returnedPlant = (res as any)?.data || (res as any);
       setModelStatus('READY');
-      setModel3dUrl(URL.createObjectURL(file));
+      setModel3dUrl(returnedPlant?.modelUrl || URL.createObjectURL(file));
       toast.success('3D model uploaded and synced live to garden!');
       setIsDirty(true);
     } catch (err: any) {

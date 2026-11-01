@@ -159,6 +159,27 @@ export class ImportService {
   }
 
   /**
+   * Build query matching existing document by _id, primary uniqueKey, or alternateUniqueKeys
+   */
+  buildExistingDocQuery(data: any, reg: any): any {
+    const orConditions: any[] = [];
+    if (data._id && Types.ObjectId.isValid(data._id)) {
+      orConditions.push({ _id: data._id });
+    }
+    if (data[reg.uniqueKey]) {
+      orConditions.push({ [reg.uniqueKey]: data[reg.uniqueKey] });
+    }
+    if (Array.isArray(reg.alternateUniqueKeys)) {
+      for (const altKey of reg.alternateUniqueKeys) {
+        if (data[altKey]) {
+          orConditions.push({ [altKey]: data[altKey] });
+        }
+      }
+    }
+    return orConditions.length > 1 ? { $or: orConditions } : (orConditions[0] || {});
+  }
+
+  /**
    * Execute Dry Run validation without persisting changes
    */
   async dryRun(
@@ -259,10 +280,7 @@ export class ImportService {
         }
 
         // Existing document check in database
-        const query = adapted._id && Types.ObjectId.isValid(adapted._id)
-          ? { $or: [{ _id: adapted._id }, { [reg.uniqueKey]: adapted[reg.uniqueKey] }] }
-          : { [reg.uniqueKey]: adapted[reg.uniqueKey] };
-
+        const query = this.buildExistingDocQuery(adapted, reg);
         const existingDoc = await reg.model.findOne(query).lean();
 
         let action: 'insert' | 'update' | 'skip' | 'error' = 'insert';
@@ -271,6 +289,12 @@ export class ImportService {
         if (rowErrors.length > 0) {
           action = 'error';
         } else if (existingDoc) {
+          const existingDocAny = existingDoc as any;
+          if (existingDocAny[reg.uniqueKey] && adapted[reg.uniqueKey] && existingDocAny[reg.uniqueKey] !== adapted[reg.uniqueKey]) {
+            rowWarnings.push(
+              `Matched existing record by alternate key "${existingDocAny.scientificName || existingDocAny._id}" (existing slug: "${existingDocAny.slug}")`
+            );
+          }
           if (mode === 'insert_only') {
             action = 'skip';
             willSkip++;
@@ -405,24 +429,65 @@ export class ImportService {
           const docData = { ...row.docData, importBatchId: dryRunResult.batchId };
 
           if (row.action === 'insert') {
-            const doc = new reg.model(docData);
-            await doc.save();
-            insertedIds.push({ collection: row.collectionName, id: doc._id as Types.ObjectId });
-            insertedCount++;
+            try {
+              const doc = new reg.model(docData);
+              await doc.save();
+              insertedIds.push({ collection: row.collectionName, id: doc._id as Types.ObjectId });
+              insertedCount++;
 
-            await dbWriteService.logAudit(
-              row.collectionName,
-              'IMPORT_INSERT',
-              doc._id as Types.ObjectId,
-              null,
-              doc.toObject(),
-              ctx,
-              { batchId: dryRunResult.batchId }
-            );
+              await dbWriteService.logAudit(
+                row.collectionName,
+                'IMPORT_INSERT',
+                doc._id as Types.ObjectId,
+                null,
+                doc.toObject(),
+                ctx,
+                { batchId: dryRunResult.batchId }
+              );
+            } catch (err: any) {
+              if (err.code === 11000) {
+                // When duplicate key collision occurs, update the existing record
+                const query = err.keyValue && Object.keys(err.keyValue).length > 0
+                  ? err.keyValue
+                  : this.buildExistingDocQuery(docData, reg);
+
+                const existingDoc = await reg.model.findOne(query);
+                if (existingDoc) {
+                  preImageSnapshots.push({
+                    collection: row.collectionName,
+                    id: existingDoc._id as Types.ObjectId,
+                    snapshot: existingDoc.toObject ? existingDoc.toObject() : existingDoc,
+                  });
+
+                  const { _id, ...fieldsToUpdate } = docData;
+                  Object.assign(existingDoc, fieldsToUpdate);
+                  await existingDoc.save();
+                  updatedCount++;
+
+                  await dbWriteService.logAudit(
+                    row.collectionName,
+                    'IMPORT_UPDATE',
+                    existingDoc._id as Types.ObjectId,
+                    existingDoc.toObject ? existingDoc.toObject() : existingDoc,
+                    docData,
+                    ctx,
+                    { batchId: dryRunResult.batchId }
+                  );
+                  continue;
+                }
+
+                const dupField = err.keyPattern ? Object.keys(err.keyPattern).join(', ') : 'unique key';
+                const dupVal = err.keyValue ? JSON.stringify(err.keyValue) : '';
+                throw new AppError(
+                  `Duplicate key collision on ${dupField} ${dupVal} in ${row.collectionName}. An existing record already has this unique value.`,
+                  409,
+                  'DUPLICATE_KEY'
+                );
+              }
+              throw err;
+            }
           } else if (row.action === 'update') {
-            const query = Types.ObjectId.isValid(docData._id)
-              ? { $or: [{ _id: docData._id }, { [reg.uniqueKey]: docData[reg.uniqueKey] }] }
-              : { [reg.uniqueKey]: docData[reg.uniqueKey] };
+            const query = this.buildExistingDocQuery(docData, reg);
 
             const oldDoc = await reg.model.findOne(query).lean();
             if (oldDoc) {
@@ -432,12 +497,15 @@ export class ImportService {
                 snapshot: oldDoc,
               });
 
-              let updatePayload = docData;
-              if (mode === 'update_merge') {
-                updatePayload = { $set: docData };
-              }
+              // Exclude immutable _id, __v, and createdAt from update payload
+              const { _id, __v, createdAt, ...fieldsToUpdate } = docData;
+              const updatePayload = { $set: fieldsToUpdate };
 
-              const updatedDoc = await reg.model.findOneAndUpdate(query, updatePayload, { new: true });
+              const updatedDoc = await reg.model.findOneAndUpdate(
+                { _id: (oldDoc as any)._id },
+                updatePayload,
+                { new: true }
+              );
               updatedCount++;
 
               await dbWriteService.logAudit(
@@ -472,6 +540,14 @@ export class ImportService {
       }
 
       job.status = 'done';
+      job.counts = {
+        inserted: insertedCount,
+        updated: updatedCount,
+        skipped: skippedCount,
+        deleted: 0,
+        errors: 0,
+        total: dryRunResult.rows.length,
+      };
       job.snapshotData = { insertedIds, preImageSnapshots };
       await job.save();
 

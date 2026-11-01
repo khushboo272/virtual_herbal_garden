@@ -554,4 +554,138 @@ describe('Contributions & Botanist Workflow Tests', () => {
       ).rejects.toThrow(/Support requests are limited to 3 per hour/i);
     });
   });
+
+  describe('8. Admin & Super Admin Contribution Access (Edit in Admin Mode)', () => {
+    it('allows ADMIN to view/edit a plant created by another user or without owner via getOne', async () => {
+      const plant = await Plant.create({
+        commonName: 'Admin Editable Plant',
+        scientificName: 'Adminus editabilis',
+        slug: 'admin-editable-plant',
+        family: 'Lamiaceae',
+        description: 'Plant created by botanist 1 to be edited by admin',
+        medicinalUses: ['Focus'],
+        partsUsed: [PlantPart.LEAVES],
+        toxicityLevel: ToxicityLevel.NONE,
+        regionNative: ['India'],
+        owner: new mongoose.Types.ObjectId(botanist1Id),
+        createdBy: new mongoose.Types.ObjectId(botanist1Id),
+        status: ContentStatus.PUBLISHED,
+        isPublished: true,
+      });
+
+      // When called with ADMIN role, getOne must return the contribution detail
+      const res = await contributionService.getOne(adminId, 'plant', plant._id.toString(), UserRole.ADMIN);
+      expect(res).toBeDefined();
+      expect(res.id).toBe(plant._id.toString());
+      expect(res.title).toBe('Admin Editable Plant');
+      expect((res.data as any).commonName).toBe('Admin Editable Plant');
+    });
+
+    it('still blocks non-owner BOTANIST from viewing another botanist contribution', async () => {
+      const plant = await Plant.create({
+        commonName: 'Botanist Secret Plant',
+        scientificName: 'Botanicus secretus',
+        slug: 'botanist-secret-plant',
+        family: 'Lamiaceae',
+        description: 'Draft owned by botanist 1',
+        medicinalUses: ['Calm'],
+        partsUsed: [PlantPart.LEAVES],
+        toxicityLevel: ToxicityLevel.NONE,
+        regionNative: ['India'],
+        owner: new mongoose.Types.ObjectId(botanist1Id),
+        createdBy: new mongoose.Types.ObjectId(botanist1Id),
+        status: ContentStatus.DRAFT,
+        isPublished: false,
+      });
+
+      // Botanist 2 should be blocked with 403
+      await expect(
+        contributionService.getOne(botanist2Id, 'plant', plant._id.toString(), UserRole.BOTANIST),
+      ).rejects.toThrow(/You can only view your own contributions/i);
+    });
+  });
+
+  describe('9. Resilient Slug & Identifier Resolution (Underscore vs Hyphen & Slug in update)', () => {
+    it('resolves plant contribution when queried with underscore slug (gotu_kola -> gotu-kola)', async () => {
+      const plant = await Plant.create({
+        commonName: 'Gotu Kola Specimen',
+        scientificName: 'Centella asiatica',
+        slug: 'gotu-kola',
+        family: 'Apiaceae',
+        description: 'Creeping herb for skin and mental clarity',
+        medicinalUses: ['Skin health'],
+        partsUsed: [PlantPart.LEAVES],
+        toxicityLevel: ToxicityLevel.LOW,
+        regionNative: ['India'],
+        owner: new mongoose.Types.ObjectId(botanist1Id),
+        createdBy: new mongoose.Types.ObjectId(botanist1Id),
+        status: ContentStatus.PUBLISHED,
+        isPublished: true,
+      });
+
+      // Querying with underscore slug 'gotu_kola' must seamlessly find 'gotu-kola'
+      const res = await contributionService.getOne(botanist1Id, 'plant', 'gotu_kola', UserRole.BOTANIST);
+      expect(res).toBeDefined();
+      expect(res.slug).toBe('gotu-kola');
+      expect(res.id).toBe(plant._id.toString());
+      expect(res.title).toBe('Gotu Kola Specimen');
+    });
+
+    it('allows plantService.update to find and update plant using slug string instead of ObjectId', async () => {
+      const plant = await Plant.create({
+        commonName: 'Slug Updatable Herb',
+        scientificName: 'Herba updatabilis',
+        slug: 'slug-updatable-herb',
+        family: 'Lamiaceae',
+        description: 'Original description',
+        medicinalUses: ['Calm'],
+        partsUsed: [PlantPart.LEAVES],
+        toxicityLevel: ToxicityLevel.NONE,
+        regionNative: ['India'],
+        owner: new mongoose.Types.ObjectId(botanist1Id),
+        createdBy: new mongoose.Types.ObjectId(botanist1Id),
+        status: ContentStatus.DRAFT,
+        isPublished: false,
+      });
+
+      // Update called with slug 'slug-updatable-herb' (or underscore 'slug_updatable_herb')
+      const updated = await plantService.update(
+        'slug_updatable_herb',
+        { description: 'Updated description via slug lookup' },
+        botanist1Id,
+        UserRole.BOTANIST,
+      );
+
+      expect(updated).toBeDefined();
+      expect(updated.description).toBe('Updated description via slug lookup');
+
+      const reloaded = await Plant.findById(plant._id);
+      expect(reloaded?.description).toBe('Updated description via slug lookup');
+    });
+
+    it('allows plantService.publish to publish plant using slug string instead of ObjectId', async () => {
+      const plant = await Plant.create({
+        commonName: 'Slug Publishable Herb',
+        scientificName: 'Herba publishabilis',
+        slug: 'slug-publishable-herb',
+        family: 'Lamiaceae',
+        description: 'Ready to publish',
+        medicinalUses: ['Focus'],
+        partsUsed: [PlantPart.LEAVES],
+        toxicityLevel: ToxicityLevel.NONE,
+        regionNative: ['India'],
+        owner: new mongoose.Types.ObjectId(botanist1Id),
+        createdBy: new mongoose.Types.ObjectId(botanist1Id),
+        status: ContentStatus.DRAFT,
+        isPublished: false,
+      });
+
+      const published = await plantService.publish('slug_publishable_herb');
+      expect(published).toBeDefined();
+      expect(published.isPublished).toBe(true);
+
+      const reloaded = await Plant.findById(plant._id);
+      expect(reloaded?.isPublished).toBe(true);
+    });
+  });
 });

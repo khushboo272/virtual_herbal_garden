@@ -265,5 +265,70 @@ describe('Garden Showcase & 3D Model Pipeline TDD Suite', () => {
       const updated = await Plant.findById(draft._id);
       expect(updated!.modelStatus).toBe(ModelStatus.READY);
     });
+
+    it('allows uploading model via POST /api/v1/plants/:slug/model using plant slug', async () => {
+      const draft = await Plant.create({
+        commonName: 'Gotu Kola',
+        scientificName: 'Centella asiatica',
+        slug: 'gotu-kola',
+        family: 'Apiaceae',
+        description: 'Testing botanist upload on slug',
+        status: ContentStatus.DRAFT,
+        isPublished: false,
+        createdBy: botanistUser._id,
+        owner: botanistUser._id,
+      });
+
+      const gltfMagic = Buffer.from('glTF\x02\x00\x00\x00\x20\x00\x00\x00');
+      const payload = Buffer.concat([gltfMagic, Buffer.alloc(50)]);
+
+      const res = await request(app)
+        .post(`/api/v1/plants/${draft.slug}/model`)
+        .set('Authorization', `Bearer ${botanistToken}`)
+        .field('targetHeightM', '0.5')
+        .field('rotationY', '1.57')
+        .attach('model', payload, 'gotu-kola.glb');
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.modelStatus).toBe(ModelStatus.READY);
+      expect(res.body.data.modelTransform.targetHeightM).toBe(0.5);
+
+      const updated = await Plant.findOne({ slug: 'gotu-kola' });
+      expect(updated!.modelStatus).toBe(ModelStatus.READY);
+      expect(updated!.modelUrl).toBeDefined();
+    });
+
+    it('falls back cleanly to local disk storage when R2 upload fails or credentials are unset', async () => {
+      const draft = await Plant.create({
+        commonName: 'Ashwagandha',
+        scientificName: 'Withania somnifera',
+        slug: 'ashwagandha',
+        family: 'Solanaceae',
+        description: 'Testing fallback storage',
+        status: ContentStatus.DRAFT,
+        isPublished: false,
+        createdBy: botanistUser._id,
+        owner: botanistUser._id,
+      });
+
+      const r2Client = await import('../src/lib/r2Client');
+      const spy = jest.spyOn(r2Client, 'uploadToR2').mockRejectedValueOnce(new Error('Cloudflare R2 Network Timeout'));
+
+      const gltfMagic = Buffer.from('glTF\x02\x00\x00\x00\x20\x00\x00\x00');
+      const payload = Buffer.concat([gltfMagic, Buffer.alloc(50)]);
+
+      const res = await request(app)
+        .post(`/api/v1/plants/${draft.slug}/model`)
+        .set('Authorization', `Bearer ${botanistToken}`)
+        .attach('model', payload, 'ashwagandha.glb');
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.modelStatus).toBe(ModelStatus.READY);
+      expect(res.body.data.modelUrl).toContain('/uploads/models/plants/ashwagandha-lod0.glb');
+
+      spy.mockRestore();
+    });
   });
 });

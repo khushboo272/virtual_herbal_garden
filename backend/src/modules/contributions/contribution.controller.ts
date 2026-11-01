@@ -17,25 +17,25 @@ export class ContributionController {
 
   async getOne(req: Request, res: Response) {
     const type = req.params.type as 'plant' | 'remedy';
-    const item = await contributionService.getOne(req.user!.sub, type, req.params.id);
+    const item = await contributionService.getOne(req.user!.sub, type, req.params.id, req.user!.role);
     sendSuccess(res, item);
   }
 
   async submit(req: Request, res: Response) {
     const type = req.params.type as 'plant' | 'remedy';
-    const result = await contributionService.submit(req.user!.sub, type, req.params.id);
+    const result = await contributionService.submit(req.user!.sub, type, req.params.id, req.user!.role);
     sendSuccess(res, result);
   }
 
   async withdraw(req: Request, res: Response) {
     const type = req.params.type as 'plant' | 'remedy';
-    const result = await contributionService.withdraw(req.user!.sub, type, req.params.id);
+    const result = await contributionService.withdraw(req.user!.sub, type, req.params.id, req.user!.role);
     sendSuccess(res, result);
   }
 
   async delete(req: Request, res: Response) {
     const type = req.params.type as 'plant' | 'remedy';
-    await contributionService.delete(req.user!.sub, type, req.params.id);
+    await contributionService.delete(req.user!.sub, type, req.params.id, req.user!.role);
     sendSuccess(res, { message: 'Contribution deleted successfully' });
   }
 

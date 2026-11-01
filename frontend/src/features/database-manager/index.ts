@@ -6,6 +6,7 @@ export * from './components/DiffViewer';
 export * from './components/DryRunTable';
 export * from './components/ConfirmDangerDialog';
 export * from './components/JobProgress';
+export * from './components/AiDebugger';
 export * from './components/DatabaseNav';
 export * from './pages/DatabaseOverviewPage';
 export * from './pages/DatabaseImportPage';

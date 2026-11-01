@@ -561,11 +561,43 @@ export function ContentManagementView({ type, title, description }: ContentManag
         </div>
       )}
 
+      {/* Error Banner */}
+      {error && (
+        <div
+          role="alert"
+          className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
+        >
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+            <span className="text-sm font-medium">{error}</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => loadData(pagination.page)}
+            className="border-red-300 text-red-700 hover:bg-red-100 self-start sm:self-auto shrink-0"
+          >
+            <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+            Retry
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-12 text-center text-slate-500 animate-pulse">Loading content entries...</div>
+          ) : error && items.length === 0 ? (
+            <div className="py-16 text-center text-slate-500 space-y-3">
+              <AlertTriangle className="w-10 h-10 text-red-400 mx-auto" />
+              <h3 className="font-semibold text-slate-800 text-base">Failed to load content</h3>
+              <p className="text-sm text-slate-500 max-w-md mx-auto">{error}</p>
+              <Button size="sm" variant="outline" onClick={() => loadData(pagination.page)}>
+                <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                Retry
+              </Button>
+            </div>
           ) : items.length === 0 ? (
             <div className="py-16 text-center text-slate-500 space-y-2">
               <Layers className="w-10 h-10 text-slate-300 mx-auto" />
@@ -594,7 +626,9 @@ export function ContentManagementView({ type, title, description }: ContentManag
               <TableBody>
                 {items.map((it) => {
                   const heroImg = it.images?.find((img) => img.isPrimary)?.url || it.images?.[0]?.url;
-                  const ownerName = it.owner?.displayName || it.owner?.name || it.createdBy?.displayName || 'Editorial Admin';
+                  const ownerObj = typeof it.owner === 'object' && it.owner !== null ? it.owner : undefined;
+                  const createdByObj = typeof it.createdBy === 'object' && it.createdBy !== null ? it.createdBy : undefined;
+                  const ownerName = ownerObj?.displayName || ownerObj?.name || createdByObj?.displayName || 'Editorial Admin';
 
                   return (
                     <TableRow key={it._id} className={selectedIds.includes(it._id) ? 'bg-green-50/40' : undefined}>

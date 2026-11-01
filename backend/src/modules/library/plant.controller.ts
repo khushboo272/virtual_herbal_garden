@@ -8,6 +8,16 @@ import { NotificationType } from '../../types';
 import User from '../users/User.model';
 import PlantRegistrationRequest from './PlantRegistrationRequest.model';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
+
+function buildPlantQuery(id: string) {
+  const isObjectId = mongoose.Types.ObjectId.isValid(id);
+  const normalizedSlug = id.toLowerCase().replace(/_/g, '-');
+  const slugVariants = Array.from(new Set([id, normalizedSlug, id.replace(/-/g, '_')]));
+  return isObjectId
+    ? { $or: [{ _id: id }, ...slugVariants.map((s) => ({ slug: s }))] }
+    : { $or: slugVariants.map((s) => ({ slug: s })) };
+}
 
 const missingPlantAlertCache = new Map<string, number>();
 
@@ -90,7 +100,8 @@ export class PlantController {
     if (!files?.length) throw new AppError('No images provided', 400, 'NO_FILES');
 
     const Plant = (await import('./Plant.model')).default;
-    const plant = await Plant.findById(req.params.id);
+    const plantQuery = buildPlantQuery(req.params.id);
+    const plant = await Plant.findOne({ ...plantQuery, isDeleted: { $ne: true } });
     if (!plant || plant.isDeleted) throw new AppError('Plant not found', 404, 'NOT_FOUND');
 
     const { assertCanModifyContent } = await import('../../core/policies/contentOwnership');
@@ -100,11 +111,11 @@ export class PlantController {
       files.map(async (file) => {
         const mime = validateImageMagicBytes(file.buffer);
         if (!mime) throw new AppError('Invalid image format', 400, 'INVALID_FORMAT');
-        return storageService.uploadPlantImage(file.buffer, req.params.id, crypto.randomUUID());
+        return storageService.uploadPlantImage(file.buffer, plant._id.toString(), crypto.randomUUID());
       }),
     );
 
-    await Plant.findByIdAndUpdate(req.params.id, { $push: { images: { $each: images } } });
+    await Plant.findByIdAndUpdate(plant._id, { $push: { images: { $each: images } } });
     sendCreated(res, images);
   }
 
@@ -132,8 +143,9 @@ export class PlantController {
 
     const Plant = (await import('./Plant.model')).default;
     const { ModelStatus } = await import('./Plant.model');
-    const plant = await Plant.findById(id);
-    if (!plant || plant.isDeleted) throw new AppError('Plant not found', 404, 'NOT_FOUND');
+    const plantQuery = buildPlantQuery(id);
+    const plant = await Plant.findOne({ ...plantQuery, isDeleted: { $ne: true } });
+    if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
 
     const { assertCanModifyContent } = await import('../../core/policies/contentOwnership');
     assertCanModifyContent(plant, req.user!.sub, req.user!.role, 'upload');
@@ -148,12 +160,25 @@ export class PlantController {
         throw new AppError('Model file exceeds maximum limit of 25 MB', 400);
       }
 
-      const { uploadToR2 } = await import('../../lib/r2Client');
-      const url = await uploadToR2(
-        file.buffer,
-        `assets-for-r2/models/plants/${plant.slug}-lod0.glb`,
-        'model/gltf-binary',
-      );
+      let url: string;
+      try {
+        const { uploadToR2 } = await import('../../lib/r2Client');
+        url = await uploadToR2(
+          file.buffer,
+          `assets-for-r2/models/plants/${plant.slug}-lod0.glb`,
+          'model/gltf-binary',
+        );
+      } catch (r2Err) {
+        // Fallback to local filesystem storage if R2 is offline or credentials unset
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const uploadDir = path.join(process.cwd(), 'uploads', 'models', 'plants');
+        await fs.mkdir(uploadDir, { recursive: true });
+        const filePath = path.join(uploadDir, `${plant.slug}-lod0.glb`);
+        await fs.writeFile(filePath, file.buffer);
+        url = `/uploads/models/plants/${plant.slug}-lod0.glb`;
+      }
+
       plant.modelUrl = url;
       plant.modelVersion = Date.now();
       plant.modelStatus = ModelStatus.READY;
@@ -194,10 +219,10 @@ export class PlantController {
     await plant.save();
 
     const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
-    gardenShowcaseService.resetModelReports(id);
+    gardenShowcaseService.resetModelReports(plant._id.toString());
     gardenShowcaseService.emitGardenPlantChange('UPDATED', plant);
 
-    req.app.get('io')?.emit('plantModelUpdated', { plantId: id, plantName: plant.commonName });
+    req.app.get('io')?.emit('plantModelUpdated', { plantId: plant._id.toString(), plantName: plant.commonName });
     sendSuccess(res, plant);
   }
 
@@ -206,21 +231,31 @@ export class PlantController {
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
 
     const Plant = (await import('./Plant.model')).default;
-    const plant = await Plant.findById(id);
+    const plantQuery = buildPlantQuery(id);
+    const plant = await Plant.findOne({ ...plantQuery, isDeleted: { $ne: true } });
     if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
-
-    const { uploadToR2 } = await import('../../lib/r2Client');
 
     if (files?.['model_lod1']?.[0]) {
       const f1 = files['model_lod1'][0];
       if (f1.buffer.length < 4 || f1.buffer.subarray(0, 4).toString('ascii') !== 'glTF') {
         throw new AppError('Invalid GLB file format: missing binary glTF magic bytes for lod1', 400);
       }
-      const url = await uploadToR2(
-        f1.buffer,
-        `assets-for-r2/models/plants/${plant.slug}-lod1.glb`,
-        'model/gltf-binary',
-      );
+      let url: string;
+      try {
+        const { uploadToR2 } = await import('../../lib/r2Client');
+        url = await uploadToR2(
+          f1.buffer,
+          `assets-for-r2/models/plants/${plant.slug}-lod1.glb`,
+          'model/gltf-binary',
+        );
+      } catch {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const uploadDir = path.join(process.cwd(), 'uploads', 'models', 'plants');
+        await fs.mkdir(uploadDir, { recursive: true });
+        await fs.writeFile(path.join(uploadDir, `${plant.slug}-lod1.glb`), f1.buffer);
+        url = `/uploads/models/plants/${plant.slug}-lod1.glb`;
+      }
       plant.modelUrl_lod1 = url;
     }
 
@@ -229,11 +264,22 @@ export class PlantController {
       if (f2.buffer.length < 4 || f2.buffer.subarray(0, 4).toString('ascii') !== 'glTF') {
         throw new AppError('Invalid GLB file format: missing binary glTF magic bytes for lod2', 400);
       }
-      const url = await uploadToR2(
-        f2.buffer,
-        `assets-for-r2/models/plants/${plant.slug}-lod2.glb`,
-        'model/gltf-binary',
-      );
+      let url: string;
+      try {
+        const { uploadToR2 } = await import('../../lib/r2Client');
+        url = await uploadToR2(
+          f2.buffer,
+          `assets-for-r2/models/plants/${plant.slug}-lod2.glb`,
+          'model/gltf-binary',
+        );
+      } catch {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const uploadDir = path.join(process.cwd(), 'uploads', 'models', 'plants');
+        await fs.mkdir(uploadDir, { recursive: true });
+        await fs.writeFile(path.join(uploadDir, `${plant.slug}-lod2.glb`), f2.buffer);
+        url = `/uploads/models/plants/${plant.slug}-lod2.glb`;
+      }
       plant.modelUrl_lod2 = url;
     }
 
@@ -253,7 +299,8 @@ export class PlantController {
     const { globalPosition3D, botanicalBed, isVisibleInGarden } = req.body;
 
     const Plant = (await import('./Plant.model')).default;
-    const plant = await Plant.findById(id);
+    const plantQuery = buildPlantQuery(id);
+    const plant = await Plant.findOne({ ...plantQuery, isDeleted: { $ne: true } });
     if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
 
     if (globalPosition3D !== undefined) plant.globalPosition3D = globalPosition3D;
@@ -266,7 +313,7 @@ export class PlantController {
     gardenShowcaseService.emitGardenPlantChange('UPDATED', plant);
 
     req.app.get('io')?.emit('plantPositionUpdated', {
-      plantId: id,
+      plantId: plant._id.toString(),
       position: plant.globalPosition3D,
       isVisible: plant.isVisibleInGarden,
     });
@@ -279,22 +326,68 @@ export class PlantController {
 
     const Plant = (await import('./Plant.model')).default;
     const { ModelStatus } = await import('./Plant.model');
-    const plant = await Plant.findById(id);
+    const plantQuery = buildPlantQuery(id);
+    const plant = await Plant.findOne({ ...plantQuery, isDeleted: { $ne: true } });
     if (!plant) throw new AppError('Plant not found', 404, 'NOT_FOUND');
 
-    const { deleteFromR2 } = await import('../../lib/r2Client');
-    const r2UrlPrefix = `${process.env.R2_PUBLIC_URL}/`;
-
     if (plant.modelUrl) {
-      await deleteFromR2(plant.modelUrl.replace(r2UrlPrefix, ''));
+      if (plant.modelUrl.startsWith('/uploads/')) {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        try {
+          await fs.unlink(path.join(process.cwd(), plant.modelUrl));
+        } catch {
+          // ignore if already deleted
+        }
+      } else {
+        try {
+          const { deleteFromR2 } = await import('../../lib/r2Client');
+          const r2UrlPrefix = `${process.env.R2_PUBLIC_URL}/`;
+          await deleteFromR2(plant.modelUrl.replace(r2UrlPrefix, ''));
+        } catch {
+          // ignore R2 error
+        }
+      }
       plant.modelUrl = null;
     }
     if (plant.modelUrl_lod1) {
-      await deleteFromR2(plant.modelUrl_lod1.replace(r2UrlPrefix, ''));
+      if (plant.modelUrl_lod1.startsWith('/uploads/')) {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        try {
+          await fs.unlink(path.join(process.cwd(), plant.modelUrl_lod1));
+        } catch {
+          // ignore
+        }
+      } else {
+        try {
+          const { deleteFromR2 } = await import('../../lib/r2Client');
+          const r2UrlPrefix = `${process.env.R2_PUBLIC_URL}/`;
+          await deleteFromR2(plant.modelUrl_lod1.replace(r2UrlPrefix, ''));
+        } catch {
+          // ignore
+        }
+      }
       plant.modelUrl_lod1 = null;
     }
     if (plant.modelUrl_lod2) {
-      await deleteFromR2(plant.modelUrl_lod2.replace(r2UrlPrefix, ''));
+      if (plant.modelUrl_lod2.startsWith('/uploads/')) {
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        try {
+          await fs.unlink(path.join(process.cwd(), plant.modelUrl_lod2));
+        } catch {
+          // ignore
+        }
+      } else {
+        try {
+          const { deleteFromR2 } = await import('../../lib/r2Client');
+          const r2UrlPrefix = `${process.env.R2_PUBLIC_URL}/`;
+          await deleteFromR2(plant.modelUrl_lod2.replace(r2UrlPrefix, ''));
+        } catch {
+          // ignore
+        }
+      }
       plant.modelUrl_lod2 = null;
     }
 
@@ -305,7 +398,7 @@ export class PlantController {
     const { gardenShowcaseService } = await import('../garden/gardenShowcase.service');
     gardenShowcaseService.emitGardenPlantChange('UPDATED', plant);
 
-    req.app.get('io')?.emit('plantModelUpdated', { plantId: id, plantName: plant.commonName });
+    req.app.get('io')?.emit('plantModelUpdated', { plantId: plant._id.toString(), plantName: plant.commonName });
     sendSuccess(res, { message: '3D models deleted successfully' });
   }
 

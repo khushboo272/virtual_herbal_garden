@@ -19,6 +19,7 @@ import {
   CheckSquare,
   Square,
   RefreshCw,
+  HardDrive,
 } from 'lucide-react';
 import { databaseApi } from '../api/databaseApi';
 import type {
@@ -493,7 +494,7 @@ export const DatabaseBrowsePage: React.FC = () => {
             </div>
           )}
 
-          {/* Conflict diff display if 409 occurred */}
+          {/* Concurrency Conflict Alert */}
           {saveConflict && (
             <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-xl space-y-2">
               <div className="text-xs font-bold text-red-800 dark:text-red-300 flex items-center space-x-1">
@@ -503,6 +504,23 @@ export const DatabaseBrowsePage: React.FC = () => {
               <p className="text-[11px] text-red-700 dark:text-red-400">
                 Another admin modified this document. Refreshing doc data with latest state.
               </p>
+            </div>
+          )}
+
+          {/* Quick link to R2 Storage */}
+          {editingDoc?.slug && (
+            <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <span className="text-xs text-slate-500">Storage Assets:</span>
+              <a
+                href={`/dashboard/database/storage`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-1 text-xs font-medium text-emerald-600 hover:text-emerald-700"
+              >
+                <HardDrive className="w-3.5 h-3.5" />
+                <span>Open Storage Manager</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
             </div>
           )}
 

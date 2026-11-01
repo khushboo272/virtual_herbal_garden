@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Wrench,
   History,
+  HardDrive,
 } from 'lucide-react';
 
 interface DatabaseNavProps {
@@ -21,6 +22,7 @@ export const DatabaseNav: React.FC<DatabaseNavProps> = ({ isSuperAdmin = false }
     { label: 'Overview', path: '/dashboard/database', icon: LayoutDashboard, end: true },
     { label: 'Import', path: '/dashboard/database/import', icon: UploadCloud },
     { label: 'Browse & Edit', path: '/dashboard/database/browse', icon: Layers },
+    { label: 'Storage (R2)', path: '/dashboard/database/storage', icon: HardDrive },
     { label: 'Export', path: '/dashboard/database/export', icon: DownloadCloud },
     { label: 'Backups', path: '/dashboard/database/backups', icon: Archive, superAdminOnly: true },
     { label: 'Query Console', path: '/dashboard/database/query', icon: Terminal },

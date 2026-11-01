@@ -6,7 +6,9 @@ import { DatabaseOverviewPage } from '../pages/DatabaseOverviewPage';
 import { DatabaseImportPage } from '../pages/DatabaseImportPage';
 import { DatabaseQueryPage } from '../pages/DatabaseQueryPage';
 import { DatabaseIntegrityPage } from '../pages/DatabaseIntegrityPage';
+import { DatabaseHistoryPage } from '../pages/DatabaseHistoryPage';
 import { JobProgress } from '../components/JobProgress';
+import { AiDebugger } from '../components/AiDebugger';
 import { databaseApi } from '../api/databaseApi';
 import type { OverviewStats, DbJobItem, IntegrityReport } from '../types';
 
@@ -23,6 +25,9 @@ vi.mock('../api/databaseApi', () => ({
     getIntegrityReport: vi.fn(),
     applyIntegrityFix: vi.fn(),
     ignoreIntegrityIssue: vi.fn(),
+    debugError: vi.fn(),
+    getJobs: vi.fn(),
+    undoBatch: vi.fn(),
   },
 }));
 
@@ -292,6 +297,81 @@ describe('Frontend Database Manager Test Suite', () => {
       expect(screen.getByText('50%')).toBeInTheDocument();
       expect(screen.getByText('Importing plant records...')).toBeInTheDocument();
       expect(screen.getByText('48')).toBeInTheDocument();
+    });
+  });
+
+  describe('AiDebugger Component', () => {
+    it('does not render when there is no error message', () => {
+      const { container } = render(<AiDebugger errorMessage={null} />);
+      expect(container.firstChild).toBeNull();
+    });
+
+    it('renders AI Debugger button when error message is provided and diagnoses upon click', async () => {
+      vi.mocked(databaseApi.debugError).mockResolvedValue({
+        analysis: '### 🔍 Root Cause Analysis\nDuplicate key collision on scientificName.',
+        model: 'gemini-3.5-flash',
+        timestamp: new Date().toISOString(),
+      });
+
+      render(
+        <AiDebugger
+          errorMessage="Import failed: E11000 duplicate key error on Glycyrrhiza glabra"
+          context={{ collection: 'plants', operation: 'import' }}
+        />
+      );
+
+      // Button exists
+      const debugBtn = screen.getByRole('button', { name: /ai debugger/i });
+      expect(debugBtn).toBeInTheDocument();
+
+      // Does not call API automatically before user clicks
+      expect(databaseApi.debugError).not.toHaveBeenCalled();
+
+      // Click button
+      fireEvent.click(debugBtn);
+
+      // Shows loading state
+      expect(screen.getByText(/analyzing with gemini/i)).toBeInTheDocument();
+
+      // Once resolved, renders the AI explanation
+      await waitFor(() => {
+        expect(databaseApi.debugError).toHaveBeenCalledWith({
+          errorMessage: 'Import failed: E11000 duplicate key error on Glycyrrhiza glabra',
+          context: { collection: 'plants', operation: 'import' },
+        });
+        expect(screen.getByText(/Root Cause Analysis/i)).toBeInTheDocument();
+        expect(screen.getByText(/Duplicate key collision on scientificName/i)).toBeInTheDocument();
+        expect(screen.getByText(/gemini-3.5-flash/i)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('DatabaseHistoryPage', () => {
+    it('renders job history safely without TypeError when API returns array or raw jobs list', async () => {
+      // Simulating backend sendSuccess(res, result.jobs) which returns an array
+      vi.mocked(databaseApi.getJobs).mockResolvedValue([
+        {
+          _id: 'job-1',
+          type: 'import',
+          status: 'done',
+          batchId: 'batch-abc',
+          counts: { inserted: 10, updated: 2, skipped: 0, deleted: 0, errors: 0, total: 12 },
+          createdAt: new Date().toISOString(),
+          errors: [],
+        },
+      ] as any);
+
+      render(
+        <MemoryRouter>
+          <DatabaseHistoryPage />
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('batch-abc')).toBeInTheDocument();
+        expect(screen.getByText('+10')).toBeInTheDocument();
+        expect(screen.getByText('~2')).toBeInTheDocument();
+      });
     });
   });
 });

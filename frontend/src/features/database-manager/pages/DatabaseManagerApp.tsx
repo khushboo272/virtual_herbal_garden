@@ -10,6 +10,7 @@ import { DatabaseQueryPage } from './DatabaseQueryPage';
 import { DatabaseIntegrityPage } from './DatabaseIntegrityPage';
 import { DatabaseToolsPage } from './DatabaseToolsPage';
 import { DatabaseHistoryPage } from './DatabaseHistoryPage';
+import { StorageManagerPage } from '../../../modules/storage-manager';
 import { useAuth } from '../../../contexts/AuthContext';
 
 export const DatabaseManagerApp: React.FC = () => {
@@ -24,6 +25,7 @@ export const DatabaseManagerApp: React.FC = () => {
           <Route index element={<DatabaseOverviewPage />} />
           <Route path="import" element={<DatabaseImportPage />} />
           <Route path="browse" element={<DatabaseBrowsePage />} />
+          <Route path="storage/*" element={<StorageManagerPage />} />
           <Route path="export" element={<DatabaseExportPage />} />
           <Route
             path="backups"

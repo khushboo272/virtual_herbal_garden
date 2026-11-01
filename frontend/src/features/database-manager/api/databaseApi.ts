@@ -276,8 +276,23 @@ export const databaseApi = {
 
   // ── Jobs & History ──
   getJobs: async (page = 1, limit = 20): Promise<{ jobs: DbJobItem[]; total: number; page: number; totalPages: number }> => {
-    const res = await api.get(`/admin/database/jobs?page=${page}&limit=${limit}`);
-    return res.data?.data || res.data;
+    const res = await api.get('/admin/database/jobs', { params: { page, limit } });
+    const raw = res.data?.data ?? res.data;
+    const meta = res.data?.meta ?? res.meta ?? {};
+    if (Array.isArray(raw)) {
+      return {
+        jobs: raw,
+        total: meta.total ?? raw.length,
+        page: meta.page ?? page,
+        totalPages: meta.totalPages ?? (Math.ceil(raw.length / limit) || 1),
+      };
+    }
+    return {
+      jobs: raw?.jobs ?? [],
+      total: raw?.total ?? meta.total ?? 0,
+      page: raw?.page ?? meta.page ?? page,
+      totalPages: raw?.totalPages ?? meta.totalPages ?? 1,
+    };
   },
 
   getJob: async (jobId: string): Promise<DbJobItem> => {
@@ -287,6 +302,20 @@ export const databaseApi = {
 
   undoBatch: async (jobOrBatchId: string): Promise<{ undoneInserted: number; restoredUpdated: number }> => {
     const res = await api.post(`/admin/database/jobs/${jobOrBatchId}/undo`, {});
+    return res.data?.data || res.data;
+  },
+
+  // ── AI Debugger ──
+  debugError: async (params: {
+    errorMessage: string;
+    context?: {
+      collection?: string;
+      operation?: string;
+      mode?: string;
+      payloadSnippet?: string;
+    };
+  }): Promise<{ analysis: string; model: string; timestamp: string }> => {
+    const res = await api.post('/admin/database/ai-debug', params);
     return res.data?.data || res.data;
   },
 };
