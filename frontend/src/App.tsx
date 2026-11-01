@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { Layout } from "./app/Layout";
@@ -77,6 +78,10 @@ import {
   AIFeedbackQueuePage,
 } from "./features/botanist";
 
+const Plant3DPage = lazy(() =>
+  import("./modules/plant-viewer").then((m) => ({ default: m.Plant3DPage }))
+);
+
 export default function App() {
   return (
     <RouteErrorBoundary isRoot>
@@ -90,6 +95,20 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/library" element={<LibraryPage />} />
             <Route path="/plant/:id" element={<PlantDetailPage />} />
+            <Route
+              path="/plant/:slug/3d"
+              element={
+                <Suspense
+                  fallback={
+                    <div className="h-screen w-screen bg-slate-950 flex items-center justify-center text-emerald-400 text-sm">
+                      Loading 3D Specimen...
+                    </div>
+                  }
+                >
+                  <Plant3DPage />
+                </Suspense>
+              }
+            />
             <Route
               path="/ai-detect"
               element={

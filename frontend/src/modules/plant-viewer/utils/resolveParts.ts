@@ -107,8 +107,17 @@ export function resolvePlantParts(
         targetObject: matchedMesh,
       });
     } else {
-      // Calculate anatomical anchor points based on height proportions
-      const anchor = getPartAnchorPoint(partKey, center, minY, height, width, depth);
+      // Calculate anatomical anchor points with angular and vertical distribution
+      const anchor = getPartAnchorPoint(
+        partKey,
+        center,
+        minY,
+        height,
+        width,
+        depth,
+        results.length,
+        activeParts.length
+      );
       results.push({
         part: partKey,
         label: PART_DISPLAY_NAMES[partKey] || partKey.charAt(0).toUpperCase() + partKey.slice(1),
@@ -123,6 +132,7 @@ export function resolvePlantParts(
 
 /**
  * Calculates anchor point based on standard botanical anatomy proportions
+ * with radial and angular distribution to prevent label overlapping
  */
 export function getPartAnchorPoint(
   partKey: string,
@@ -130,28 +140,62 @@ export function getPartAnchorPoint(
   minY: number,
   height: number,
   width: number,
-  depth: number
+  depth: number,
+  index = 0,
+  totalParts = 1
 ): [number, number, number] {
+  let relativeY = 0.5;
+  let radialFactor = 0.35;
+
   switch (partKey) {
-    case 'leaves':
-      return [center.x, minY + height * 0.8, center.z + depth * 0.15];
-    case 'flowers':
-      return [center.x + width * 0.2, minY + height * 0.75, center.z + depth * 0.2];
-    case 'fruit':
-      return [center.x - width * 0.2, minY + height * 0.65, center.z + depth * 0.2];
-    case 'seeds':
-      return [center.x, minY + height * 0.7, center.z - depth * 0.2];
-    case 'bark':
-      return [center.x + width * 0.15, minY + height * 0.35, center.z];
-    case 'stem':
-      return [center.x, minY + height * 0.45, center.z];
     case 'roots':
-      return [center.x, minY + height * 0.05, center.z];
+      relativeY = 0.08;
+      radialFactor = 0.2;
+      break;
+    case 'bark':
+      relativeY = 0.3;
+      radialFactor = 0.28;
+      break;
+    case 'stem':
+      relativeY = 0.45;
+      radialFactor = 0.22;
+      break;
     case 'resin':
-      return [center.x - width * 0.1, minY + height * 0.5, center.z + depth * 0.1];
+      relativeY = 0.52;
+      radialFactor = 0.3;
+      break;
+    case 'leaves':
+      relativeY = 0.8;
+      radialFactor = 0.38;
+      break;
+    case 'fruit':
+      relativeY = 0.72;
+      radialFactor = 0.4;
+      break;
+    case 'seeds':
+      relativeY = 0.78;
+      radialFactor = 0.38;
+      break;
+    case 'flowers':
+      relativeY = 0.86;
+      radialFactor = 0.42;
+      break;
     case 'whole_plant':
     default:
-      return [center.x, minY + height * 0.5, center.z];
+      relativeY = 0.5;
+      radialFactor = 0.3;
+      break;
   }
+
+  // Radiate angularly around the plant perimeter based on index
+  const angle = (2 * Math.PI * index) / Math.max(1, totalParts) + Math.PI / 6;
+  const radiusX = Math.max(0.12, width * radialFactor);
+  const radiusZ = Math.max(0.12, depth * radialFactor);
+
+  const posX = center.x + Math.cos(angle) * radiusX;
+  const posY = minY + height * relativeY;
+  const posZ = center.z + Math.sin(angle) * radiusZ;
+
+  return [posX, posY, posZ];
 }
 

@@ -16,6 +16,7 @@ interface PlantModelProps {
   selectedPart?: string | null;
   onSelectPart: (part: string) => void;
   onAnchorsResolved?: (anchors: PartMeshAnchor[]) => void;
+  onModelLoaded?: (box: THREE.Box3) => void;
 }
 
 export const PlantModel: React.FC<PlantModelProps> = ({
@@ -27,6 +28,7 @@ export const PlantModel: React.FC<PlantModelProps> = ({
   selectedPart = null,
   onSelectPart,
   onAnchorsResolved,
+  onModelLoaded,
 }) => {
   const gltf = useGLTF(modelUrl);
 
@@ -39,18 +41,22 @@ export const PlantModel: React.FC<PlantModelProps> = ({
   const targetHeightM = Math.max(0.3, plant.visual?.heightM || 1.5);
 
   // Normalize and resolve parts
-  const { anchors } = useMemo(() => {
+  const { anchors, box } = useMemo(() => {
     normalizeViewerModel(clonedScene, targetHeightM, true);
+    const sceneBox = new THREE.Box3().setFromObject(clonedScene);
     const resolved = resolvePlantParts(clonedScene, plant.partsUsed || []);
-    return { anchors: resolved };
+    return { anchors: resolved, box: sceneBox };
   }, [clonedScene, targetHeightM, plant.partsUsed]);
 
-  // Notify parent of resolved anchors
+  // Notify parent of resolved anchors & bounding box for camera framing
   useEffect(() => {
     if (onAnchorsResolved) {
       onAnchorsResolved(anchors);
     }
-  }, [anchors, onAnchorsResolved]);
+    if (onModelLoaded) {
+      onModelLoaded(box);
+    }
+  }, [anchors, box, onAnchorsResolved, onModelLoaded]);
 
   // Apply wireframe and isolation / dimming effects
   useEffect(() => {

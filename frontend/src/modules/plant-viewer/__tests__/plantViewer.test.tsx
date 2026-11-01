@@ -1,11 +1,16 @@
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import * as THREE from 'three';
 import { resolvePlantParts, getPartAnchorPoint } from '../utils/resolveParts';
 import { normalizeViewerModel } from '../utils/normalizeViewerModel';
 import { PlantInfoPanel } from '../components/PlantInfoPanel';
+import { ModelErrorBoundary } from '../components/ModelErrorBoundary';
+import { calculateBboxFraming } from '../utils/cameraFraming';
+import { PlantViewerToolbar } from '../components/PlantViewerToolbar';
+import { PlantLabels } from '../components/PlantLabels';
+import { PlantViewerModal } from '../components/PlantViewerModal';
 
 vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -79,6 +84,36 @@ describe('Plant 3D Viewer Module — TDD Suite', () => {
       expect(leaves?.hasRealMesh).toBe(false);
       // In a box spanning -1 to +1 (height 2), 80% mark from base (-1 + 1.6) is 0.6
       expect(leaves?.position[1]).toBeCloseTo(0.6, 1);
+    });
+
+    it('distributes multiple anatomical fallback anchors radially and vertically to prevent overlap', () => {
+      const scene = new THREE.Group();
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5));
+      mesh.name = 'unnamed_generic_mesh';
+      scene.add(mesh);
+
+      // Tulsi parts: leaves, flowers, seeds
+      const partsUsed = ['leaves', 'flowers', 'seeds'];
+      const resolved = resolvePlantParts(scene, partsUsed);
+
+      expect(resolved).toHaveLength(3);
+
+      // Verify no two anchors are co-located (minimum Euclidean distance in 3D >= 0.05m)
+      for (let i = 0; i < resolved.length; i++) {
+        for (let j = i + 1; j < resolved.length; j++) {
+          const p1 = new THREE.Vector3(...resolved[i].position);
+          const p2 = new THREE.Vector3(...resolved[j].position);
+          const dist = p1.distanceTo(p2);
+          expect(dist).toBeGreaterThanOrEqual(0.08); // Must have at least 8cm 3D separation
+        }
+      }
+
+      // Verify angular and radial distribution exists (x or z offsets differ significantly)
+      const xs = resolved.map((p) => p.position[0]);
+      const zs = resolved.map((p) => p.position[2]);
+      const xRange = Math.max(...xs) - Math.min(...xs);
+      const zRange = Math.max(...zs) - Math.min(...zs);
+      expect(xRange + zRange).toBeGreaterThan(0.1);
     });
   });
 
@@ -225,6 +260,196 @@ describe('Plant 3D Viewer Module — TDD Suite', () => {
           />
         );
       }).not.toThrow();
+    });
+  });
+
+  describe('Model Error Boundary (ModelErrorBoundary)', () => {
+    it('catches GLTF loading/parsing errors and renders procedural fallback without crashing', () => {
+      // Suppress console.error in React during boundary test
+      const originalError = console.error;
+      console.error = vi.fn();
+
+      const BombComponent = () => {
+        throw new Error('THREE.GLTFLoader: JSON content not found.');
+      };
+
+      const onError = vi.fn();
+
+      render(
+        <ModelErrorBoundary
+          fallback={<div data-testid="procedural-fallback">Procedural Fallback Model</div>}
+          onError={onError}
+        >
+          <BombComponent />
+        </ModelErrorBoundary>
+      );
+
+      expect(screen.getByTestId('procedural-fallback')).toBeInTheDocument();
+      expect(onError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining('THREE.GLTFLoader: JSON content not found.') })
+      );
+
+      console.error = originalError;
+    });
+  });
+
+  describe('Camera Framing & Bounding Box Fitting (calculateBboxFraming)', () => {
+    it('computes camera distance and target so the plant occupies 60-70% of canvas height', () => {
+      // Create a bounding box representing Tulsi (height: 0.5m, spread: 0.4m, centered at origin base y=0)
+      const box = new THREE.Box3(
+        new THREE.Vector3(-0.2, 0, -0.2),
+        new THREE.Vector3(0.2, 0.5, 0.2)
+      );
+
+      const framing = calculateBboxFraming(box, 45, 0.65);
+
+      expect(framing.plantHeightM).toBeCloseTo(0.5, 2);
+      expect(framing.plantSpreadM).toBeCloseTo(0.4, 2);
+      // Target must be centered in Y at plant midpoint
+      expect(framing.target[0]).toBeCloseTo(0, 2);
+      expect(framing.target[1]).toBeCloseTo(0.25, 2);
+      expect(framing.target[2]).toBeCloseTo(0, 2);
+
+      // Camera distance should frame 0.5m height to fill ~65% of 45-deg FOV (around 0.93m, not 2.6m)
+      expect(framing.distance).toBeGreaterThan(0.7);
+      expect(framing.distance).toBeLessThan(1.2);
+      expect(framing.cameraPosition[2]).toBeCloseTo(framing.distance, 1);
+    });
+  });
+
+  describe('Canvas-First Floating Toolbar (PlantViewerToolbar)', () => {
+    it('renders compact 40px icon toolbar and triggers callbacks', () => {
+      const mockState: any = {
+        zoom: 50,
+        autoRotate: false,
+        showLabels: true,
+        labelMode: 'all',
+        wireframe: false,
+        showGroundGrid: true,
+        showScaleReference: false,
+        lightingPreset: 'garden',
+        backgroundPreset: 'gradient',
+      };
+
+      const onReset = vi.fn();
+      const onTakeScreenshot = vi.fn();
+      const onChange = vi.fn();
+
+      render(
+        <PlantViewerToolbar
+          state={mockState}
+          onChange={onChange}
+          onRotateStep={vi.fn()}
+          onApplyPreset={vi.fn()}
+          onResetView={onReset}
+          onTakeScreenshot={onTakeScreenshot}
+          isFullscreen={false}
+          onToggleFullscreen={vi.fn()}
+        />
+      );
+
+      // Verify thin floating toolbar buttons
+      expect(screen.getByTitle(/Reset View/i)).toBeInTheDocument();
+      expect(screen.getByTitle(/Auto-rotate/i)).toBeInTheDocument();
+      expect(screen.getByTitle(/Screenshot/i)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTitle(/Reset View/i));
+      expect(onReset).toHaveBeenCalled();
+    });
+  });
+
+  describe('Anatomical Pin Dot Markers & Leader Lines (PlantLabels)', () => {
+    it('renders compact pin dot markers with leader lines and clamped styling', () => {
+      const mockAnchors: any[] = [
+        {
+          part: 'leaves',
+          label: 'Leaves',
+          position: [0, 0.4, 0.15],
+          hasRealMesh: false,
+        },
+        {
+          part: 'seeds',
+          label: 'Seeds',
+          position: [0.15, 0.35, -0.15],
+          hasRealMesh: false,
+        },
+      ];
+
+      const onSelect = vi.fn();
+      render(
+        <PlantLabels
+          anchors={mockAnchors}
+          selectedPart={null}
+          onSelectPart={onSelect}
+          visible={true}
+        />
+      );
+
+      // Verify compact pin elements with pin-dot class or data-testid
+      const pins = screen.getAllByTestId('plant-pin-marker');
+      expect(pins).toHaveLength(2);
+
+      // Verify leader line elements are rendered
+      const leaderLines = screen.getAllByTestId('plant-pin-leader-line');
+      expect(leaderLines).toHaveLength(2);
+
+      // Verify label buttons exist and trigger selection
+      const leafBtn = screen.getByRole('button', { name: /Leaves/i });
+      expect(leafBtn).toBeInTheDocument();
+      fireEvent.click(leafBtn);
+      expect(onSelect).toHaveBeenCalledWith('leaves');
+    });
+  });
+
+  describe('Canvas-First Immersive Layout & Collapsible Drawer (PlantViewerModal)', () => {
+    it('renders full-bleed canvas and allows collapsing the info drawer to maximize 3D view', () => {
+      const mockPlant: any = {
+        _id: 'plant_123',
+        slug: 'tulsi',
+        commonName: 'Holy Basil (Tulsi)',
+        scientificName: 'Ocimum tenuiflorum',
+        family: 'Lamiaceae',
+        partsUsed: ['leaves', 'seeds'],
+        medicinalUses: ['Respiratory health'],
+        toxicityLevel: 'NONE',
+        images: [],
+      };
+
+      render(
+        <MemoryRouter>
+          <PlantViewerModal
+            isOpen={true}
+            onClose={vi.fn()}
+            plant={mockPlant}
+          />
+        </MemoryRouter>
+      );
+
+      // Verify canvas container is full-bleed
+      const canvasContainer = screen.getByTestId('plant-viewer-canvas-container');
+      expect(canvasContainer).toBeInTheDocument();
+      expect(canvasContainer.className).toContain('inset-0');
+
+      // Verify floating toolbar is present
+      expect(screen.getByLabelText(/3D Viewer Controls/i)).toBeInTheDocument();
+
+      // Verify collapsible info drawer toggle button
+      const closeBtn = screen.getByTestId('drawer-close-btn');
+      expect(closeBtn).toBeInTheDocument();
+
+      // Drawer is initially open
+      const drawer = screen.getByTestId('plant-info-drawer');
+      expect(drawer.className).not.toContain('translate-x-full');
+
+      // Toggle drawer closed to maximize canvas
+      fireEvent.click(closeBtn);
+      expect(drawer.className).toContain('translate-x-full');
+
+      // Toggle drawer back open
+      const openBtn = screen.getByTestId('drawer-open-btn');
+      expect(openBtn).toBeInTheDocument();
+      fireEvent.click(openBtn);
+      expect(drawer.className).not.toContain('translate-x-full');
     });
   });
 });

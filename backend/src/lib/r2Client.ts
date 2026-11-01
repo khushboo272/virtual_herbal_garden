@@ -1,36 +1,48 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-
-export const r2 = new S3Client({
-  region: 'auto',
-  endpoint: process.env.R2_ENDPOINT!,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-});
+import { PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { getR2Client } from '../core/storage/r2Storage';
+import { env } from '../core/config/env';
 
 export const uploadToR2 = async (
   buffer: Buffer,
   key: string,
   contentType: string
 ): Promise<string> => {
-  await r2.send(
+  const client = getR2Client();
+  const bucket = env.R2_BUCKET_NAME || env.AWS_S3_BUCKET;
+  if (!bucket) {
+    throw new Error('No storage bucket configured (R2_BUCKET_NAME is required)');
+  }
+
+  const cleanKey = key.replace(/^\/+/, '');
+
+  await client.send(
     new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME!,
-      Key: key,
+      Bucket: bucket,
+      Key: cleanKey,
       Body: buffer,
       ContentType: contentType,
       CacheControl: 'public, max-age=31536000, immutable',
     })
   );
-  return `${process.env.R2_PUBLIC_URL}/${key}`;
+
+  const publicBase = (
+    env.R2_PUBLIC_URL ||
+    env.CDN_BASE_URL ||
+    'https://pub-f64898458710437f99f8cc11e38ea63a.r2.dev'
+  ).replace(/\/+$/, '');
+
+  return `${publicBase}/${cleanKey}`;
 };
 
 export const deleteFromR2 = async (key: string): Promise<void> => {
-  await r2.send(
+  const client = getR2Client();
+  const bucket = env.R2_BUCKET_NAME || env.AWS_S3_BUCKET;
+  if (!bucket) return;
+
+  await client.send(
     new DeleteObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME!,
-      Key: key,
+      Bucket: bucket,
+      Key: key.replace(/^\/+/, ''),
     })
   );
 };

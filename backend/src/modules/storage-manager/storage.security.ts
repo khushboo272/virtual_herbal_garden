@@ -7,6 +7,7 @@ export const ALLOWED_WRITE_PREFIXES = [
   'remedies/',
   'tours/',
   'avatars/',
+  'environment/',
   'uploads/',
   'misc/',
   'trash/',
@@ -22,6 +23,9 @@ export const ALLOWED_MIME_TYPES = [
   'text/csv',
   'application/pdf',
   'video/mp4',
+  'audio/mpeg',
+  'audio/wav',
+  'audio/ogg',
 ] as const;
 
 export function normalizeKey(rawKey: string): string {

@@ -6,7 +6,10 @@ import type { LibraryPlant } from '../../../features/library/types/library.types
 import type { ViewerControlsState, PartMeshAnchor, ViewPreset } from '../types';
 import { PlantModel } from './PlantModel';
 import { ProceduralPlantViewer } from './ProceduralPlantViewer';
+import { ModelErrorBoundary } from './ModelErrorBoundary';
 import { ScaleReference } from './ScaleReference';
+import { SoftGround } from './SoftGround';
+import { calculateBboxFraming, BboxFramingResult } from '../utils/cameraFraming';
 
 interface PlantViewerCanvasProps {
   plant: LibraryPlant;
@@ -57,23 +60,40 @@ function CameraAndControls({
   controlsState,
   onControlsChange,
   targetPosition,
+  framing,
   orbitRef,
 }: {
   controlsState: ViewerControlsState;
   onControlsChange: (updater: Partial<ViewerControlsState> | ((prev: ViewerControlsState) => ViewerControlsState)) => void;
   targetPosition: [number, number, number] | null;
+  framing: BboxFramingResult | null;
   orbitRef: React.RefObject<any>;
 }) {
   const { camera } = useThree();
   const lerpTarget = useRef<THREE.Vector3 | null>(null);
+  const hasInitializedFraming = useRef(false);
+
+  // Initialize camera position based on calculated model bounding box framing
+  useEffect(() => {
+    if (framing && !hasInitializedFraming.current && orbitRef.current) {
+      hasInitializedFraming.current = true;
+      camera.position.set(...framing.cameraPosition);
+      orbitRef.current.target.set(...framing.target);
+      lerpTarget.current = new THREE.Vector3(...framing.target);
+      orbitRef.current.update();
+      onControlsChange({ distanceM: Number(framing.distance.toFixed(2)) });
+    }
+  }, [framing, camera, orbitRef, onControlsChange]);
 
   useEffect(() => {
     if (targetPosition) {
       lerpTarget.current = new THREE.Vector3(...targetPosition);
+    } else if (framing) {
+      lerpTarget.current = new THREE.Vector3(...framing.target);
     } else {
-      lerpTarget.current = new THREE.Vector3(0, 0.75, 0);
+      lerpTarget.current = new THREE.Vector3(0, 0.5, 0);
     }
-  }, [targetPosition]);
+  }, [targetPosition, framing]);
 
   useFrame((_, delta) => {
     if (orbitRef.current && lerpTarget.current) {
@@ -87,16 +107,20 @@ function CameraAndControls({
       ref={orbitRef}
       enableDamping
       dampingFactor={0.08}
-      minDistance={0.5}
-      maxDistance={6.0}
+      minDistance={framing?.minDistance || 0.2}
+      maxDistance={framing?.maxDistance || 8.0}
       maxPolarAngle={Math.PI / 2 + 0.05} // don't go below ground
       autoRotate={controlsState.autoRotate}
       autoRotateSpeed={controlsState.autoRotateSpeed || 1.8}
       onChange={() => {
         if (orbitRef.current) {
           const dist = camera.position.distanceTo(orbitRef.current.target);
-          const computedZoom = Math.round(Math.max(15, Math.min(180, (2.5 / dist) * 100)));
-          onControlsChange({ zoom: computedZoom });
+          const baseDist = framing?.distance || 1.5;
+          const computedZoom = Math.round(Math.max(15, Math.min(180, (baseDist / dist) * 100)));
+          onControlsChange({
+            zoom: computedZoom,
+            distanceM: Number(dist.toFixed(2)),
+          });
         }
       }}
     />
@@ -119,6 +143,7 @@ export const PlantViewerCanvas = forwardRef<PlantViewerCanvasRef, PlantViewerCan
     const orbitRef = useRef<any>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const [anchors, setAnchors] = useState<PartMeshAnchor[]>([]);
+    const [framing, setFraming] = useState<BboxFramingResult | null>(null);
     const [hasLoadError, setHasLoadError] = useState(false);
     const [loadStartTime] = useState(Date.now());
 
@@ -138,36 +163,48 @@ export const PlantViewerCanvas = forwardRef<PlantViewerCanvasRef, PlantViewerCan
       return found ? found.position : null;
     }, [selectedPart, anchors]);
 
-    // Imperative control handles
+    // Imperative control handles with dynamic plant bounding box support
     useImperativeHandle(ref, () => ({
       resetView: () => {
-        if (orbitRef.current) {
+        if (orbitRef.current && framing) {
           orbitRef.current.reset();
-          orbitRef.current.target.set(0, 0.75, 0);
+          orbitRef.current.target.set(...framing.target);
+          const camera = orbitRef.current.object as THREE.Camera;
+          camera.position.set(...framing.cameraPosition);
+          orbitRef.current.update();
+          onControlsChange({ zoom: 50, autoRotate: false, distanceM: Number(framing.distance.toFixed(2)) });
+        } else if (orbitRef.current) {
+          orbitRef.current.reset();
+          orbitRef.current.target.set(0, 0.5, 0);
           onControlsChange({ zoom: 50, autoRotate: false });
         }
       },
       applyPreset: (preset: ViewPreset) => {
         if (!orbitRef.current) return;
         const camera = orbitRef.current.object as THREE.PerspectiveCamera;
-        const dist = 2.4;
+        const dist = framing?.distance || 1.8;
+        const targetY = framing?.target[1] || 0.5;
 
         switch (preset) {
           case 'front':
-            camera.position.set(0, 0.8, dist);
-            orbitRef.current.target.set(0, 0.75, 0);
+            camera.position.set(0, targetY + dist * 0.15, dist);
+            orbitRef.current.target.set(0, targetY, 0);
             break;
           case 'side':
-            camera.position.set(dist, 0.8, 0);
-            orbitRef.current.target.set(0, 0.75, 0);
+            camera.position.set(dist, targetY + dist * 0.15, 0);
+            orbitRef.current.target.set(0, targetY, 0);
             break;
           case 'top':
-            camera.position.set(0, dist * 1.3, 0.01);
-            orbitRef.current.target.set(0, 0.5, 0);
+            camera.position.set(0, dist * 1.35, 0.01);
+            orbitRef.current.target.set(0, targetY * 0.5, 0);
             break;
           case 'closeup':
-            camera.position.set(0, 0.9, dist * 0.45);
-            orbitRef.current.target.set(0, 0.8, 0);
+            camera.position.set(0, targetY + dist * 0.05, dist * 0.45);
+            orbitRef.current.target.set(0, targetY, 0);
+            break;
+          case 'roots':
+            camera.position.set(0, dist * 0.15, dist * 0.55);
+            orbitRef.current.target.set(0, 0.05, 0);
             break;
         }
         orbitRef.current.update();
@@ -226,6 +263,7 @@ export const PlantViewerCanvas = forwardRef<PlantViewerCanvasRef, PlantViewerCan
       white: 'bg-white dark:bg-gray-900',
       transparent: 'bg-transparent',
       garden: 'bg-gradient-to-b from-emerald-950 via-teal-950 to-green-950',
+      sky: 'bg-gradient-to-b from-sky-300/80 via-emerald-100/50 to-stone-100/90 dark:from-slate-900 dark:via-emerald-950/70 dark:to-stone-900',
     }[controlsState.backgroundPreset || 'gradient'];
 
     return (
@@ -273,53 +311,83 @@ export const PlantViewerCanvas = forwardRef<PlantViewerCanvasRef, PlantViewerCan
             </>
           )}
 
-          {/* Plant Model (Real GLB or Procedural Fallback) */}
+          {controlsState.lightingPreset === 'greenhouse' && (
+            <>
+              <ambientLight intensity={1.1} color="#fef3c7" />
+              <directionalLight position={[5, 10, 3]} intensity={2.2} color="#fffbeb" castShadow shadow-mapSize={1024} />
+              <directionalLight position={[-6, 4, -4]} intensity={0.8} color="#d1fae5" />
+              <pointLight position={[0, 2, 0]} intensity={0.5} color="#ecfdf5" />
+            </>
+          )}
+
+          {/* Plant Model (Real GLB with Error Boundary -> Procedural Fallback) */}
           <Suspense fallback={<ModelLoadingProgress />}>
-            {!shouldUseProcedural && modelUrl ? (
-              <PlantModel
-                plant={plant}
-                modelUrl={modelUrl}
-                wireframe={controlsState.wireframe}
-                isolatedPart={controlsState.isolatedPart}
-                showLabels={controlsState.showLabels}
-                selectedPart={selectedPart}
-                onSelectPart={onSelectPart}
-                onAnchorsResolved={setAnchors}
-              />
-            ) : (
-              <ProceduralPlantViewer
-                plant={plant}
-                wireframe={controlsState.wireframe}
-                isolatedPart={controlsState.isolatedPart}
-                showLabels={controlsState.showLabels}
-                selectedPart={selectedPart}
-                onSelectPart={onSelectPart}
-                onAnchorsResolved={setAnchors}
-              />
-            )}
+            <ModelErrorBoundary
+              onError={() => {
+                setHasLoadError(true);
+                if (onProceduralActive) {
+                  onProceduralActive(true);
+                }
+              }}
+              fallback={
+                <ProceduralPlantViewer
+                  plant={plant}
+                  wireframe={controlsState.wireframe}
+                  isolatedPart={controlsState.isolatedPart}
+                  showLabels={controlsState.showLabels}
+                  selectedPart={selectedPart}
+                  onSelectPart={onSelectPart}
+                  onAnchorsResolved={setAnchors}
+                  onModelLoaded={(box) => setFraming(calculateBboxFraming(box, 45, 0.65))}
+                />
+              }
+            >
+              {!shouldUseProcedural && modelUrl ? (
+                <PlantModel
+                  plant={plant}
+                  modelUrl={modelUrl}
+                  wireframe={controlsState.wireframe}
+                  isolatedPart={controlsState.isolatedPart}
+                  showLabels={controlsState.showLabels}
+                  selectedPart={selectedPart}
+                  onSelectPart={onSelectPart}
+                  onAnchorsResolved={setAnchors}
+                  onModelLoaded={(box) => setFraming(calculateBboxFraming(box, 45, 0.65))}
+                />
+              ) : (
+                <ProceduralPlantViewer
+                  plant={plant}
+                  wireframe={controlsState.wireframe}
+                  isolatedPart={controlsState.isolatedPart}
+                  showLabels={controlsState.showLabels}
+                  selectedPart={selectedPart}
+                  onSelectPart={onSelectPart}
+                  onAnchorsResolved={setAnchors}
+                  onModelLoaded={(box) => setFraming(calculateBboxFraming(box, 45, 0.65))}
+                />
+              )}
+            </ModelErrorBoundary>
           </Suspense>
 
-          {/* Ground Contact Shadow Disc */}
+          {/* Soft Ground Disc fading smoothly to horizon */}
+          <SoftGround
+            showGrid={controlsState.showGroundGrid}
+            radius={Math.max(2.5, (framing?.plantSpreadM || 1) * 3.5)}
+          />
+
+          {/* Ground Contact Shadow */}
           <ContactShadows
             position={[0, 0, 0]}
             opacity={0.65}
-            scale={4.0}
+            scale={Math.max(3.0, (framing?.plantSpreadM || 1) * 3.0)}
             blur={2.0}
             far={1.5}
             color="#064e3b"
           />
 
-          {/* Optional Ground Grid Disc */}
-          {controlsState.showGroundGrid && (
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.005, 0]}>
-              <circleGeometry args={[1.8, 64]} />
-              <meshBasicMaterial color="#10b981" wireframe transparent opacity={0.25} />
-            </mesh>
-          )}
-
           {/* Optional 1.7m Human Scale Reference */}
           {controlsState.showScaleReference && (
-            <ScaleReference plantHeightM={plant.visual?.heightM || 1.2} />
+            <ScaleReference plantHeightM={plant.visual?.heightM || framing?.plantHeightM || 1.2} />
           )}
 
           {/* Orbit Controls & Smooth Lerp Target */}
@@ -327,6 +395,7 @@ export const PlantViewerCanvas = forwardRef<PlantViewerCanvasRef, PlantViewerCan
             controlsState={controlsState}
             onControlsChange={onControlsChange}
             targetPosition={targetAnchorPosition}
+            framing={framing}
             orbitRef={orbitRef}
           />
         </Canvas>

@@ -47,6 +47,48 @@ export interface ILastModelError {
   message: string;
 }
 
+export interface IViewerHotspot {
+  id?: string;
+  part: string;
+  label: string;
+  position: [number, number, number];
+  normal?: [number, number, number];
+  description?: string;
+  remedies?: string[];
+  cameraPreset?: string;
+}
+
+export interface IViewerStoryStep {
+  step: number;
+  title: string;
+  description: string;
+  targetPosition?: [number, number, number];
+  cameraPosition?: [number, number, number];
+  partFocus?: string;
+  durationMs?: number;
+}
+
+export interface IViewerModels {
+  lod0?: string;
+  lod1?: string;
+  lod2?: string;
+  foliageVariant?: string;
+  seasonalVariants?: {
+    spring?: string;
+    summer?: string;
+    autumn?: string;
+    winter?: string;
+  };
+}
+
+export interface IViewerDefaults {
+  lightingPreset?: string;
+  backgroundPreset?: string;
+  defaultView?: string;
+  initialPart?: string;
+  autoRotate?: boolean;
+}
+
 export interface IPlant extends Document {
   commonName: string;
   scientificName: string;
@@ -102,6 +144,10 @@ export interface IPlant extends Document {
   modelStatus?: ModelStatus;
   modelTransform?: IModelTransform;
   lastModelError?: ILastModelError;
+  hotspots?: IViewerHotspot[];
+  story?: IViewerStoryStep[];
+  models?: IViewerModels;
+  viewerDefaults?: IViewerDefaults;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -359,6 +405,47 @@ const PlantSchema = new Schema<IPlant>(
     lastModelError: {
       at: { type: Date },
       message: { type: String },
+    },
+    hotspots: [
+      {
+        part: { type: String, required: true },
+        label: { type: String, required: true },
+        position: { type: [Number], required: true },
+        normal: { type: [Number] },
+        description: { type: String },
+        remedies: [{ type: String }],
+        cameraPreset: { type: String },
+      },
+    ],
+    story: [
+      {
+        step: { type: Number, required: true },
+        title: { type: String, required: true },
+        description: { type: String, required: true },
+        targetPosition: { type: [Number] },
+        cameraPosition: { type: [Number] },
+        partFocus: { type: String },
+        durationMs: { type: Number },
+      },
+    ],
+    models: {
+      lod0: { type: String },
+      lod1: { type: String },
+      lod2: { type: String },
+      foliageVariant: { type: String },
+      seasonalVariants: {
+        spring: { type: String },
+        summer: { type: String },
+        autumn: { type: String },
+        winter: { type: String },
+      },
+    },
+    viewerDefaults: {
+      lightingPreset: { type: String, default: 'garden' },
+      backgroundPreset: { type: String, default: 'gradient' },
+      defaultView: { type: String, default: 'front' },
+      initialPart: { type: String },
+      autoRotate: { type: Boolean, default: true },
     },
   },
   { timestamps: true },

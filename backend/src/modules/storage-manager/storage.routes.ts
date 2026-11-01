@@ -31,6 +31,7 @@ router.post('/create-folder', storageController.createFolder);
 router.post('/presign-upload', storageController.presignUpload);
 router.get('/presign-download', storageController.presignDownload);
 router.post('/download-zip', storageController.downloadZip);
+router.post('/map-to-db', storageController.mapToDb);
 
 // ── Mutations ──
 router.post('/copy', storageController.copy);

@@ -326,7 +326,7 @@ describe('Garden Showcase & 3D Model Pipeline TDD Suite', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.modelStatus).toBe(ModelStatus.READY);
-      expect(res.body.data.modelUrl).toContain('/uploads/models/plants/ashwagandha-lod0.glb');
+      expect(res.body.data.modelUrl).toContain('/uploads/models/plants/ashwagandha.glb');
 
       spy.mockRestore();
     });

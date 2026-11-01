@@ -41,6 +41,12 @@ const updateMetadataSchema = z.object({
   customMetadata: z.record(z.string()).optional(),
 });
 
+const mapToDbSchema = z.object({
+  key: z.string().min(1),
+  targetSlug: z.string().optional(),
+  targetType: z.string().optional(),
+});
+
 export class StorageController {
   async list(req: Request, res: Response) {
     const prefix = (req.query.prefix as string) || '';
@@ -316,6 +322,23 @@ export class StorageController {
     });
 
     sendSuccess(res, { message: 'Trash emptied successfully', deletedCount });
+  }
+
+  async mapToDb(req: Request, res: Response) {
+    const { key, targetSlug, targetType } = mapToDbSchema.parse(req.body);
+
+    const result = await storageService.mapToDb(key, targetSlug, targetType);
+
+    await createAuditLog({
+      req,
+      userId: req.user!.sub,
+      action: 'STORAGE_MAP_TO_DB',
+      targetModel: 'Storage',
+      targetId: result._id ? result._id.toString() : undefined,
+      details: { key, targetSlug, targetType },
+    });
+
+    sendSuccess(res, result);
   }
 }
 

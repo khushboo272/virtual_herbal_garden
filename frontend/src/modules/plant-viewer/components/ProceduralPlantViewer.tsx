@@ -15,6 +15,7 @@ interface ProceduralPlantViewerProps {
   selectedPart?: string | null;
   onSelectPart: (part: string) => void;
   onAnchorsResolved?: (anchors: PartMeshAnchor[]) => void;
+  onModelLoaded?: (box: THREE.Box3) => void;
 }
 
 export const ProceduralPlantViewer: React.FC<ProceduralPlantViewerProps> = ({
@@ -25,6 +26,7 @@ export const ProceduralPlantViewer: React.FC<ProceduralPlantViewerProps> = ({
   selectedPart = null,
   onSelectPart,
   onAnchorsResolved,
+  onModelLoaded,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -77,7 +79,16 @@ export const ProceduralPlantViewer: React.FC<ProceduralPlantViewerProps> = ({
     if (onAnchorsResolved) {
       onAnchorsResolved(anchors);
     }
-  }, [anchors, onAnchorsResolved]);
+    if (onModelLoaded) {
+      const height = Math.max(0.4, showcasePlant.visual.heightM);
+      const width = Math.max(0.3, showcasePlant.visual.spreadM);
+      const box = new THREE.Box3(
+        new THREE.Vector3(-width / 2, 0, -width / 2),
+        new THREE.Vector3(width / 2, height, width / 2)
+      );
+      onModelLoaded(box);
+    }
+  }, [anchors, showcasePlant.visual, onAnchorsResolved, onModelLoaded]);
 
   // Handle wireframe on procedural meshes
   useEffect(() => {

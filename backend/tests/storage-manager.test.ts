@@ -259,5 +259,48 @@ describe('Storage Manager (R2) TDD Suite', () => {
       expect(Array.isArray(res.body.data.brokenLinks)).toBe(true);
       expect(Array.isArray(res.body.data.orphans)).toBe(true);
     });
+
+    it('maps uploaded storage item to database with stable link', async () => {
+      const plant = await Plant.create({
+        commonName: 'Holy Basil',
+        scientificName: 'Ocimum sanctum',
+        slug: 'tulsi',
+        family: 'Lamiaceae',
+        description: 'Sacred medicinal plant',
+        medicinalUses: ['Respiratory health'],
+        toxicityLevel: 'NONE',
+        regionNative: ['India'],
+        images: [],
+        isPublished: true,
+        createdBy: adminUser._id,
+      });
+
+      // 1. Map 3D Model
+      const modelRes = await request(app)
+        .post('/api/admin/storage/map-to-db')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          key: 'plants/models/tulsi.glb',
+        });
+
+      expect(modelRes.status).toBe(200);
+      expect(modelRes.body.success).toBe(true);
+      expect(modelRes.body.data.model3dUrl).toContain('plants/models/tulsi.glb');
+
+      // 2. Map Plant Image
+      const imageRes = await request(app)
+        .post('/api/admin/storage/map-to-db')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          key: 'plants/images/tulsi.webp',
+        });
+
+      expect(imageRes.status).toBe(200);
+      expect(imageRes.body.success).toBe(true);
+
+      const updatedPlant = await Plant.findById(plant._id);
+      expect(updatedPlant?.model3dUrl).toContain('plants/models/tulsi.glb');
+      expect(updatedPlant?.images[0].url).toContain('plants/images/tulsi.webp');
+    });
   });
 });

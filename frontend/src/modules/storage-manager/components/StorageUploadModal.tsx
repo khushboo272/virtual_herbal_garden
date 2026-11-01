@@ -54,7 +54,20 @@ export const StorageUploadModal: React.FC<StorageUploadModalProps> = ({
 
   // Smart Naming Mode
   const [useSmartNaming, setUseSmartNaming] = useState(false);
-  const [smartAssetType, setSmartAssetType] = useState<'plant_hero' | 'plant_gallery' | 'plant_glb' | 'plant_lod' | 'remedy_cover' | 'tour_cover'>('plant_hero');
+  const [smartAssetType, setSmartAssetType] = useState<
+    | 'plant_image'
+    | 'plant_hero'
+    | 'plant_gallery'
+    | 'plant_model'
+    | 'plant_glb'
+    | 'plant_lod'
+    | 'remedy_image'
+    | 'remedy_cover'
+    | 'tour_image'
+    | 'tour_cover'
+    | 'tour_audio'
+    | 'avatar'
+  >('plant_image');
   const [smartSlug, setSmartSlug] = useState('');
   const [linkToDatabase, setLinkToDatabase] = useState(true);
 
@@ -109,18 +122,26 @@ export const StorageUploadModal: React.FC<StorageUploadModalProps> = ({
   const computeSmartKey = (fileName: string): string => {
     const slug = smartSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-') || 'unnamed';
     switch (smartAssetType) {
+      case 'plant_image':
       case 'plant_hero':
-        return `plants/${slug}/hero.webp`;
+        return `plants/images/${slug}.webp`;
       case 'plant_gallery':
-        return `plants/${slug}/gallery/01.webp`;
+        return `plants/images/${slug}-gallery.webp`;
+      case 'plant_model':
       case 'plant_glb':
-        return `models/${slug}.glb`;
+        return `plants/models/${slug}.glb`;
       case 'plant_lod':
-        return `models/${slug}-lod.glb`;
+        return `plants/models/${slug}-lod.glb`;
+      case 'remedy_image':
       case 'remedy_cover':
-        return `remedies/${slug}/cover.webp`;
+        return `remedies/images/${slug}.webp`;
+      case 'tour_image':
       case 'tour_cover':
-        return `tours/${slug}/cover.webp`;
+        return `tours/images/${slug}.webp`;
+      case 'tour_audio':
+        return `tours/audios/${slug}.mp3`;
+      case 'avatar':
+        return `avatars/${slug}.webp`;
       default:
         return `${destinationFolder}${fileName}`;
     }
@@ -231,6 +252,16 @@ export const StorageUploadModal: React.FC<StorageUploadModalProps> = ({
           cacheControl: 'public, max-age=31536000, immutable',
         }).catch(() => null);
 
+        // Map stable link to MongoDB document
+        if (useSmartNaming && linkToDatabase && smartSlug.trim()) {
+          try {
+            await storageApi.mapToDb(key, smartSlug.trim(), smartAssetType);
+            toast.success(`Mapped to database with stable link`);
+          } catch (mapErr: any) {
+            console.warn('Could not auto-map to database:', mapErr);
+          }
+        }
+
         setQueue((prev) =>
           prev.map((q) => (q.id === item.id ? { ...q, status: 'completed', progress: 100 } : q))
         );
@@ -312,12 +343,14 @@ export const StorageUploadModal: React.FC<StorageUploadModalProps> = ({
                     onChange={(e) => setSmartAssetType(e.target.value as any)}
                     className="w-full p-2 rounded-lg border border-purple-200 dark:border-purple-800 bg-white dark:bg-slate-900 font-medium"
                   >
-                    <option value="plant_hero">Plant Hero Photo (plants/slug/hero.webp)</option>
-                    <option value="plant_gallery">Plant Gallery Photo (plants/slug/gallery/NN.webp)</option>
-                    <option value="plant_glb">Plant 3D GLB Model (models/slug.glb)</option>
-                    <option value="plant_lod">Plant LOD Model (models/slug-lod.glb)</option>
-                    <option value="remedy_cover">Remedy Cover (remedies/slug/cover.webp)</option>
-                    <option value="tour_cover">Tour Cover (tours/slug/cover.webp)</option>
+                    <option value="plant_image">Plant Photo (plants/images/slug.webp)</option>
+                    <option value="plant_model">Plant 3D GLB Model (plants/models/slug.glb)</option>
+                    <option value="plant_lod">Plant LOD Model (plants/models/slug-lod.glb)</option>
+                    <option value="plant_gallery">Plant Gallery Photo (plants/images/slug-gallery.webp)</option>
+                    <option value="remedy_image">Remedy Photo (remedies/images/slug.webp)</option>
+                    <option value="tour_image">Tour Cover (tours/images/slug.webp)</option>
+                    <option value="tour_audio">Tour Audio (tours/audios/slug.mp3)</option>
+                    <option value="avatar">User Avatar (avatars/username.webp)</option>
                   </select>
                 </div>
                 <div>

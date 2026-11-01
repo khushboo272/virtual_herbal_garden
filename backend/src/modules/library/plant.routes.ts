@@ -35,12 +35,25 @@ router.patch(
   requireRole(UserRole.BOTANIST),
   plantController.updatePlantRegistrationRequestStatus,
 );
+router.get('/:slug/viewer', plantController.getViewerConfig);
 // :slug accepts both slug strings and Mongo ObjectIds
 router.get('/:slug', authenticate(true), plantController.getBySlug);
 router.get('/:id/related', plantController.getRelated);
 router.get('/:id/reviews', plantController.getReviews);
 
 // ── Protected routes ───────────────────────────────────────────────────────
+router.put(
+  '/:id/viewer-config',
+  authenticate(),
+  requireRole(UserRole.BOTANIST),
+  plantController.updateViewerConfig,
+);
+router.patch(
+  '/:id/viewer-config',
+  authenticate(),
+  requireRole(UserRole.BOTANIST),
+  plantController.updateViewerConfig,
+);
 router.post(
   '/',
   authenticate(),

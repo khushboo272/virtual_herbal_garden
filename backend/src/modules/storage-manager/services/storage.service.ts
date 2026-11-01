@@ -9,6 +9,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Response } from 'express';
+import mongoose from 'mongoose';
 import { getR2Client, isR2Configured } from '../../../core/storage/r2Storage';
 import { env } from '../../../core/config/env';
 import { AppError } from '../../../core/errors/AppError';
@@ -597,8 +598,17 @@ export class StorageService {
     await archive.finalize();
   }
 
+  private dbRefCache = new Map<
+    string,
+    {
+      refs: Array<{ collection: string; id: string; name: string; field: string }>;
+      cachedAt: number;
+    }
+  >();
+  private readonly DB_REF_CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+
   /**
-   * Helper: Match storage keys against MongoDB models
+   * Helper: Match storage keys against MongoDB models with in-memory caching
    */
   private async batchFindDbReferences(
     keys: string[],
@@ -606,8 +616,24 @@ export class StorageService {
     const map = new Map<string, Array<{ collection: string; id: string; name: string; field: string }>>();
     if (keys.length === 0) return map;
 
-    // Build regex searches for each key
-    const patterns = keys.map((k) => new RegExp(k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+    const now = Date.now();
+    const uncachedKeys: string[] = [];
+
+    for (const k of keys) {
+      const cached = this.dbRefCache.get(k);
+      if (cached && now - cached.cachedAt < this.DB_REF_CACHE_TTL) {
+        map.set(k, cached.refs);
+      } else {
+        uncachedKeys.push(k);
+      }
+    }
+
+    if (uncachedKeys.length === 0) {
+      return map;
+    }
+
+    // Build regex searches for uncached keys
+    const patterns = uncachedKeys.map((k) => new RegExp(k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
 
     try {
       const [plants, remedies, tours] = await Promise.all([
@@ -634,7 +660,7 @@ export class StorageService {
           .lean(),
       ]);
 
-      for (const key of keys) {
+      for (const key of uncachedKeys) {
         const refs: Array<{ collection: string; id: string; name: string; field: string }> = [];
 
         for (const p of plants) {
@@ -664,13 +690,147 @@ export class StorageService {
           }
         }
 
+        this.dbRefCache.set(key, { refs, cachedAt: now });
         map.set(key, refs);
       }
     } catch {
-      // return empty map on database failure
+      // return map on database failure
     }
 
     return map;
+  }
+
+  /**
+   * Maps an uploaded storage key to its corresponding database record with a stable link
+   */
+  async mapToDb(
+    rawKey: string,
+    targetSlug?: string,
+    targetType?: string,
+  ): Promise<any> {
+    const key = normalizeKey(rawKey);
+    const publicUrl = this.getPublicUrl(key);
+    const parts = key.split('/');
+
+    let slug = targetSlug;
+    if (!slug) {
+      const fileName = parts[parts.length - 1];
+      slug = fileName
+        .replace(/\.[^/.]+$/, '')
+        .replace(/-(hero|gallery|lod\d*)$/i, '');
+    }
+
+    const slugVariants = [
+      slug,
+      slug.replace(/_/g, '-'),
+      slug.replace(/-/g, '_'),
+    ];
+
+    const isPlantModel =
+      targetType === 'plant_model' ||
+      (parts[0] === 'plants' && parts[1] === 'models') ||
+      parts[0] === 'models' ||
+      key.endsWith('.glb');
+
+    if (isPlantModel) {
+      const query: any = {
+        $or: [
+          { slug: { $in: slugVariants } },
+          ...(mongoose.Types.ObjectId.isValid(slug) ? [{ _id: slug }] : []),
+        ],
+        isDeleted: { $ne: true },
+      };
+
+      const plant = await Plant.findOne(query);
+      if (!plant) {
+        throw new AppError(`Plant with slug/id "${slug}" not found`, 404);
+      }
+
+      plant.model3dUrl = publicUrl;
+      plant.modelUrl = publicUrl;
+      (plant as any).modelStatus = 'READY';
+      await plant.save();
+
+      this.dbRefCache.clear();
+      return plant;
+    }
+
+    const isPlantImage =
+      targetType === 'plant_image' ||
+      (parts[0] === 'plants' && (parts[1] === 'images' || parts[1] === slug));
+
+    if (isPlantImage) {
+      const query: any = {
+        $or: [
+          { slug: { $in: slugVariants } },
+          ...(mongoose.Types.ObjectId.isValid(slug) ? [{ _id: slug }] : []),
+        ],
+        isDeleted: { $ne: true },
+      };
+
+      const plant = await Plant.findOne(query);
+      if (!plant) {
+        throw new AppError(`Plant with slug/id "${slug}" not found`, 404);
+      }
+
+      const alreadyHasImage = plant.images.some((img: any) => img.url === publicUrl);
+      if (!alreadyHasImage) {
+        plant.images.push({
+          url: publicUrl,
+          isPrimary: plant.images.length === 0,
+          type: 'main',
+        } as any);
+        await plant.save();
+      }
+
+      this.dbRefCache.clear();
+      return plant;
+    }
+
+    if (parts[0] === 'remedies' || targetType === 'remedy_image') {
+      const query: any = {
+        $or: [
+          { slug: { $in: slugVariants } },
+          ...(mongoose.Types.ObjectId.isValid(slug) ? [{ _id: slug }] : []),
+        ],
+        isDeleted: { $ne: true },
+      };
+
+      const remedy = await Remedy.findOne(query);
+      if (!remedy) {
+        throw new AppError(`Remedy with slug "${slug}" not found`, 404);
+      }
+
+      (remedy as any).imageUrl = publicUrl;
+      (remedy as any).image = publicUrl;
+      await remedy.save();
+
+      this.dbRefCache.clear();
+      return remedy;
+    }
+
+    if (parts[0] === 'tours' || targetType === 'tour_image' || targetType === 'tour_audio') {
+      const query: any = {
+        $or: [
+          { slug: { $in: slugVariants } },
+          ...(mongoose.Types.ObjectId.isValid(slug) ? [{ _id: slug }] : []),
+        ],
+        isDeleted: { $ne: true },
+      };
+
+      const tour = await Tour.findOne(query);
+      if (!tour) {
+        throw new AppError(`Tour with slug "${slug}" not found`, 404);
+      }
+
+      tour.coverImageUrl = publicUrl;
+      await tour.save();
+
+      this.dbRefCache.clear();
+      return tour;
+    }
+
+    return { key, publicUrl, mapped: false };
   }
 
   private guessMimeType(key: string): string {

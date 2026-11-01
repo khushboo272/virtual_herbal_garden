@@ -7,7 +7,6 @@ import { notificationService } from '../notifications/notification.service';
 import { NotificationType } from '../../types';
 import User from '../users/User.model';
 import PlantRegistrationRequest from './PlantRegistrationRequest.model';
-import crypto from 'crypto';
 import mongoose from 'mongoose';
 
 function buildPlantQuery(id: string) {
@@ -107,11 +106,23 @@ export class PlantController {
     const { assertCanModifyContent } = await import('../../core/policies/contentOwnership');
     assertCanModifyContent(plant, req.user!.sub, req.user!.role, 'upload');
 
+    const existingCount = (plant.images || []).length;
     const images = await Promise.all(
-      files.map(async (file) => {
+      files.map(async (file, idx) => {
         const mime = validateImageMagicBytes(file.buffer);
         if (!mime) throw new AppError('Invalid image format', 400, 'INVALID_FORMAT');
-        return storageService.uploadPlantImage(file.buffer, plant._id.toString(), crypto.randomUUID());
+
+        const plantNameKey =
+          existingCount === 0 && idx === 0
+            ? plant.slug
+            : `${plant.slug}-${existingCount + idx + 1}`;
+
+        const uploadRes = await storageService.uploadPlantImage(file.buffer, plant.slug, plantNameKey);
+        return {
+          url: uploadRes.url,
+          isPrimary: existingCount === 0 && idx === 0,
+          type: existingCount === 0 && idx === 0 ? 'main' : 'detail',
+        };
       }),
     );
 
@@ -165,7 +176,7 @@ export class PlantController {
         const { uploadToR2 } = await import('../../lib/r2Client');
         url = await uploadToR2(
           file.buffer,
-          `assets-for-r2/models/plants/${plant.slug}-lod0.glb`,
+          `plants/models/${plant.slug}.glb`,
           'model/gltf-binary',
         );
       } catch (r2Err) {
@@ -174,12 +185,13 @@ export class PlantController {
         const path = await import('path');
         const uploadDir = path.join(process.cwd(), 'uploads', 'models', 'plants');
         await fs.mkdir(uploadDir, { recursive: true });
-        const filePath = path.join(uploadDir, `${plant.slug}-lod0.glb`);
+        const filePath = path.join(uploadDir, `${plant.slug}.glb`);
         await fs.writeFile(filePath, file.buffer);
-        url = `/uploads/models/plants/${plant.slug}-lod0.glb`;
+        url = `/uploads/models/plants/${plant.slug}.glb`;
       }
 
       plant.modelUrl = url;
+      plant.model3dUrl = url;
       plant.modelVersion = Date.now();
       plant.modelStatus = ModelStatus.READY;
       plant.lastModelError = undefined;
@@ -245,7 +257,7 @@ export class PlantController {
         const { uploadToR2 } = await import('../../lib/r2Client');
         url = await uploadToR2(
           f1.buffer,
-          `assets-for-r2/models/plants/${plant.slug}-lod1.glb`,
+          `plants/models/${plant.slug}-lod1.glb`,
           'model/gltf-binary',
         );
       } catch {
@@ -269,7 +281,7 @@ export class PlantController {
         const { uploadToR2 } = await import('../../lib/r2Client');
         url = await uploadToR2(
           f2.buffer,
-          `assets-for-r2/models/plants/${plant.slug}-lod2.glb`,
+          `plants/models/${plant.slug}-lod2.glb`,
           'model/gltf-binary',
         );
       } catch {
@@ -571,6 +583,101 @@ export class PlantController {
     }
 
     sendSuccess(res, updated);
+  }
+
+  async getViewerConfig(req: Request, res: Response) {
+    const { slug } = req.params;
+    const Plant = (await import('./Plant.model')).default;
+    const query = mongoose.Types.ObjectId.isValid(slug)
+      ? { $or: [{ _id: slug }, { slug }] }
+      : { slug };
+
+    const plant = await Plant.findOne(query).lean();
+    if (!plant) {
+      throw new AppError('Plant not found', 404, 'NOT_FOUND');
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=60');
+
+    sendSuccess(res, {
+      _id: plant._id,
+      slug: plant.slug,
+      commonName: plant.commonName,
+      scientificName: plant.scientificName,
+      family: plant.family,
+      description: plant.description,
+      partsUsed: plant.partsUsed || [],
+      medicinalUses: plant.medicinalUses || [],
+      toxicityLevel: plant.toxicityLevel,
+      model3dUrl: plant.model3dUrl,
+      modelUrl: plant.modelUrl,
+      modelUrl_lod1: plant.modelUrl_lod1,
+      modelUrl_lod2: plant.modelUrl_lod2,
+      visual: plant.visual,
+      hotspots: plant.hotspots || [],
+      story: plant.story || [],
+      models: plant.models || {},
+      viewerDefaults: plant.viewerDefaults || {
+        lightingPreset: 'garden',
+        backgroundPreset: 'gradient',
+        defaultView: 'front',
+        autoRotate: true,
+      },
+    });
+  }
+
+  async updateViewerConfig(req: Request, res: Response) {
+    const { id } = req.params;
+    const { hotspots, story, models, viewerDefaults } = req.body || {};
+    const userId = (req.user as any)?.sub || (req.user as any)?._id;
+
+    const Plant = (await import('./Plant.model')).default;
+    const query = mongoose.Types.ObjectId.isValid(id)
+      ? { $or: [{ _id: id }, { slug: id }] }
+      : { slug: id };
+
+    const plant = await Plant.findOne(query);
+    if (!plant) {
+      throw new AppError('Plant not found', 404, 'NOT_FOUND');
+    }
+
+    if (hotspots !== undefined) plant.hotspots = hotspots;
+    if (story !== undefined) plant.story = story;
+    if (models !== undefined) plant.models = models;
+    if (viewerDefaults !== undefined) {
+      plant.viewerDefaults = {
+        ...plant.viewerDefaults,
+        ...viewerDefaults,
+      };
+    }
+
+    await plant.save();
+
+    try {
+      const AuditLog = (await import('../admin/AuditLog.model')).default;
+      await AuditLog.create({
+        action: 'UPDATE',
+        entity: 'PlantViewerConfig',
+        entityId: plant._id,
+        performedBy: userId,
+        details: {
+          plantSlug: plant.slug,
+          hotspotsCount: plant.hotspots?.length || 0,
+          storyStepsCount: plant.story?.length || 0,
+        },
+      });
+    } catch {
+      // non-blocking
+    }
+
+    sendSuccess(res, {
+      _id: plant._id,
+      slug: plant.slug,
+      hotspots: plant.hotspots,
+      story: plant.story,
+      models: plant.models,
+      viewerDefaults: plant.viewerDefaults,
+    });
   }
 }
 

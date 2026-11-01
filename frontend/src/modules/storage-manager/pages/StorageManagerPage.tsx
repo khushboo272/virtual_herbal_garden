@@ -100,8 +100,11 @@ export const StorageManagerPage: React.FC = () => {
 
   useEffect(() => {
     loadObjects(currentPrefix);
+  }, [currentPrefix, loadObjects]);
+
+  useEffect(() => {
     loadBucketStats();
-  }, [currentPrefix, loadObjects, loadBucketStats]);
+  }, [loadBucketStats]);
 
   // Navigate into a folder
   const handleSelectPrefix = (prefix: string) => {
@@ -126,10 +129,13 @@ export const StorageManagerPage: React.FC = () => {
   };
 
   const handleSelectAll = () => {
-    if (selectedKeys.length === items.length) {
+    if (displayItems.length === 0) return;
+    const allKeys = displayItems.map((it) => it.key);
+    const areAllSelected = allKeys.length > 0 && allKeys.every((k) => selectedKeys.includes(k));
+    if (areAllSelected) {
       setSelectedKeys([]);
     } else {
-      setSelectedKeys(items.map((it) => it.key));
+      setSelectedKeys(allKeys);
     }
   };
 
@@ -345,11 +351,14 @@ export const StorageManagerPage: React.FC = () => {
         {/* Left Tree & Usage Sidebar (Visible in Files & Tools modes) */}
         <StorageTree
           currentPrefix={currentPrefix}
+          folders={folders}
           onSelectPrefix={handleSelectPrefix}
           stats={bucketStats}
           onRefreshStats={() => loadBucketStats(true)}
           isSuperAdmin={isSuperAdmin}
           formatBytes={formatBytes}
+          activeView={activeTab === 'files' ? 'browser' : activeTab}
+          onChangeView={(view) => setActiveTab(view === 'browser' ? 'files' : view)}
         />
 
         {/* Center Content Pane */}
@@ -378,6 +387,8 @@ export const StorageManagerPage: React.FC = () => {
                 onCreateFolderClick={handleCreateFolder}
                 onRefreshClick={() => loadObjects(currentPrefix)}
                 selectedCount={selectedKeys.length}
+                totalItemsCount={displayItems.length}
+                onToggleSelectAll={handleSelectAll}
                 onBulkDeleteClick={handleBulkDelete}
                 onBulkDownloadClick={handleBulkDownload}
               />

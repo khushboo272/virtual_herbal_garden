@@ -129,6 +129,7 @@ describe('Frontend Storage Manager Module Tests', () => {
       const handleSearch = vi.fn();
       const handleTypeFilter = vi.fn();
       const handleUpload = vi.fn();
+      const handleToggleSelectAll = vi.fn();
 
       render(
         <StorageToolbar
@@ -149,6 +150,8 @@ describe('Frontend Storage Manager Module Tests', () => {
           onCreateFolderClick={vi.fn()}
           onRefreshClick={vi.fn()}
           selectedCount={0}
+          totalItemsCount={3}
+          onToggleSelectAll={handleToggleSelectAll}
           onBulkDeleteClick={vi.fn()}
           onBulkDownloadClick={vi.fn()}
         />
@@ -159,6 +162,11 @@ describe('Frontend Storage Manager Module Tests', () => {
 
       fireEvent.click(screen.getByText('Upload'));
       expect(handleUpload).toHaveBeenCalled();
+
+      const selectAllBtn = screen.getByTitle('Select all');
+      expect(selectAllBtn).toBeInTheDocument();
+      fireEvent.click(selectAllBtn);
+      expect(handleToggleSelectAll).toHaveBeenCalled();
     });
   });
 
@@ -190,14 +198,27 @@ describe('Frontend Storage Manager Module Tests', () => {
 
     it('renders storage item rows in table list mode and supports multi-select', () => {
       const handleSelectKey = vi.fn();
+      const handleSelectAll = vi.fn();
+      const handleOpenFolder = vi.fn();
+
+      const mockFolderItem: IStorageItem = {
+        key: 'plants/',
+        name: 'plants',
+        size: 0,
+        lastModified: new Date('2026-11-01T10:00:00Z'),
+        contentType: 'directory',
+        publicUrl: '',
+        isFolder: true,
+        dbUsageCount: 0,
+      };
 
       render(
         <StorageItemList
-          items={[mockItem]}
+          items={[mockFolderItem, mockItem]}
           selectedKeys={['plants/tulsi/hero.webp']}
           onSelectKey={handleSelectKey}
-          onSelectAll={vi.fn()}
-          onOpenFolder={vi.fn()}
+          onSelectAll={handleSelectAll}
+          onOpenFolder={handleOpenFolder}
           onOpenPreview={vi.fn()}
           onDelete={vi.fn()}
           onDownload={vi.fn()}
@@ -207,9 +228,19 @@ describe('Frontend Storage Manager Module Tests', () => {
       );
 
       expect(screen.getByText('hero.webp')).toBeInTheDocument();
+      expect(screen.getByText('plants')).toBeInTheDocument();
       expect(screen.getByText('1 link')).toBeInTheDocument();
       const checkbox = screen.getByLabelText('Select hero.webp') as HTMLInputElement;
       expect(checkbox.checked).toBe(true);
+
+      // Select all header checkbox
+      const headerCheckbox = screen.getByLabelText('Select all files in folder');
+      fireEvent.click(headerCheckbox);
+      expect(handleSelectAll).toHaveBeenCalled();
+
+      // Folder single click navigation
+      fireEvent.click(screen.getByText('plants'));
+      expect(handleOpenFolder).toHaveBeenCalledWith('plants/');
     });
   });
 

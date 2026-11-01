@@ -134,6 +134,19 @@ export const storageApi = {
     return response.blob();
   },
 
+  mapToDb: async (
+    key: string,
+    targetSlug?: string,
+    targetType?: string
+  ): Promise<any> => {
+    const res = await api.post('/admin/storage/map-to-db', {
+      key,
+      targetSlug,
+      targetType,
+    });
+    return (res as any)?.data || res;
+  },
+
   syncCheck: async (): Promise<ISyncCheckResult> => {
     const res = await api.get<ISyncCheckResult>('/admin/storage/sync-check');
     return (res as any)?.data || res;

@@ -113,10 +113,30 @@ export const StorageItemList: React.FC<StorageItemListProps> = ({
                   />
                 </td>
                 <td className="p-3 font-medium flex items-center gap-2">
-                  <div className="shrink-0">{getFileIcon(item)}</div>
+                  <div
+                    className={`shrink-0 ${item.isFolder ? 'cursor-pointer hover:scale-110 transition-transform' : ''}`}
+                    onClick={(e) => {
+                      if (item.isFolder) {
+                        e.stopPropagation();
+                        onOpenFolder(item.key);
+                      }
+                    }}
+                  >
+                    {getFileIcon(item)}
+                  </div>
                   <span
-                    className="truncate max-w-[280px] sm:max-w-md font-medium text-slate-800 dark:text-slate-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400"
+                    className={`truncate max-w-[280px] sm:max-w-md font-medium text-slate-800 dark:text-slate-100 ${
+                      item.isFolder
+                        ? 'cursor-pointer hover:underline hover:text-emerald-700 dark:hover:text-emerald-400'
+                        : 'group-hover:text-emerald-700 dark:group-hover:text-emerald-400'
+                    }`}
                     title={item.name}
+                    onClick={(e) => {
+                      if (item.isFolder) {
+                        e.stopPropagation();
+                        onOpenFolder(item.key);
+                      }
+                    }}
                   >
                     {item.name}
                   </span>
